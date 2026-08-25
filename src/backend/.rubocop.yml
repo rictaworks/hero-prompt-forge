@@ -61,3 +61,11 @@ RSpec/ExampleLength:
 RSpec/DescribeClass:
   Exclude:
     - "spec/config/**/*"
+
+# 外部サービスとのやり取りは、要求の組み立て・送信・応答の検証・変換で
+# 手続きが増えます。無理に分割すると呼び出しの流れが追えなくなるため、
+# 外部サービスの窓口となるクラスに限って上限を緩めます。
+Metrics/ClassLength:
+  Exclude:
+    - "app/services/auth/*.rb"
+    - "app/services/follower_gate_client.rb"
