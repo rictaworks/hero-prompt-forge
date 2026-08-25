@@ -29,10 +29,17 @@ SAFE_BRANCH="$(printf '%s' "$BRANCH" | tr '/' '-')"
 RECORD_DIR="review-records/security-review"
 RECORD="$RECORD_DIR/${SAFE_BRANCH}.md"
 
-STAGED_DIFF="$(git diff --cached -- . ":(exclude)review-records/")"
-if [ -z "$STAGED_DIFF" ]; then
+if [ -z "$(git diff --cached --name-only)" ]; then
   echo "ステージされた変更がありません。" >&2
   exit 2
+fi
+
+# 指紋は review-records/ を除いた差分から作ります。記録自身が指紋を変えると、
+# 記録を書いた瞬間に指紋がずれて永久に通らなくなるためです。
+STAGED_DIFF="$(git diff --cached -- . ":(exclude)review-records/")"
+if [ -z "$STAGED_DIFF" ]; then
+  # 記録だけのコミットです。検査すべきコードの変更が無いため、そのまま通します。
+  exit 0
 fi
 FINGERPRINT="$(printf '%s' "$STAGED_DIFF" | sha256sum | cut -c1-16)"
 
