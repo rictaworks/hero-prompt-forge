@@ -10,9 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "projects", force: :cascade do |t|
+    t.jsonb "brand_settings", default: {}, null: false, comment: "トーン・カラー等"
+    t.datetime "created_at", null: false
+    t.string "industry", null: false, comment: "業種"
+    t.string "name", comment: "サイト名（任意）"
+    t.string "style_family", null: false, comment: "スタイル系統"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "created_at"], name: "index_projects_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_projects_on_user_id"
+  end
 
   create_table "rule_dictionaries", force: :cascade do |t|
     t.jsonb "anti_ai_rules", default: {}, null: false, comment: "クリシェ排除規則"
@@ -210,6 +222,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150000) do
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
+  add_foreign_key "projects", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
