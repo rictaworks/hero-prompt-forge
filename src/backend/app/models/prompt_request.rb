@@ -39,6 +39,7 @@ class PromptRequest < ApplicationRecord
 
   belongs_to :project
   has_one :user, through: :project
+  has_many :prompt_outputs, dependent: :restrict_with_exception
 
   validates :status, inclusion: { in: STATUSES }
   validates :target_model, presence: true, inclusion: { in: TARGET_MODELS }
