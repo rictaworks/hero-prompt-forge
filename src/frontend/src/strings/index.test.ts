@@ -16,7 +16,12 @@ describe("strings", () => {
   it("文の文言はすべてですます調で終わります", () => {
     // 画面の項目名（ボタン・見出しの語）は文ではないため、対象にしません。
     // 対象から外す場所は、ここに明示して増減を追えるようにします。
-    const LABEL_PREFIXES = ["app.title", "app.wordmark", "nav."];
+    const LABEL_PREFIXES = [
+      "app.title",
+      "app.wordmark",
+      "nav.",
+      "errors.unexpected.traceLabel",
+    ];
 
     const collect = (value: unknown, path: string): [string, string][] =>
       typeof value === "string"

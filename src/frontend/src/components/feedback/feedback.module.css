@@ -1,0 +1,57 @@
+/* 状態を伝える帯です。
+   値は app-ui/degraded.html の3種類の帯と 1:1 で対応させています。 */
+
+.banner {
+  padding: 20px 24px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 2px;
+  border: 1px solid;
+}
+
+.icon {
+  font-size: 15px;
+  padding-top: 2px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.text {
+  font-size: 12.5px;
+  line-height: 1.85;
+  margin: 0;
+}
+
+.nextAction {
+  font-size: 12.5px;
+  line-height: 1.85;
+  margin: 8px 0 0;
+  color: #e0e0e0;
+}
+
+/* 上限に達したことを伝える帯です。 */
+.notice { border-color: rgba(201, 168, 76, .4); }
+.notice .icon { color: #c9a84c; }
+.notice .text { color: #999; }
+
+/* 縮退したことを伝える帯です。 */
+.degraded {
+  border-color: #c0392b;
+  background: rgba(192, 57, 43, .15);
+}
+.degraded .icon { color: #c0392b; }
+.degraded .text { color: #e0e0e0; }
+
+/* 受け付けなかったことを伝える帯です。 */
+.rejected { border-color: rgba(255, 255, 255, .12); }
+.rejected .icon { color: #c0392b; }
+.rejected .text { color: #999; }
