@@ -5,9 +5,10 @@ services:
   db:
     image: postgres:16-bookworm
     environment:
-      POSTGRES_USER: hero
-      POSTGRES_PASSWORD: hero_development_only
-      POSTGRES_DB: hero_prompt_forge_development
+      # 値は .env から読みます。未設定なら起動時に失敗します（既定値を持たせません）。
+      POSTGRES_USER: ${POSTGRES_USER:?.env に POSTGRES_USER を設定してください}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env に POSTGRES_PASSWORD を設定してください}
+      POSTGRES_DB: ${POSTGRES_DB:?.env に POSTGRES_DB を設定してください}
       TZ: Asia/Tokyo
       PGTZ: Asia/Tokyo
     volumes:
@@ -34,9 +35,11 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Tokyo
-      # 開発用の接続先です。本番の値はここに書きません。
-      DATABASE_URL: postgres://hero:hero_development_only@db:5432/hero_prompt_forge_development
-      TEST_DATABASE_URL: postgres://hero:hero_development_only@db:5432/hero_prompt_forge_test
+      # 値は .env から読みます。ソースに接続情報を書きません。
+      APP_ENV: ${APP_ENV:?.env に APP_ENV を設定してください}
+      DATABASE_URL: ${DATABASE_URL:?.env に DATABASE_URL を設定してください}
+      TEST_DATABASE_URL: ${TEST_DATABASE_URL:?.env に TEST_DATABASE_URL を設定してください}
+      NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:?.env に NEXT_PUBLIC_APP_ENV を設定してください}
     volumes:
       - .:/workspace
       - bundle:/bundle
