@@ -4,7 +4,9 @@
   "description": "開発用の道具置き場です。アプリケーションの実装は src/ にあります。",
   "scripts": {
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:hardcode": "node --test test/hardcode/*.test.mjs",
+    "check:hardcode": "node test/hardcode/check-hardcoded-strings.mjs ."
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.16.0",
