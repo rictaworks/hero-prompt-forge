@@ -1,4 +1,4 @@
-import { MissingStringError, text } from "@/strings";
+import { MissingStringError, strings, text } from "@/strings";
 
 describe("strings", () => {
   it("文言を取り出せます", () => {
@@ -13,26 +13,30 @@ describe("strings", () => {
     expect(() => text("errors.nothing.message")).toThrow(MissingStringError);
   });
 
-  it("日本語の文言はすべてですます調で終わります", () => {
-    const collect = (value: unknown): string[] =>
+  it("文の文言はすべてですます調で終わります", () => {
+    // 画面の項目名（ボタン・見出しの語）は文ではないため、対象にしません。
+    // 対象から外す場所は、ここに明示して増減を追えるようにします。
+    const LABEL_PREFIXES = ["app.title", "app.wordmark", "nav."];
+
+    const collect = (value: unknown, path: string): [string, string][] =>
       typeof value === "string"
-        ? [value]
+        ? [[path, value]]
         : typeof value === "object" && value !== null
-          ? Object.values(value).flatMap(collect)
+          ? Object.entries(value).flatMap(([key, child]) =>
+              collect(child, path ? `${path}.${key}` : key),
+            )
           : [];
 
-    const all = collect(
-      // 文言の一覧をたどるため、モジュール全体を対象にします。
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require("@/strings/ja").strings,
+    const all = collect(strings, "");
+    const sentences = all.filter(
+      ([path, value]) =>
+        /[぀-ゟ゠-ヿ一-鿿]/.test(value) &&
+        !LABEL_PREFIXES.some((prefix) => path.startsWith(prefix)),
     );
 
-    // 製品名など日本語を含まない値は文ではないため、対象にしません。
-    const sentences = all.filter((value) => /[぀-ゟ゠-ヿ一-鿿]/.test(value));
-
     expect(sentences.length).toBeGreaterThan(0);
-    for (const value of sentences) {
-      expect(value.endsWith("。")).toBe(true);
+    for (const [path, value] of sentences) {
+      expect([path, value.endsWith("。")]).toEqual([path, true]);
     }
   });
 });

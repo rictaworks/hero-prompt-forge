@@ -1,0 +1,101 @@
+/* アプリ内画面の上部バーです。
+   値は app-ui/HPFAppBar.dc.html と 1:1 で対応させています。 */
+
+.appBar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px 32px;
+  padding: 8px 6%;
+  background: rgba(10, 10, 10, .92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  flex-wrap: wrap;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 24px 40px;
+  flex-wrap: wrap;
+}
+
+.nav {
+  display: flex;
+  gap: 30px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  min-height: 48px;
+  padding-bottom: 4px;
+  text-decoration: none;
+}
+
+.navEn {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #ccc;
+}
+
+.navJa {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: #666;
+  margin-top: 3px;
+}
+
+/* 現在地にだけ引く下線です。 */
+.navItemActive::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #c0392b;
+}
+
+/* 未実装の画面は導線を張らず、同じ体裁のまま淡く落とします。 */
+.navItemPending {
+  opacity: .4;
+  cursor: default;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.plan {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: #c9a84c;
+  border: 1px solid rgba(201, 168, 76, .4);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.user {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #888;
+}
+
+@media (max-width: 768px) {
+  .appBar { padding: 8px 5%; }
+}

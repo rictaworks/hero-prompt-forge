@@ -7,8 +7,15 @@
 export const strings = {
   app: {
     title: "hero-prompt-forge",
+    wordmark: "Veyra Dragon",
     description:
       "ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。",
+  },
+  nav: {
+    projects: { en: "Projects", ja: "プロジェクト" },
+    presets: { en: "Presets", ja: "プリセット" },
+    admin: { en: "Admin", ja: "管理" },
+    newRequest: { en: "New Request", ja: "新規生成", action: "新規生成" },
   },
   errors: {
     common: {
