@@ -10,9 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "evaluation_notes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "memo", comment: "所感"
+    t.bigint "prompt_output_id", null: false
+    t.integer "rating", comment: "5段階の評価。未評価は空です"
+    t.datetime "updated_at", null: false
+    t.index ["prompt_output_id"], name: "index_evaluation_notes_on_prompt_output_id", unique: true
+  end
 
   create_table "presets", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -261,6 +270,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_190000) do
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
+  add_foreign_key "evaluation_notes", "prompt_outputs"
   add_foreign_key "presets", "users"
   add_foreign_key "projects", "users"
   add_foreign_key "prompt_outputs", "prompt_requests"

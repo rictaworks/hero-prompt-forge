@@ -12,6 +12,7 @@ class PromptOutput < ApplicationRecord
   VARIATION_COUNT = 3
 
   belongs_to :prompt_request
+  has_one :evaluation_note, dependent: :restrict_with_exception
 
   validates :variation_no, presence: true,
                            inclusion: { in: 1..VARIATION_COUNT },
