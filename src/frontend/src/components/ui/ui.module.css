@@ -1,0 +1,292 @@
+/* デザインシステムの部品の体裁です。
+   値は app-ui/_ds/_ds_bundle.js の実装と 1:1 で対応させています。 */
+
+/* ── Logo ─────────────────────────────────────────────────── */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-xl);
+  color: var(--gold);
+  text-decoration: none;
+  transition: color var(--dur-fast);
+}
+.logo:hover { color: var(--gold-light); }
+
+.logoDisc {
+  width: var(--logo-disc);
+  height: var(--logo-disc);
+  background: var(--brand-orb);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.logoSmall { font-size: 1rem; }
+.logoSmall .logoDisc { width: 28px; height: 28px; font-size: .85rem; }
+
+/* ── Button ───────────────────────────────────────────────── */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  letter-spacing: var(--ls-button);
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.outline {
+  padding: 14px 28px;
+  border: var(--border-cta);
+  background: transparent;
+  color: var(--gold);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border-radius: var(--radius-none);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.outline:hover:not(:disabled) { background: var(--gold); color: #000; }
+
+.solid {
+  padding: 8px 22px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border-radius: var(--radius-button);
+  transition: background var(--dur-fast);
+}
+.solid:hover:not(:disabled) { background: var(--red-bright); color: #fff; }
+
+.submit {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: var(--fs-base-2);
+  font-weight: 700;
+  border-radius: var(--radius-none);
+  transition: background var(--dur-fast);
+}
+.submit:hover:not(:disabled) { background: var(--red-bright); color: #fff; }
+
+.fullWidth { width: 100%; }
+
+.button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── SectionHeading ───────────────────────────────────────── */
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: var(--ls-eyebrow);
+  color: var(--red);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.headingTitle {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: var(--lh-title);
+  margin-bottom: 20px;
+}
+.sizeDefault { font-size: var(--fs-title); }
+.sizeSm { font-size: var(--fs-title-sm); }
+.sizeContact { font-size: clamp(1.8rem, 3vw, 2.4rem); }
+.sizeBand { font-size: var(--fs-title-band); }
+
+.divider {
+  width: var(--divider-w);
+  height: var(--divider-h);
+  background: var(--red);
+  margin: 20px 0;
+}
+.dividerCenter { margin: 20px auto; }
+
+.headingBody {
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+  line-height: var(--lh-loose);
+}
+
+.alignCenter { text-align: center; }
+
+/* ── StrengthCard ─────────────────────────────────────────── */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 36px 28px;
+  transition: var(--transition-card);
+}
+.card:hover {
+  border-color: var(--red);
+  transform: var(--lift-hover);
+}
+
+.cardIcon {
+  width: var(--icon-disc);
+  height: var(--icon-disc);
+  background: var(--tint-red-15);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--red);
+  margin-bottom: 20px;
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 12px;
+}
+
+.cardBody {
+  font-size: var(--fs-sm-2);
+  color: var(--grey-777);
+  line-height: var(--lh-relaxed);
+}
+
+/* ── ProcessStep ──────────────────────────────────────────── */
+.step {
+  display: grid;
+  grid-template-columns: 90px 64px 1fr;
+  align-items: stretch;
+  padding: 24px 0;
+  border-bottom: var(--border-hairline);
+  position: relative;
+}
+
+.stepLabel {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: var(--ls-step);
+  color: var(--red);
+  padding-top: 4px;
+}
+
+.stepNumber {
+  display: block;
+  font-size: var(--fs-2xl);
+  font-weight: 900;
+  color: var(--text-heading);
+  letter-spacing: 0;
+}
+
+.stepRail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.stepRail::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.stepDisc {
+  width: var(--step-disc);
+  height: var(--step-disc);
+  background: var(--red);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+.stepContent { padding-left: 24px; }
+
+.stepTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 6px;
+}
+
+.stepBody {
+  font-size: var(--fs-sm-3);
+  color: var(--grey-777);
+  line-height: var(--lh-relaxed);
+}
+
+/* ── FaqItem ──────────────────────────────────────────────── */
+.faqItem { border-bottom: var(--border-hairline); }
+
+.faqQuestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  color: var(--grey-ccc);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  transition: var(--transition-color);
+  user-select: none;
+}
+.faqQuestion:hover { color: #fff; }
+
+.faqChevron {
+  color: var(--red);
+  font-size: var(--fs-sm);
+  flex: 0 0 auto;
+  transition: transform var(--dur-med);
+}
+.faqQuestion[aria-expanded="true"] .faqChevron { transform: rotate(180deg); }
+
+.faqAnswer {
+  max-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  transition: max-height var(--dur-slow) var(--ease), padding var(--dur-med);
+}
+.faqAnswerOpen {
+  max-height: 200px;
+  padding-bottom: 18px;
+}
+.faqAnswer p {
+  font-size: var(--fs-sm-4);
+  color: var(--text-muted);
+  line-height: var(--lh-relaxed);
+}
+
+/* 狭い画面での最小限の保護です。 */
+@media (max-width: 768px) {
+  .step { grid-template-columns: 72px 48px 1fr; }
+  .stepContent { padding-left: 16px; }
+}
