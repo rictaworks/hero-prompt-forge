@@ -69,3 +69,9 @@ Metrics/ClassLength:
   Exclude:
     - "app/services/auth/*.rb"
     - "app/services/follower_gate_client.rb"
+
+# 移行は表の定義をそのまま並べるため行数が伸びます。
+# 分割すると、どの表がどう作られるのかが追えなくなります。
+Metrics/MethodLength:
+  Exclude:
+    - "db/migrate/*.rb"

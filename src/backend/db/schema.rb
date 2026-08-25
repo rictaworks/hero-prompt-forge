@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_170000) do
     t.bigint "user_id", null: false
     t.index ["user_id", "created_at"], name: "index_projects_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_projects_on_user_id"
+  end
+
+  create_table "prompt_requests", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "degraded", default: false, null: false, comment: "縮退モードで生成したか"
+    t.string "dictionary_version", comment: "適用した規則辞書の版"
+    t.jsonb "inputs", default: {}, null: false, comment: "正規化済み入力"
+    t.bigint "project_id", null: false
+    t.text "rejection_reason", comment: "差し戻した理由"
+    t.string "status", default: "draft", null: false, comment: "状態遷移図を参照"
+    t.string "target_model", null: false, comment: "生成モデル"
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "created_at"], name: "index_prompt_requests_on_project_id_and_created_at"
+    t.index ["project_id"], name: "index_prompt_requests_on_project_id"
+    t.index ["status"], name: "index_prompt_requests_on_status"
   end
 
   create_table "rule_dictionaries", force: :cascade do |t|
@@ -234,6 +249,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_170000) do
 
   add_foreign_key "presets", "users"
   add_foreign_key "projects", "users"
+  add_foreign_key "prompt_requests", "projects"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
