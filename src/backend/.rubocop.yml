@@ -51,3 +51,8 @@ Style/AsciiComments:
 # 分割すると同じ準備を二度書くことになり、かえって読みにくくなるためです。
 RSpec/MultipleExpectations:
   Max: 4
+
+# 期待する構造をそのまま書く例では行数が伸びます。
+# 構造を分割して書くと、かえって何を期待しているのかが読めなくなるため許します。
+RSpec/ExampleLength:
+  Max: 12
