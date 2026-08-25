@@ -37,6 +37,11 @@ export const strings = {
       message: "入力の内容に誤りがあります。",
       nextAction: "赤く示された項目を直してから、もう一度お試しください。",
     },
+    unexpected: {
+      message: "想定していない問題が起きました。",
+      nextAction: "時間をおいて、もう一度お試しください。",
+      traceLabel: "参照番号",
+    },
     serviceUnavailable: {
       message: "ただいま処理を受け付けられません。",
       nextAction: "時間をおいて、もう一度お試しください。",
