@@ -36,6 +36,11 @@ begin
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
+require 'webmock/rspec'
+
+# テストから外部へ通信しません。差し替えていない通信は失敗させます。
+WebMock.disable_net_connect!(allow_localhost: false)
+
 RSpec.configure do |config|
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_paths = [
