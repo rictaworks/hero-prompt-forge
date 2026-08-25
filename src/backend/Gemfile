@@ -48,4 +48,7 @@ group :development, :test do
   gem 'rubocop', require: false
   gem 'rubocop-rails', require: false
   gem 'rubocop-rspec', require: false
+
+  # 外部への通信をテストで差し替えます。
+  gem 'webmock', require: false
 end
