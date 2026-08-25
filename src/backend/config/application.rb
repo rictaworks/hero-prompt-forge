@@ -37,6 +37,10 @@ module Backend
     # 未翻訳のまま英語の識別子が画面へ出ても気づけないためです。
     config.i18n.raise_on_missing_translations = true
 
+    # API モードでは、クッキーを扱う仕組みが既定で外れています。
+    # ログイン状態の受け渡しに署名付きクッキーを使うため、明示的に組み込みます。
+    config.middleware.use ActionDispatch::Cookies
+
     # 時刻は JST です。
     config.time_zone = 'Asia/Tokyo'
     config.active_record.default_timezone = :utc
