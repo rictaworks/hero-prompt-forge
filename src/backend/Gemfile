@@ -40,3 +40,8 @@ group :development, :test do
   # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)
   gem "bundler-audit", require: false
 end
+
+group :development, :test do
+  # テストは RSpec で書きます。
+  gem "rspec-rails", "~> 8.0"
+end
