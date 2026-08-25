@@ -10,9 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "presets", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "input_conditions", default: {}, null: false, comment: "入力条件の組み合わせ"
+    t.string "name", null: false, comment: "プリセット名"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "name"], name: "index_presets_on_user_id_and_name", unique: true
+    t.index ["user_id"], name: "index_presets_on_user_id"
+  end
 
   create_table "projects", force: :cascade do |t|
     t.jsonb "brand_settings", default: {}, null: false, comment: "トーン・カラー等"
@@ -222,6 +232,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
+  add_foreign_key "presets", "users"
   add_foreign_key "projects", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
