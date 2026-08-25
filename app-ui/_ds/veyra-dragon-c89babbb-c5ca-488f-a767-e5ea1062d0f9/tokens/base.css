@@ -1,0 +1,23 @@
+/* ─── Veyra Dragon · Base layer ──────────────────────────────
+   Mirrors the source template's global reset and body defaults. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--surface-page);
+  color: var(--text-body);
+  font-family: var(--font-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--text-body); text-decoration: none; transition: var(--transition-color); }
+a:hover { color: var(--accent-secondary); }
+
+::selection { background: var(--accent-primary); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/colors.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/typography.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/effects.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/base.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/_ds_bundle.js"></script>
+<style>
+  body { margin:0; background:#0a0a0a; }
+  a { color:#c9a84c; text-decoration:none; }
+  a:hover { color:#e6c96a; }
+</style>
+</helmet>
+<div style="background:#0a0a0a;font-family:var(--font-body);min-height:100vh">
+
+  <div style="position:sticky;top:0;z-index:100;height:64px;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 6%;background:rgba(10,10,10,.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap">
+    <x-import component-from-global-scope="VeyraDragon_c89bab.Logo" href="Landing.dc.html" hint-size="190px,36px"></x-import>
+    <div style="display:flex;align-items:center;gap:30px">
+      <a href="#features" style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#999;text-decoration:none">Features</a>
+      <a href="#process" style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#999;text-decoration:none">Process</a>
+      <a href="#faq" style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#999;text-decoration:none">FAQ</a>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.Button" variant="solid" href="Projects.dc.html" hint-size="150px,38px">Xでログイン</x-import>
+    </div>
+  </div>
+
+  <div style="position:relative;min-height:640px;display:flex;align-items:center;overflow:hidden">
+    <img src="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/assets/hero_background.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.45) saturate(1.3)">
+    <div style="position:absolute;inset:0;background:linear-gradient(to right, rgba(10,10,10,.94) 0%, rgba(10,10,10,.6) 55%, rgba(10,10,10,0) 80%)"></div>
+    <div style="position:relative;max-width:560px;margin-left:6%;padding:100px 0">
+      <span style="display:block;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#c0392b;margin-bottom:22px">HERO IMAGE PROMPT ENGINE</span>
+      <h1 style="font-family:var(--font-display);font-size:clamp(2.6rem,5.5vw,4.2rem);font-weight:900;color:#fff;line-height:1.1;margin:0 0 26px">Forge Heroes<br>Beyond the <span style="color:#c0392b">Cliché.</span></h1>
+      <p style="font-size:14px;line-height:1.9;color:#bbb;margin:0 0 34px">ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。クリシェ配色・意味のない浮遊オブジェクト・破綻した人物表現は、規則辞書の段階で排除されます。</p>
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <x-import component-from-global-scope="VeyraDragon_c89bab.Button" variant="outline" href="Projects.dc.html" icon="chevron-right" hint-size="250px,48px">Xでログインして始める</x-import>
+        <span style="font-size:11.5px;color:#777;line-height:1.7">利用条件：<a href="Projects.dc.html">@veyra_dragon</a> の<br>フォロワーであること</span>
+      </div>
+    </div>
+    <div style="position:absolute;left:50%;bottom:28px;width:1px;height:44px;background:linear-gradient(to bottom, rgba(255,255,255,0), #c9a84c)"></div>
+  </div>
+
+  <div id="features" style="padding:80px 6%;background:#111;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:72px;align-items:start">
+    <x-import component-from-global-scope="VeyraDragon_c89bab.SectionHeading" eyebrow="WHAT WE DO" title="Three Guards" size="small" hint-size="100%,200px">出力されるすべての案が、この3つの規則を通過します。通過しない案は出力されません。</x-import>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2px;grid-column:span 2">
+      <x-import component-from-global-scope="VeyraDragon_c89bab.StrengthCard" icon="shield-halved" title="Anti-Cliché Rules" hint-size="100%,240px">紫〜ティールのグラデーション、浮遊する3Dオブジェクト、過剰な彩度を辞書で常時排除し、対応するネガティブプロンプトを自動で注入します。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.StrengthCard" icon="bolt" title="Photographic Spec" hint-size="100%,240px">実写系はレンズ焦点距離・キーライト／フィルライト／リムライト・被写界深度を必ず明示します。撮影指示を欠く案は出力しません。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.StrengthCard" icon="chart-line" title="Copy Space Guard" hint-size="100%,240px">見出しとCTAを載せる余白を三分割構図で確保し、被写体と視線誘導が余白側と競合しない配置を指示します。</x-import>
+    </div>
+  </div>
+
+  <div id="process" style="padding:80px 6%;background:#0a0a0a;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:72px;align-items:start">
+    <x-import component-from-global-scope="VeyraDragon_c89bab.SectionHeading" eyebrow="OUR PROCESS" title="From Input to Package" size="small" hint-size="100%,200px">入力から3案の受け取りまで、4段階で処理されます。</x-import>
+    <div style="grid-column:span 2">
+      <x-import component-from-global-scope="VeyraDragon_c89bab.ProcessStep" step="01" icon="comments" title="Input" hint-size="100%,120px">業種・スタイル系統・生成モデルの3項目を選び、必要に応じてサービス概要とブランド条件を加えます。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.ProcessStep" step="02" icon="chess-knight" title="Rules" hint-size="100%,120px">アンチAIルック規則とスタイル仕様化規則を適用し、入力の矛盾を優先順位に従って統合します。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.ProcessStep" step="03" icon="code" title="Refine" hint-size="100%,120px">モデル別の記法へ整形し、非同期ジョブでLLMが表現を磨き込みます。障害時は辞書のみの合成へ縮退します。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.ProcessStep" step="04" icon="handshake" title="Package" hint-size="100%,120px">構図の異なる3案を、ネガティブプロンプト・推奨パラメータ・アートディレクションノート付きで受け取ります。</x-import>
+    </div>
+  </div>
+
+  <div id="faq" style="padding:80px 6%;background:#111;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:72px;align-items:start">
+    <x-import component-from-global-scope="VeyraDragon_c89bab.SectionHeading" eyebrow="FAQ" title="Before You Start" size="small" hint-size="100%,180px"></x-import>
+    <div style="grid-column:span 2">
+      <x-import component-from-global-scope="VeyraDragon_c89bab.FaqItem" question="Q. 生成された画像もこのアプリで作れますか？" hint-size="100%,80px">画像生成は行いません。出力はプロンプトパッケージのみで、生成はお使いの画像生成サービス側で実行してください。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.FaqItem" question="Q. 実在の人物名やブランド名を入れられますか？" hint-size="100%,80px">実在人物名・企業ロゴ・第三者著作物への言及を検出した場合は生成を行わず、理由を添えてエラーを返します。</x-import>
+      <x-import component-from-global-scope="VeyraDragon_c89bab.FaqItem" question="Q. 日本語で入力できますか？" hint-size="100%,80px">サービス概要は日本語で入力できます。日本語固有名詞は翻訳せずローマ字表記で保持し、意味説明を併記します。</x-import>
+    </div>
+  </div>
+
+  <div style="position:relative;padding:90px 6%;overflow:hidden">
+    <img src="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/assets/contact_background.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.45) saturate(1.2)">
+    <div style="position:absolute;inset:0;background:rgba(10,10,10,.85)"></div>
+    <div style="position:relative;max-width:520px">
+      <x-import component-from-global-scope="VeyraDragon_c89bab.SectionHeading" eyebrow="GET IN GEAR" title="第一印象を、業務品質に。" size="small" hint-size="100%,200px">ログインは指定アカウントのフォロワー判定のみで完了します。メールアドレスの登録はありません。</x-import>
+      <div style="margin-top:32px;max-width:280px">
+        <x-import component-from-global-scope="VeyraDragon_c89bab.Button" variant="submit" href="Projects.dc.html" hint-size="100%,52px">Xでログイン</x-import>
+      </div>
+    </div>
+  </div>
+
+  <dc-import name="HPFMockLinks" hint-size="100%,140px"></dc-import>
+</div>
+</x-dc>
+</body>
+</html>

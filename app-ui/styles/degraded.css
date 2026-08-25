@@ -1,0 +1,250 @@
+/* ─────────────────────────────────────────────────────────────
+   Degraded（08 縮退・エラー）— Degraded.dc.html を移植したもの。
+   上限到達 / 縮退モード / 禁止入力の差し戻し、の3ブロック。
+   ───────────────────────────────────────────────────────────── */
+
+.dg-main {
+  flex: 1;
+  padding: 56px 6%;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+.dg-intro { max-width: 560px; }
+
+/* ── 各ブロック共通の見出し帯 ─────────────────────────────── */
+.dg-banner {
+  padding: 20px 24px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 2px;
+  border: 1px solid;
+}
+.dg-banner__icon {
+  font-size: 15px;
+  padding-top: 2px;
+}
+.dg-banner__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.dg-banner__text {
+  font-size: 12.5px;
+  line-height: 1.85;
+  margin: 0;
+}
+
+/* 上限到達（金の枠） */
+.dg-banner--quota { border-color: rgba(201, 168, 76, .4); }
+.dg-banner--quota .dg-banner__icon { color: #c9a84c; }
+.dg-banner--quota .dg-banner__text { color: #999; }
+
+/* 縮退（赤の枠＋赤の薄い地） */
+.dg-banner--degraded {
+  border-color: #c0392b;
+  background: rgba(192, 57, 43, .15);
+}
+.dg-banner--degraded .dg-banner__icon { color: #c0392b; }
+.dg-banner--degraded .dg-banner__text { color: #e0e0e0; }
+
+/* 差し戻し（無彩色の枠） */
+.dg-banner--reject { border-color: rgba(255, 255, 255, .12); }
+.dg-banner--reject .dg-banner__icon { color: #c0392b; }
+.dg-banner--reject .dg-banner__text { color: #999; }
+
+/* ── 帯の下に続く本体パネル ───────────────────────────────── */
+.dg-panel {
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, .07);
+  padding: 32px 28px;
+}
+.dg-panel--split {
+  display: flex;
+  gap: 48px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.dg-label {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: #777;
+  margin-bottom: 12px;
+}
+
+/* ── 上限到達：次回リセット ───────────────────────────────── */
+.dg-reset__time {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+}
+.dg-reset__rule {
+  width: 60px;
+  height: 2px;
+  background: #c0392b;
+  margin: 14px 0 10px;
+}
+.dg-reset__note {
+  font-size: 11.5px;
+  color: #777;
+}
+
+.dg-facts {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+}
+.dg-facts__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.dg-facts__key {
+  font-size: 12px;
+  color: #999;
+}
+.dg-facts__val {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: #e0e0e0;
+}
+.dg-facts__note {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: #666;
+  margin: 18px 0 0;
+}
+
+/* ── 操作列 ───────────────────────────────────────────────── */
+.dg-actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dg-actions--spaced { margin-top: 20px; }
+.dg-actions__link { font-size: 12px; }
+.dg-actions__note {
+  font-size: 11.5px;
+  color: #666;
+}
+
+/* ── 縮退：生成済みの案 ───────────────────────────────────── */
+.dg-variation__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.dg-variation__eyebrow {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  color: #c0392b;
+  margin-bottom: 8px;
+}
+.dg-variation__title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.dg-variation__meta {
+  font-size: 11.5px;
+  color: #666;
+}
+.dg-chips {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.dg-chip {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: #999;
+  border: 1px solid rgba(255, 255, 255, .07);
+  padding: 8px 12px;
+}
+.dg-chip--warn {
+  color: #c0392b;
+  border-color: rgba(192, 57, 43, .5);
+}
+
+/* 生成物・入力文をそのまま見せる枠 */
+.dg-quote {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, .07);
+  padding: 16px;
+  color: #e0e0e0;
+}
+.dg-quote--prompt {
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 0 0 22px;
+}
+.dg-quote--input {
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 0 0 24px;
+}
+/* 検出された禁止表現 */
+.dg-flag {
+  color: #fff;
+  border-bottom: 2px solid #c0392b;
+}
+
+/* ── 差し戻し：理由の一覧 ─────────────────────────────────── */
+.dg-reasons {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 26px;
+}
+.dg-reasons__row {
+  display: flex;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.dg-reasons__key {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  color: #777;
+  min-width: 130px;
+}
+.dg-reasons__val {
+  font-size: 12px;
+  color: #999;
+  line-height: 1.8;
+}
+.dg-submit { width: 260px; }
+
+/* ── 狭い画面での最小限の保護（元デザインには無い追加分） ───── */
+@media (max-width: 768px) {
+  .dg-main { padding: 40px 5%; gap: 40px; }
+  .dg-panel { padding: 24px 20px; }
+  .dg-panel--split { gap: 32px; }
+  .dg-reasons__key { min-width: 96px; }
+  .dg-submit { width: 100%; }
+}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limits &amp; Fallbacks — hero-prompt-forge</title>
+<meta name="description" content="上限到達、縮退モードでの完了、禁止入力による差し戻しの3状態。">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/chrome.css">
+<link rel="stylesheet" href="styles/degraded.css">
+</head>
+<body>
+<div class="hpf-page hpf-page--app">
+
+  <header class="hpf-appbar" data-chrome="appbar" data-active="None" data-plan="PLAN · ACTIVE" data-user="@ao_design"></header>
+
+  <main class="dg-main">
+
+    <div class="dg-intro">
+      <div class="vd-section-heading">
+        <p class="vd-eyebrow">EXCEPTIONS</p>
+        <h2 class="vd-section-heading__title">Limits &amp; Fallbacks</h2>
+        <div class="vd-section-heading__divider"></div>
+        <p class="vd-section-heading__body">上限到達、縮退モードでの完了、禁止入力による差し戻しの3状態です。いずれも曖昧なエラーを返さず、次の操作と時刻を明示します。</p>
+      </div>
+    </div>
+
+    <!-- ── 上限到達 ───────────────────────────────────────── -->
+    <section>
+      <div class="dg-banner dg-banner--quota">
+        <span class="dg-banner__icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span>
+        <div>
+          <div class="dg-banner__title">Daily Quota Reached — 本日の生成枠を使い切りました</div>
+          <p class="dg-banner__text">生成は1アカウントにつき1日1回です。本日分は 09:44 のリクエスト #4821 で消費済みです。</p>
+        </div>
+      </div>
+      <div class="dg-panel dg-panel--split">
+        <div>
+          <div class="dg-label">NEXT RESET</div>
+          <div class="dg-reset__time">03:00</div>
+          <div class="dg-reset__rule"></div>
+          <span class="dg-reset__note">JST — 2026-08-26（あと 17時間16分）</span>
+        </div>
+        <div class="dg-facts">
+          <div class="dg-facts__row"><span class="dg-facts__key">消費の帰属</span><span class="dg-facts__val">クォータ日 2026-08-25</span></div>
+          <div class="dg-facts__row"><span class="dg-facts__key">状態</span><span class="dg-facts__val">confirmed（完了により確定）</span></div>
+          <div class="dg-facts__row"><span class="dg-facts__key">返還される場合</span><span class="dg-facts__val">縮退も失敗したとき</span></div>
+          <p class="dg-facts__note">生成済みの3案の閲覧・コピー・評価メモの記録は上限に関係なく行えます。</p>
+          <div class="dg-actions dg-actions--spaced">
+            <a class="vd-btn vd-btn--outline" data-screen-link="Result">
+              <span>本日の結果を見る</span>
+              <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            <a class="dg-actions__link" data-screen-link="Projects">履歴を見る</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 縮退モード ─────────────────────────────────────── -->
+    <section>
+      <div class="dg-banner dg-banner--degraded">
+        <span class="dg-banner__icon"><i class="fa-solid fa-arrow-trend-down" aria-hidden="true"></i></span>
+        <div>
+          <div class="dg-banner__title">Degraded Mode — 辞書のみで合成しました</div>
+          <p class="dg-banner__text">LLMプロバイダへのリトライが上限（3回）に達したため、規則辞書のみによるテンプレート合成へ縮退しました。規則の適用とコピースペースの規定は通常どおり行われていますが、表現の磨き込みは行われていません。成果物を提供しているため、本日のクォータは確定します。</p>
+        </div>
+      </div>
+      <div class="dg-panel">
+        <div class="dg-variation__head">
+          <div>
+            <span class="dg-variation__eyebrow">REQUEST #4795 · VARIATION 01</span>
+            <h3 class="dg-variation__title">Torii Coffee Stand</h3>
+            <span class="dg-variation__meta">飲食 / 実写 / nano banana系 ・ degraded = true</span>
+          </div>
+          <div class="dg-chips">
+            <span class="dg-chip">DICTIONARY v2026.05.1</span>
+            <span class="dg-chip dg-chip--warn">NOT REFINED</span>
+          </div>
+        </div>
+        <p class="dg-quote dg-quote--prompt">Small coffee stand counter seen from the side, morning, 50mm lens, f/2.8, key light from a north-facing window, fill from a white wall, rim light on the brass tap, shallow depth of field on the counter edge, palette of dark walnut, brass and off-white, right third kept empty as negative space, documentary food photography, natural color grading, hands cropped at the wrist only</p>
+        <div class="dg-actions">
+          <a class="vd-btn vd-btn--outline" data-screen-link="Generating">
+            <span>精緻化のみ再実行</span>
+            <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+          </a>
+          <a class="dg-actions__link" data-screen-link="Result">このまま3案を見る</a>
+          <span class="dg-actions__note">縮退で生成された案には履歴上も印が残ります</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 禁止入力による差し戻し ─────────────────────────── -->
+    <section>
+      <div class="dg-banner dg-banner--reject">
+        <span class="dg-banner__icon"><i class="fa-solid fa-ban" aria-hidden="true"></i></span>
+        <div>
+          <div class="dg-banner__title">Rejected — 禁止入力を検出しました</div>
+          <p class="dg-banner__text">実在人物名・企業ロゴ・第三者著作物への言及が含まれているため、生成を行いませんでした。ジョブ投入前の差し戻しのため、クォータは消費していません。該当箇所を修正して再送信してください。</p>
+        </div>
+      </div>
+      <div class="dg-panel">
+        <div class="dg-label">DETECTED IN — サービス概要</div>
+        <p class="dg-quote dg-quote--input">港区の法律事務所。<span class="dg-flag">実在弁護士の氏名</span>を前面に出し、<span class="dg-flag">他社事務所のロゴ</span>と並べた構図にしたい。</p>
+        <div class="dg-reasons">
+          <div class="dg-reasons__row"><span class="dg-reasons__key">REASON 01</span><span class="dg-reasons__val">実在人物名の指定 — 肖像・パブリシティ権の観点から生成対象外です。</span></div>
+          <div class="dg-reasons__row"><span class="dg-reasons__key">REASON 02</span><span class="dg-reasons__val">第三者のロゴの指定 — 商標を含む生成物は出力できません。</span></div>
+          <div class="dg-reasons__row"><span class="dg-reasons__key">SUGGESTION</span><span class="dg-reasons__val">「後ろ姿の弁護士」「無地の看板」に置き換えると、同じ構図の意図を保ったまま生成できます。</span></div>
+        </div>
+        <div class="dg-submit">
+          <a class="vd-btn vd-btn--submit" data-screen-link="New Request"><span>入力を修正する</span></a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="hpf-mocklinks" data-chrome="mocklinks" data-current="Degraded"></nav>
+
+</div>
+<script src="scripts/chrome.js"></script>
+</body>
+</html>

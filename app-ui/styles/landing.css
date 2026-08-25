@@ -1,0 +1,169 @@
+/* ─────────────────────────────────────────────────────────────
+   Landing（01）— Claude Design の Landing.dc.html を移植したもの。
+   インラインスタイルで書かれていた値をクラスへ起こしただけで、
+   数値・色・余白はすべて元のまま。
+   ───────────────────────────────────────────────────────────── */
+
+/* helmet の <style> 相当・.hpf-page・モックインデックスは chrome.css にある */
+
+/* ── ランディング専用のヘッダー ───────────────────────────── */
+.hpf-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 6%;
+  background: rgba(10, 10, 10, .92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  flex-wrap: wrap;
+}
+.hpf-nav__menu {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+.hpf-nav__link {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #999;
+  text-decoration: none;
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hpf-hero {
+  position: relative;
+  min-height: 640px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.hpf-hero__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(.45) saturate(1.3);
+}
+.hpf-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(10, 10, 10, .94) 0%, rgba(10, 10, 10, .6) 55%, rgba(10, 10, 10, 0) 80%);
+}
+.hpf-hero__inner {
+  position: relative;
+  max-width: 560px;
+  margin-left: 6%;
+  padding: 100px 0;
+}
+.hpf-hero__eyebrow {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #c0392b;
+  margin-bottom: 22px;
+}
+.hpf-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  margin: 0 0 26px;
+}
+.hpf-hero__title .accent { color: #c0392b; }
+.hpf-hero__lead {
+  font-size: 14px;
+  line-height: 1.9;
+  color: #bbb;
+  margin: 0 0 34px;
+}
+.hpf-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.hpf-hero__note {
+  font-size: 11.5px;
+  color: #777;
+  line-height: 1.7;
+}
+.hpf-hero__scrollcue {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  width: 1px;
+  height: 44px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #c9a84c);
+}
+
+/* ── 3カラム構成のセクション（左に見出し・右に本体） ────────── */
+.hpf-section {
+  padding: 80px 6%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 72px;
+  align-items: start;
+  background: #0a0a0a;
+}
+.hpf-section--alt { background: #111; }
+.hpf-section__body { grid-column: span 2; }
+
+.hpf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2px;
+  grid-column: span 2;
+}
+
+/* ── Contact ──────────────────────────────────────────────── */
+.hpf-contact {
+  position: relative;
+  padding: 90px 6%;
+  overflow: hidden;
+}
+.hpf-contact__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(.45) saturate(1.2);
+}
+.hpf-contact__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, .85);
+}
+.hpf-contact__inner {
+  position: relative;
+  max-width: 520px;
+}
+.hpf-contact__cta {
+  margin-top: 32px;
+  max-width: 280px;
+}
+
+/* ── 狭い画面での最小限の保護（元デザインには無い追加分） ───── */
+@media (max-width: 768px) {
+  .hpf-nav { padding: 12px 5%; height: auto; gap: 12px; }
+  .hpf-nav__menu { gap: 18px; flex-wrap: wrap; }
+  .hpf-hero__inner { margin-left: 5%; margin-right: 5%; padding: 72px 0; }
+  .hpf-section { padding: 60px 5%; gap: 40px; }
+  .hpf-contact { padding: 60px 5%; }
+  .vd-process-step { grid-template-columns: 72px 48px 1fr; }
+  .vd-process-step__content { padding-left: 16px; }
+}

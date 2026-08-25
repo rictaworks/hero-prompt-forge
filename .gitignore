@@ -1,0 +1,69 @@
+# ─── シークレット・環境変数 ───────────────────────────────
+# 秘匿値はファイルではなく Railway Variables / Vercel Environment Variables で管理する。
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+config/master.key
+config/credentials/*.key
+
+# ─── ゴミ箱 ───────────────────────────────────────────────
+DELETE/
+
+# ─── Node / Next.js ───────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Ruby / Rails ─────────────────────────────────────────
+/vendor/bundle
+.bundle/
+log/*.log
+tmp/
+storage/
+public/assets/
+public/packs/
+public/packs-test/
+*.gem
+.byebug_history
+db/*.sqlite3
+db/*.sqlite3-*
+
+# ─── テスト・カバレッジ ───────────────────────────────────
+coverage/
+.nyc_output/
+spec/examples.txt
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# ─── OS / エディタ ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ─── Windows のダウンロード痕（代替データストリーム） ─────
+*:Zone.Identifier
+
+.claude/*.md
+CLIENT/
+DEBUG/
+ENV/
+TASKS/
+WORK/

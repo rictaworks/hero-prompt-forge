@@ -1,0 +1,275 @@
+/* ─────────────────────────────────────────────────────────────
+   Veyra Dragon design system components — CSS port
+
+   Claude Design 上では React コンポーネント（_ds_bundle.js）として
+   提供されているものを、そのまま静的 HTML/CSS へ移植した版。
+   値はすべて _ds_bundle.js の実装と 1:1 で対応させている。
+   ───────────────────────────────────────────────────────────── */
+
+/* ── Logo ─────────────────────────────────────────────────── */
+.vd-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-xl);
+  color: var(--gold);
+  text-decoration: none;
+  transition: color var(--dur-fast);
+}
+.vd-logo:hover { color: var(--gold-light); }
+
+.vd-logo__disc {
+  width: var(--logo-disc);
+  height: var(--logo-disc);
+  background: var(--brand-orb);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.vd-logo--sm { font-size: 1rem; }
+.vd-logo--sm .vd-logo__disc { width: 28px; height: 28px; font-size: .85rem; }
+
+/* ── Button ───────────────────────────────────────────────── */
+.vd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  letter-spacing: var(--ls-button);
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.vd-btn--outline {
+  padding: 14px 28px;
+  border: var(--border-cta);
+  background: transparent;
+  color: var(--gold);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border-radius: var(--radius-none);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.vd-btn--outline:hover { background: var(--gold); color: #000; }
+
+.vd-btn--solid {
+  padding: 8px 22px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border-radius: var(--radius-button);
+  transition: background var(--dur-fast);
+}
+.vd-btn--solid:hover { background: var(--red-bright); color: #fff; }
+
+.vd-btn--submit {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: var(--red);
+  color: #fff;
+  font-size: var(--fs-base-2);
+  font-weight: 700;
+  border-radius: var(--radius-none);
+  transition: background var(--dur-fast);
+}
+.vd-btn--submit:hover { background: var(--red-bright); color: #fff; }
+
+.vd-btn[aria-disabled='true'] { opacity: .4; cursor: not-allowed; }
+
+/* ── Eyebrow ──────────────────────────────────────────────── */
+.vd-eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: var(--ls-eyebrow);
+  color: var(--red);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+/* ── SectionHeading ───────────────────────────────────────── */
+/* Landing.dc.html は size="small" を渡しているが、SectionHeading の
+   SIZES マップに "small" は無い（default / sm / contact / band のみ）ため
+   実際には default = var(--fs-title) で描画される。ここでもそれに合わせる。 */
+.vd-section-heading__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 800;
+  color: var(--text-heading);
+  line-height: var(--lh-title);
+  margin-bottom: 20px;
+}
+.vd-section-heading__divider {
+  width: var(--divider-w);
+  height: var(--divider-h);
+  background: var(--red);
+  margin: 20px 0;
+}
+.vd-section-heading__body {
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+  line-height: var(--lh-loose);
+}
+
+/* ── StrengthCard ─────────────────────────────────────────── */
+.vd-strength-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 36px 28px;
+  transition: var(--transition-card);
+}
+.vd-strength-card:hover {
+  border-color: var(--red);
+  transform: var(--lift-hover);
+}
+.vd-strength-card__icon {
+  width: var(--icon-disc);
+  height: var(--icon-disc);
+  background: var(--tint-red-15);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--red);
+  margin-bottom: 20px;
+}
+.vd-strength-card__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 12px;
+}
+.vd-strength-card__body {
+  font-size: var(--fs-sm-2);
+  color: var(--grey-777);
+  line-height: var(--lh-relaxed);
+}
+
+/* ── ProcessStep ──────────────────────────────────────────── */
+.vd-process-step {
+  display: grid;
+  grid-template-columns: 90px 64px 1fr;
+  align-items: stretch;
+  padding: 24px 0;
+  border-bottom: var(--border-hairline);
+  position: relative;
+}
+.vd-process-step__label {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: var(--ls-step);
+  color: var(--red);
+  padding-top: 4px;
+}
+.vd-process-step__no {
+  display: block;
+  font-size: var(--fs-2xl);
+  font-weight: 900;
+  color: var(--text-heading);
+  letter-spacing: 0;
+}
+.vd-process-step__rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.vd-process-step__rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+.vd-process-step__disc {
+  width: var(--step-disc);
+  height: var(--step-disc);
+  background: var(--red);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+.vd-process-step__content { padding-left: 24px; }
+.vd-process-step__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-heading);
+  margin-bottom: 6px;
+}
+.vd-process-step__body {
+  font-size: var(--fs-sm-3);
+  color: var(--grey-777);
+  line-height: var(--lh-relaxed);
+}
+
+/* ── FaqItem ──────────────────────────────────────────────── */
+.vd-faq-item { border-bottom: var(--border-hairline); }
+
+.vd-faq-item__question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  color: var(--grey-ccc);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  transition: var(--transition-color);
+  user-select: none;
+}
+.vd-faq-item__question:hover { color: #fff; }
+
+.vd-faq-item__chevron {
+  color: var(--red);
+  font-size: var(--fs-sm);
+  flex: 0 0 auto;
+  transition: transform var(--dur-med);
+}
+.vd-faq-item__question[aria-expanded='true'] .vd-faq-item__chevron { transform: rotate(180deg); }
+
+.vd-faq-item__answer {
+  max-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+  transition: max-height var(--dur-slow) var(--ease), padding var(--dur-med);
+}
+.vd-faq-item__answer.is-open {
+  max-height: 200px;
+  padding-bottom: 18px;
+}
+.vd-faq-item__answer p {
+  font-size: var(--fs-sm-4);
+  color: var(--text-muted);
+  line-height: var(--lh-relaxed);
+}

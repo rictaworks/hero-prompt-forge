@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/colors.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/typography.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/effects.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/tokens/base.css">
+<link rel="stylesheet" href="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="_ds/veyra-dragon-c89babbb-c5ca-488f-a767-e5ea1062d0f9/_ds_bundle.js"></script>
+</helmet>
+<div style="min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:24px 32px;padding:8px 6%;background:rgba(10,10,10,.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.07);flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:24px 40px;flex-wrap:wrap">
+    <x-import component-from-global-scope="VeyraDragon_c89bab.Logo" href="Landing.dc.html" hint-size="190px,36px"></x-import>
+    <nav style="display:flex;gap:30px;align-items:stretch;flex-wrap:wrap">
+      <a href="Projects.dc.html" style="display:flex;flex-direction:column;justify-content:center;position:relative;min-height:48px;padding-bottom:4px;text-decoration:none">
+        <span style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#ccc">Projects</span>
+        <span style="font-family:var(--font-body);font-size:10px;color:#666;margin-top:3px">プロジェクト</span>
+        <sc-if value="{{ onProjects }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:#c0392b"></span></sc-if>
+      </a>
+      <a href="Presets.dc.html" style="display:flex;flex-direction:column;justify-content:center;position:relative;min-height:48px;padding-bottom:4px;text-decoration:none">
+        <span style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#ccc">Presets</span>
+        <span style="font-family:var(--font-body);font-size:10px;color:#666;margin-top:3px">プリセット</span>
+        <sc-if value="{{ onPresets }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:#c0392b"></span></sc-if>
+      </a>
+      <a href="Admin.dc.html" style="display:flex;flex-direction:column;justify-content:center;position:relative;min-height:48px;padding-bottom:4px;text-decoration:none">
+        <span style="font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#ccc">Admin</span>
+        <span style="font-family:var(--font-body);font-size:10px;color:#666;margin-top:3px">管理</span>
+        <sc-if value="{{ onAdmin }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:0;right:0;bottom:0;height:2px;background:#c0392b"></span></sc-if>
+      </a>
+    </nav>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <span style="font-family:var(--font-display);font-size:9px;font-weight:700;letter-spacing:.18em;color:#c9a84c;border:1px solid rgba(201,168,76,.4);padding:5px 10px;white-space:nowrap">{{ plan }}</span>
+    <span style="font-family:var(--font-body);font-size:12px;color:#888">{{ user }}</span>
+    <x-import component-from-global-scope="VeyraDragon_c89bab.Button" variant="solid" href="NewRequest.dc.html" icon="plus" icon-position="start" hint-size="150px,38px">新規生成</x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:64},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Projects&quot;,&quot;Presets&quot;,&quot;Admin&quot;,&quot;None&quot;],&quot;default&quot;:&quot;Projects&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;plan&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;PLAN · ACTIVE&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;user&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;@ao_design&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'Projects';
+    return {
+      onProjects: a === 'Projects',
+      onPresets: a === 'Presets',
+      onAdmin: a === 'Admin',
+      plan: this.props.plan ?? 'PLAN · ACTIVE',
+      user: this.props.user ?? '@ao_design'
+    };
+  }
+}
+</script>
+</body>
+</html>

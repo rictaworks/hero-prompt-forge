@@ -1,0 +1,39 @@
+/* ─── Veyra Dragon · Radius, border, elevation, motion ───────
+   The brand has no drop shadows. Depth comes from surface value steps
+   and 1px hairlines; the only rounding is small (2–4px) or a full circle. */
+
+:root {
+  /* Radius */
+  --radius-field: 2px;    /* inputs, textarea */
+  --radius-button: 3px;   /* nav CTA */
+  --radius-media: 4px;    /* image frames, social tiles */
+  --radius-full: 50%;     /* icon discs, logo orb */
+  --radius-none: 0;       /* cards, stat cells, submit button — square by default */
+
+  /* Borders */
+  --border-width: 1px;
+  --border-hairline: 1px solid var(--border);
+  --border-field: 1px solid var(--field-border);
+  --border-cta: 1px solid var(--gold);
+
+  /* Elevation — shadowless. Lift is a 4px translate, not a shadow. */
+  --lift-hover: translateY(-4px); /* @kind other */
+  --shadow-none: none; /* @kind other */
+
+  /* Scrims & filters */
+  --filter-hero: brightness(0.45) saturate(1.3); /* @kind other */
+  --filter-photo: brightness(0.8) saturate(1.2); /* @kind other */
+  --blur-nav: blur(8px); /* @kind other */
+  --fade-hero: linear-gradient(90deg, rgba(10,10,10,.92) 40%, transparent 80%); /* @kind other */
+  --fade-vignette: radial-gradient(ellipse at center, transparent 40%, var(--dark2) 90%); /* @kind other */
+
+  /* Motion */
+  --dur-fast: 0.2s; /* @kind other */       /* color / background swaps */
+  --dur-med: 0.3s; /* @kind other */        /* border-color, transform, menu */
+  --dur-slow: 0.4s; /* @kind other */       /* accordion max-height */
+  --ease: ease; /* @kind other */
+  --ease-inout: ease-in-out; /* @kind other */
+  --transition-color: color var(--dur-fast); /* @kind other */
+  --transition-bg: background var(--dur-fast); /* @kind other */
+  --transition-card: border-color var(--dur-med), transform var(--dur-med); /* @kind other */
+}

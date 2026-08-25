@@ -1,0 +1,166 @@
+/* ─────────────────────────────────────────────────────────────
+   全画面で共通の外枠。
+
+   - `.dc.html` の <helmet> 内 <style> に相当する土台
+   - HPFAppBar.dc.html（アプリ内画面の上部バー）
+   - HPFMockLinks.dc.html（モックインデックス）
+
+   値は原本のインラインスタイルと 1:1。
+   ───────────────────────────────────────────────────────────── */
+
+/* ── helmet の <style> 相当 ───────────────────────────────── */
+body { margin: 0; background: #0a0a0a; }
+a { color: #c9a84c; text-decoration: none; }
+a:hover { color: #e6c96a; }
+
+.hpf-page {
+  background: #0a0a0a;
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+/* アプリ内画面（上部バー＋本文＋モックインデックスの縦積み） */
+.hpf-page--app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HPFAppBar ────────────────────────────────────────────── */
+.hpf-appbar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px 32px;
+  padding: 8px 6%;
+  background: rgba(10, 10, 10, .92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  flex-wrap: wrap;
+}
+.hpf-appbar__left {
+  display: flex;
+  align-items: center;
+  gap: 24px 40px;
+  flex-wrap: wrap;
+}
+.hpf-appbar__nav {
+  display: flex;
+  gap: 30px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.hpf-appbar__navlink {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  min-height: 48px;
+  padding-bottom: 4px;
+  text-decoration: none;
+}
+.hpf-appbar__navlink-en {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #ccc;
+}
+.hpf-appbar__navlink-ja {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: #666;
+  margin-top: 3px;
+}
+/* active な項目にだけ引かれる下線（sc-if 相当） */
+.hpf-appbar__navlink--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #c0392b;
+}
+.hpf-appbar__right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.hpf-appbar__plan {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: #c9a84c;
+  border: 1px solid rgba(201, 168, 76, .4);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+.hpf-appbar__user {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #888;
+}
+
+/* ── HPFMockLinks ─────────────────────────────────────────── */
+.hpf-mocklinks {
+  border-top: 1px solid rgba(255, 255, 255, .07);
+  background: #111;
+  padding: 26px 6%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hpf-mocklinks__label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  color: #555;
+}
+.hpf-mocklinks__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.hpf-mocklink {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  background: #141414;
+  text-decoration: none;
+}
+.hpf-mocklink__no {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 900;
+  color: #c0392b;
+}
+.hpf-mocklink__en {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #ccc;
+}
+.hpf-mocklink__ja {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  color: #666;
+}
+/* 未実装の画面は導線を張らず、同じ体裁のまま淡く落とす */
+.hpf-mocklink--pending {
+  opacity: .4;
+  cursor: default;
+}
+
+@media (max-width: 768px) {
+  .hpf-appbar { padding: 8px 5%; }
+  .hpf-mocklinks { padding: 26px 5%; }
+}
