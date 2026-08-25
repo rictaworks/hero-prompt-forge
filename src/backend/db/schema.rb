@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_110001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -173,6 +173,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_110001) do
     t.index ["expires_at"], name: "index_solid_queue_semaphores_on_expires_at"
     t.index ["key", "value"], name: "index_solid_queue_semaphores_on_key_and_value"
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name", null: false, comment: "X の表示名"
+    t.string "plan", default: "unverified", null: false, comment: "アクセス権を表す単一項目"
+    t.datetime "updated_at", null: false
+    t.string "x_user_id", null: false, comment: "X の数値のユーザーID"
+    t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
