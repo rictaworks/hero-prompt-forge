@@ -1,0 +1,7 @@
+/* 書体の割り当てです。
+   app-ui は Google Fonts と同梱の woff2 を読み込みますが、こちらは Next.js の
+   仕組みで読み込みます。読み込み方だけが違い、割り当てる書体は同じです。 */
+:root {
+  --font-display: var(--font-montserrat), sans-serif;
+  --font-body: var(--font-noto-sans-jp), sans-serif;
+}

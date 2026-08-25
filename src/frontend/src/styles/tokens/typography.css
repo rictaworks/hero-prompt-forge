@@ -1,0 +1,57 @@
+/* ─── Veyra Dragon · Typography tokens ───────────────────────
+   Two families only. Montserrat carries every Latin display/UI string;
+   Noto Sans JP carries all running copy (and all Japanese). */
+
+:root {
+  --font-display: 'Montserrat', sans-serif; /* @kind font */   /* headings, eyebrows, numerals, buttons */
+  --font-body: 'Noto Sans JP', sans-serif; /* @kind font */    /* body copy, form fields, links */
+
+  /* Weights actually loaded */
+  --fw-light: 300; /* @kind font */      /* Noto only */
+  --fw-regular: 400; /* @kind font */
+  --fw-medium: 500; /* @kind font */     /* Noto only — FAQ question */
+  --fw-semibold: 600; /* @kind font */   /* Montserrat — nav CTA, outline button */
+  --fw-bold: 700; /* @kind font */
+  --fw-extrabold: 800; /* @kind font */  /* section titles */
+  --fw-black: 900; /* @kind font */      /* hero h1, stat values */
+
+  /* Sizes — verbatim rem values from the source */
+  --fs-3xs: 0.65rem; /* @kind font */   /* vertical badge text */
+  --fs-2xs: 0.72rem; /* @kind font */   /* eyebrow, step label */
+  --fs-xs: 0.75rem; /* @kind font */    /* footer column heading, copyright */
+  --fs-sm: 0.8rem; /* @kind font */     /* stat label, footer body */
+  --fs-sm-2: 0.82rem; /* @kind font */  /* strength card body */
+  --fs-sm-3: 0.83rem; /* @kind font */  /* process body, footer link */
+  --fs-sm-4: 0.85rem; /* @kind font */  /* FAQ answer */
+  --fs-base: 0.88rem; /* @kind font */  /* nav link, lead paragraphs, button, field */
+  --fs-base-2: 0.9rem; /* @kind font */ /* essence body, submit button */
+  --fs-md: 0.92rem; /* @kind font */    /* FAQ question */
+  --fs-md-2: 0.95rem; /* @kind font */  /* hero subcopy */
+  --fs-lg: 1rem; /* @kind font */       /* card h3, step h3 */
+  --fs-xl: 1.2rem; /* @kind font */     /* wordmark */
+  --fs-2xl: 1.4rem; /* @kind font */    /* step number */
+
+  /* Fluid heads */
+  --fs-hero: clamp(2.6rem, 5.5vw, 4.2rem); /* @kind font */
+  --fs-title: clamp(1.8rem, 3.5vw, 2.6rem); /* @kind font */
+  --fs-title-sm: clamp(1.5rem, 2.5vw, 2rem); /* @kind font */
+  --fs-title-band: clamp(1.6rem, 3vw, 2.2rem); /* @kind font */
+  --fs-stat: clamp(2.4rem, 5vw, 3.6rem); /* @kind font */
+
+  /* Line heights */
+  --lh-hero: 1.1; /* @kind font */
+  --lh-title: 1.2; /* @kind font */
+  --lh-tight: 1; /* @kind font */        /* stat values */
+  --lh-body: 1.7; /* @kind font */       /* global default */
+  --lh-relaxed: 1.8; /* @kind font */    /* card + footer copy */
+  --lh-loose: 1.9; /* @kind font */      /* lead paragraphs */
+
+  /* Tracking — Montserrat is always tracked out, Noto never is */
+  --ls-none: 0; /* @kind font */
+  --ls-nav: 0.04em; /* @kind font */
+  --ls-button: 0.08em; /* @kind font */
+  --ls-step: 0.1em; /* @kind font */
+  --ls-footer-head: 0.15em; /* @kind font */
+  --ls-eyebrow: 0.2em; /* @kind font */
+  --ls-badge: 0.25em; /* @kind font */
+}

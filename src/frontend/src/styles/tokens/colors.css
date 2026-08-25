@@ -1,0 +1,70 @@
+/* ─── Veyra Dragon · Color tokens ─────────────────────────────
+   Base values copied verbatim from the source template's :root block.
+   Semantic aliases added on top; base names kept for 1:1 traceability. */
+
+:root {
+  /* Base — brand */
+  --red: #c0392b;
+  --red-bright: #e74c3c;
+  --gold: #c9a84c;
+  --gold-light: #e6c96a;
+
+  /* Base — surfaces (near-black ladder, lightest step = #1e1e1e) */
+  --dark: #0a0a0a;
+  --dark2: #111111;
+  --dark3: #181818;
+  --dark4: #1e1e1e;
+  --card-bg: #141414;
+
+  /* Base — line + text */
+  --border: rgba(255, 255, 255, 0.07);
+  --text: #e0e0e0;
+  --text-muted: #888;
+
+  /* Base — greys used as literals throughout the source */
+  --grey-ccc: #ccc;   /* FAQ question */
+  --grey-bbb: #bbb;   /* hero subcopy */
+  --grey-999: #999;   /* essence body */
+  --grey-777: #777;   /* card body */
+  --grey-666: #666;   /* footer body */
+  --grey-555: #555;   /* placeholder, copyright */
+
+  /* Base — translucency */
+  --scrim-92: rgba(10, 10, 10, 0.92);  /* nav bar */
+  --scrim-97: rgba(10, 10, 10, 0.97);  /* mobile menu */
+  --scrim-85: rgba(10, 10, 10, 0.85);  /* contact photo scrim */
+  --scrim-82: rgba(10, 10, 10, 0.82);  /* numbers photo scrim */
+  --tint-red-15: rgba(192, 57, 43, 0.15);   /* strength icon disc */
+  --field-bg: rgba(255, 255, 255, 0.06);
+  --field-border: rgba(255, 255, 255, 0.12);
+
+  /* Semantic — surfaces */
+  --surface-page: var(--dark);
+  --surface-alt: var(--dark2);
+  --surface-card: var(--card-bg);
+  --surface-raised: var(--dark3);
+  --surface-raised-2: var(--dark4);
+
+  /* Semantic — text */
+  --text-heading: #ffffff;
+  --text-body: var(--text);
+  --text-secondary: var(--grey-999);
+  --text-tertiary: var(--grey-777);
+  --text-faint: var(--grey-555);
+  --text-on-red: #ffffff;
+  --text-on-gold: #000000;
+
+  /* Semantic — accents */
+  --accent-primary: var(--red);          /* action, eyebrows, rules, step markers */
+  --accent-primary-hover: var(--red-bright);
+  --accent-secondary: var(--gold);       /* logo, outline CTA, footer headings */
+  --accent-secondary-hover: var(--gold-light);
+
+  /* Semantic — lines */
+  --line: var(--border);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-active: var(--red);
+
+  /* Semantic — brand gradient (logo disc only) */
+  --brand-orb: radial-gradient(circle at 40% 60%, var(--gold), var(--red)); /* @kind color */
+}
