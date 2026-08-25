@@ -1,0 +1,13 @@
+{
+  "name": "hero-prompt-forge",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "dev",
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [3000, 3001],
+  "portsAttributes": {
+    "3000": { "label": "Next.js（ホスト側は 3300）" },
+    "3001": { "label": "Rails API（ホスト側は 3301）" }
+  }
+}
