@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_180000) do
     t.bigint "user_id", null: false
     t.index ["user_id", "created_at"], name: "index_projects_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_projects_on_user_id"
+  end
+
+  create_table "prompt_outputs", force: :cascade do |t|
+    t.text "art_direction_note", null: false, comment: "アートディレクションノート"
+    t.string "composition_type", null: false, comment: "被写体主導／環境主導／抽象背景"
+    t.datetime "created_at", null: false
+    t.text "main_prompt", null: false, comment: "メインプロンプト"
+    t.text "negative_prompt", comment: "ネガティブプロンプト。対応しないモデルでは空です"
+    t.jsonb "parameters", default: {}, null: false, comment: "推奨パラメータ"
+    t.bigint "prompt_request_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "variation_no", null: false, comment: "1〜3"
+    t.index ["prompt_request_id", "variation_no"], name: "index_prompt_outputs_on_prompt_request_id_and_variation_no", unique: true
+    t.index ["prompt_request_id"], name: "index_prompt_outputs_on_prompt_request_id"
   end
 
   create_table "prompt_requests", force: :cascade do |t|
@@ -249,6 +263,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_180000) do
 
   add_foreign_key "presets", "users"
   add_foreign_key "projects", "users"
+  add_foreign_key "prompt_outputs", "prompt_requests"
   add_foreign_key "prompt_requests", "projects"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
