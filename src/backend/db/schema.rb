@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -179,6 +179,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_120000) do
     t.datetime "created_at", null: false
     t.string "display_name", null: false, comment: "X の表示名"
     t.string "plan", default: "unverified", null: false, comment: "アクセス権を表す単一項目"
+    t.datetime "plan_checked_at", comment: "プラン値を最後に判定した時刻"
+    t.datetime "recheck_available_at", comment: "次に手動再判定を要求できる時刻"
     t.datetime "updated_at", null: false
     t.string "x_user_id", null: false, comment: "X の数値のユーザーID"
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true

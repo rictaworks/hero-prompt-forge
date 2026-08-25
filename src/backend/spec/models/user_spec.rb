@@ -60,10 +60,11 @@ RSpec.describe User do
       expect(columns).not_to include('email', 'address', 'phone', 'phone_number')
     end
 
-    it '保持するのは識別子・表示名・プラン値のみです' do
+    it '保持するのは識別子・表示名・プラン値と、判定の時刻のみです' do
       columns = described_class.column_names - %w[id created_at updated_at]
 
-      expect(columns).to contain_exactly('x_user_id', 'display_name', 'plan')
+      expect(columns).to contain_exactly('x_user_id', 'display_name', 'plan',
+                                         'recheck_available_at', 'plan_checked_at')
     end
   end
 end
