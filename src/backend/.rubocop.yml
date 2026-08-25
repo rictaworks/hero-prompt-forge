@@ -1,0 +1,47 @@
+# コード規約の検査です。
+plugins:
+  - rubocop-rails
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.3
+  SuggestExtensions: false
+  NewCops: enable
+  Exclude:
+    - "bin/**/*"
+    - "db/schema.rb"
+    - "db/migrate/*_create_solid_*.rb"
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "storage/**/*"
+
+# ── プロジェクトの決まりに対応する検査 ──────────────────
+# セキュリティの観点からグローバル変数を禁止します。
+Style/GlobalVars:
+  Enabled: true
+
+# 例外を握りつぶす書き方を禁止します（フォールバック禁止）。
+Lint/SuppressedException:
+  Enabled: true
+  AllowComments: false
+
+# 例外を捨てる rescue を禁止します。
+Style/RescueStandardError:
+  Enabled: true
+  EnforcedStyle: explicit
+
+# ── 文体・分量 ──────────────────────────────────────────
+Style/Documentation:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "config/**/*"
+
+Layout/LineLength:
+  Max: 120
+
+# 日本語のコメントを許可します。
+Style/AsciiComments:
+  Enabled: false

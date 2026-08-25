@@ -15,15 +15,15 @@ class AppEnvironment
   class << self
     # @return [String] development / test / production
     def current
-      value = ENV.fetch("APP_ENV", nil) || Rails.env.to_s
+      value = ENV.fetch('APP_ENV', nil) || Rails.env.to_s
       raise UnknownEnvironmentError, "APP_ENV が不正です: #{value.inspect}" unless KNOWN.include?(value)
 
       value
     end
 
-    def development? = current == "development"
-    def test? = current == "test"
-    def production? = current == "production"
+    def development? = current == 'development'
+    def test? = current == 'test'
+    def production? = current == 'production'
 
     # 開発向けの近道を有効にしてよい環境かどうかを返します。
     # 本番では必ず false を返します。
