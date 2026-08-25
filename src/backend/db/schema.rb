@@ -10,9 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "sessions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false, comment: "失効する時刻"
+    t.datetime "revoked_at", comment: "取り消した時刻"
+    t.string "token_digest", null: false, comment: "セッション識別子のハッシュ"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["expires_at"], name: "index_sessions_on_expires_at"
+    t.index ["token_digest"], name: "index_sessions_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
 
   create_table "solid_cache_entries", force: :cascade do |t|
     t.integer "byte_size", null: false
@@ -186,6 +198,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_130000) do
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
+  add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
