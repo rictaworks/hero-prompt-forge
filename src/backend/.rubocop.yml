@@ -45,3 +45,9 @@ Layout/LineLength:
 # 日本語のコメントを許可します。
 Style/AsciiComments:
   Enabled: false
+
+# 1つの例で複数の観点を確認することを許します。
+# 記録の内容は「開始」と「完了」の対で1つの振る舞いであり、
+# 分割すると同じ準備を二度書くことになり、かえって読みにくくなるためです。
+RSpec/MultipleExpectations:
+  Max: 4
