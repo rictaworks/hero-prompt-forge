@@ -15,9 +15,9 @@ class ApiError < StandardError
   # @param status [Integer] HTTP の状態コード
   # @param details [Hash] 補足。個人情報・秘匿値を入れません
   def initialize(code:, message:, next_action:, status:, details: {})
-    raise ArgumentError, 'code を空にできません' if code.to_s.empty?
-    raise ArgumentError, 'message を空にできません' if message.to_s.empty?
-    raise ArgumentError, 'next_action を空にできません' if next_action.to_s.empty?
+    raise ArgumentError, 'code を空にできません' if code.to_s.empty? # 開発者向け
+    raise ArgumentError, 'message を空にできません' if message.to_s.empty? # 開発者向け
+    raise ArgumentError, 'next_action を空にできません' if next_action.to_s.empty? # 開発者向け
 
     @code = code
     @status = status

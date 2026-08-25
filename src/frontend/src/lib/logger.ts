@@ -23,7 +23,7 @@ export function traceError(
   context: TraceContext = {},
 ): void {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  console.error(`[trace] ${name} 失敗 ${format(context)} error=${message}`);
+  console.error(`[trace] ${name} 失敗 ${format(context)} error=${message}`); // 開発者向け
 }
 
 /** 処理を包んで、開始・完了・失敗を記録します。例外はそのまま投げ直します。 */
@@ -35,7 +35,7 @@ export async function traceStep<T>(
   traceInfo(name, context);
   try {
     const result = await run();
-    traceInfo(`${name} 完了`, context);
+    traceInfo(`${name} 完了`, context); // 開発者向け
     return result;
   } catch (error) {
     traceError(name, error, context);

@@ -139,3 +139,19 @@ jobs:
             raise "本番で開発向けの近道が有効です" if AppEnvironment.developer_shortcuts_allowed?
             puts "本番設定での読み込み・ジョブ・キャッシュ・環境判定: 正常"
           '
+
+  hardcode:
+    name: ハードコードの検査
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 検査の仕組み自体のテスト
+        run: npm run test:hardcode
+
+      - name: 直書きの文言が無いことの確認
+        run: npm run check:hardcode

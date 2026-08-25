@@ -24,7 +24,7 @@ export function currentEnvironment(): AppEnvironment {
   const value = process.env.NEXT_PUBLIC_APP_ENV;
   if (!isAppEnvironment(value)) {
     throw new UnknownEnvironmentError(
-      `NEXT_PUBLIC_APP_ENV が不正です: ${String(value)}`,
+      `NEXT_PUBLIC_APP_ENV が不正です: ${String(value)}`, // 開発者向け
     );
   }
   return value;
