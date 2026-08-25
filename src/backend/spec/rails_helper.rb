@@ -41,6 +41,9 @@ require 'webmock/rspec'
 # テストから外部へ通信しません。差し替えていない通信は失敗させます。
 WebMock.disable_net_connect!(allow_localhost: false)
 
+# 補助の読み込みです。
+Rails.root.glob('spec/support/**/*.rb').each { |f| require f }
+
 RSpec.configure do |config|
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_paths = [
@@ -70,7 +73,8 @@ RSpec.configure do |config|
   # behaviour is considered legacy and will be removed in a future version.
   #
   # To enable this behaviour uncomment the line below.
-  # config.infer_spec_type_from_file_location!
+  # 置き場所から種別を推定します。spec/requests は要求としてのテストになります。
+  config.infer_spec_type_from_file_location!
 
   # Filter lines from Rails gems in backtraces.
   config.filter_rails_from_backtrace!
