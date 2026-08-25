@@ -30,6 +30,17 @@ module Backend
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # 日本語版のみを提供します。他の言語を追加しません。
+    config.i18n.default_locale = :ja
+    config.i18n.available_locales = [:ja]
+    # 文言が見つからない場合は例外にします。既定値へ寄せると、
+    # 未翻訳のまま英語の識別子が画面へ出ても気づけないためです。
+    config.i18n.raise_on_missing_translations = true
+
+    # 時刻は JST です。
+    config.time_zone = 'Asia/Tokyo'
+    config.active_record.default_timezone = :utc
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

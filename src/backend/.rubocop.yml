@@ -56,3 +56,8 @@ RSpec/MultipleExpectations:
 # 構造を分割して書くと、かえって何を期待しているのかが読めなくなるため許します。
 RSpec/ExampleLength:
   Max: 12
+
+# 設定・定義そのものを検証する spec は、対象がクラスではありません。
+RSpec/DescribeClass:
+  Exclude:
+    - "spec/config/**/*"

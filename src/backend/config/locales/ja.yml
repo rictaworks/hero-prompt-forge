@@ -1,0 +1,23 @@
+# 画面・応答に出す文言です。
+#
+# 文言をモデルやコントローラへ直書きしません。ここへ追加します。
+# 日本語版のみを提供するため、他の言語のファイルを置きません。
+ja:
+  errors:
+    common:
+      next_action_unknown: "解決しない場合は info@rictaworks.jp までご連絡ください。"
+    unauthorized:
+      message: "ログインが必要です。"
+      next_action: "X でログインしてから、もう一度お試しください。"
+    forbidden:
+      message: "この操作を行う権限がありません。"
+      next_action: "利用条件をご確認ください。"
+    not_found:
+      message: "お探しのものが見つかりませんでした。"
+      next_action: "一覧から選び直してください。"
+    invalid_input:
+      message: "入力の内容に誤りがあります。"
+      next_action: "赤く示された項目を直してから、もう一度お試しください。"
+    service_unavailable:
+      message: "ただいま処理を受け付けられません。"
+      next_action: "時間をおいて、もう一度お試しください。"
