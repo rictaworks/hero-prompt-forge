@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Tokyo
+
+jobs:
+  backend:
+    name: バックエンド（RuboCop / RSpec）
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hero
+          POSTGRES_PASSWORD: hero_ci_only
+          POSTGRES_DB: hero_prompt_forge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hero"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      APP_ENV: test
+      RAILS_ENV: test
+      DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_test
+      TEST_DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/backend
+          bundler-cache: true
+
+      - name: 書き方の検査
+        working-directory: src/backend
+        run: bundle exec rubocop --format simple
+
+      - name: データベースの準備
+        working-directory: src/backend
+        run: bin/rails db:prepare
+
+      - name: テスト
+        working-directory: src/backend
+        run: bundle exec rspec
+
+  frontend:
+    name: フロントエンド（ESLint / 型検査 / Jest / ビルド）
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: 依存の導入
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: 書き方の検査
+        working-directory: src/frontend
+        run: npx eslint .
+
+      - name: 型検査
+        working-directory: src/frontend
+        run: npx tsc --noEmit
+
+      - name: テスト
+        working-directory: src/frontend
+        run: npm test
+
+      - name: ビルド
+        working-directory: src/frontend
+        run: npm run build
+
+  production-boot:
+    name: 本番と同じ設定での読み込み確認
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hero
+          POSTGRES_PASSWORD: hero_ci_only
+          POSTGRES_DB: hero_prompt_forge_production
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hero"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      APP_ENV: production
+      RAILS_ENV: production
+      DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_production
+      TEST_DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_production
+      SECRET_KEY_BASE: ci_boot_check_only_not_a_real_secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/backend
+          bundler-cache: true
+
+      # 本番でだけ起きる不具合（ジョブ・キャッシュの表が作られない等）は、
+      # 通常のテストでは見つかりません。本番と同じ設定で実際に触って確認します。
+      - name: データベースの準備
+        working-directory: src/backend
+        run: bin/rails db:prepare
+
+      - name: 読み込み・ジョブ・キャッシュを実際に触る
+        working-directory: src/backend
+        run: |
+          bin/rails runner '
+            ActiveRecord::Base.connection.execute("select 1")
+            Rails.cache.write(:ci_boot_check, "ok")
+            raise "キャッシュが読み書きできません" unless Rails.cache.read(:ci_boot_check) == "ok"
+            SolidQueue::Job.count
+            raise "本番で開発向けの近道が有効です" if AppEnvironment.developer_shortcuts_allowed?
+            puts "本番設定での読み込み・ジョブ・キャッシュ・環境判定: 正常"
+          '
