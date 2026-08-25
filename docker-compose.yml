@@ -43,6 +43,7 @@ services:
     volumes:
       - .:/workspace
       - bundle:/bundle
+      - playwright:/ms-playwright
     working_dir: /workspace
     ports:
       # コンテナ内は 3000 : Next.js / 3001 : Rails API です。
@@ -55,3 +56,4 @@ services:
 volumes:
   db-data:
   bundle:
+  playwright:

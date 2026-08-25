@@ -1,0 +1,12 @@
+{
+  "name": "hero-prompt-forge-dev-tools",
+  "private": true,
+  "description": "開発用の道具置き場です。アプリケーションの実装は src/ にあります。",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}

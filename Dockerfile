@@ -23,6 +23,16 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
+# Playwright（Chromium）の動作に必要なライブラリと日本語フォントを入れます。
+# 実行時は非 root ユーザーのため apt を叩けません。ビルド時に入れておきます。
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+      libdrm2 libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+      libgbm1 libxkbcommon0 libasound2 libpango-1.0-0 libcairo2 \
+      fonts-noto-cjk \
+ && rm -rf /var/lib/apt/lists/*
+
 # 時刻は JST に揃えます。
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
 
@@ -32,10 +42,11 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 RUN groupadd --gid ${USER_GID} ${USER_NAME} 2>/dev/null || true \
  && useradd --uid ${USER_UID} --gid ${USER_GID} --create-home --shell /bin/bash ${USER_NAME} 2>/dev/null || true \
- && mkdir -p /workspace /bundle /node_modules_cache \
- && chown -R ${USER_UID}:${USER_GID} /workspace /bundle /node_modules_cache
+ && mkdir -p /workspace /bundle /node_modules_cache /ms-playwright \
+ && chown -R ${USER_UID}:${USER_GID} /workspace /bundle /node_modules_cache /ms-playwright
 
-ENV BUNDLE_PATH=/bundle \
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    BUNDLE_PATH=/bundle \
     BUNDLE_APP_CONFIG=/bundle \
     GEM_HOME=/bundle \
     PATH=/bundle/bin:${PATH}
