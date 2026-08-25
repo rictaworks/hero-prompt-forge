@@ -5,6 +5,11 @@
  * 日本語版のみを提供するため、他の言語のファイルを置きません。
  */
 export const strings = {
+  app: {
+    title: "hero-prompt-forge",
+    description:
+      "ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。",
+  },
   errors: {
     common: {
       nextActionUnknown: "解決しない場合は info@rictaworks.jp までご連絡ください。",

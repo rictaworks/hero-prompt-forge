@@ -1,0 +1,51 @@
+/* ─── Veyra Dragon · Spacing & layout tokens ───────────────── */
+
+:root {
+  /* Raw steps present in the source */
+  --space-0: 0;
+  --space-1: 2px;    /* card grid gutter — hairline, not a gap */
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 14px;
+  --space-7: 16px;
+  --space-8: 18px;
+  --space-9: 20px;
+  --space-10: 22px;
+  --space-11: 24px;
+  --space-12: 28px;
+  --space-13: 32px;
+  --space-14: 36px;
+  --space-15: 40px;
+  --space-16: 48px;
+  --space-17: 60px;
+  --space-18: 64px;
+  --space-19: 80px;
+
+  /* Layout */
+  --nav-height: 64px;
+  --page-gutter: 6%;          /* desktop section inline padding */
+  --page-gutter-sm: 5%;       /* ≤768px */
+  --section-pad-y: 80px;
+  --section-pad-y-sm: 60px;
+  --col-sidebar: 260px;       /* left explainer column in Strengths/Process/FAQ */
+  --col-footer-brand: 280px;
+  --gap-section: 60px;
+  --gap-section-lg: 80px;
+  --gap-grid-hairline: 2px;
+
+  /* Component metrics */
+  --hero-max-w: 560px;
+  --essence-image-h: 420px;
+  --essence-image-h-sm: 280px;
+  --divider-w: 48px;
+  --divider-h: 3px;
+  --rule-accent-w: 60px;      /* underline under each stat cell */
+  --rule-accent-h: 2px;
+  --icon-disc: 52px;          /* strength card icon */
+  --step-disc: 48px;          /* process timeline node */
+  --logo-disc: 36px;
+  --social-tile: 34px;
+  --textarea-h: 120px;
+}

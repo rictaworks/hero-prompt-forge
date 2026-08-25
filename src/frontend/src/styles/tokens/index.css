@@ -1,0 +1,8 @@
+/* デザイントークンです。値は app-ui/_ds/tokens/ と一致させています。
+   書体の読み込み方だけが異なるため、fonts.css は最後に読み込みます。 */
+@import "./colors.css";
+@import "./typography.css";
+@import "./spacing.css";
+@import "./effects.css";
+@import "./base.css";
+@import "./fonts.css";

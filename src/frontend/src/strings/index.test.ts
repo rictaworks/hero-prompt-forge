@@ -13,7 +13,7 @@ describe("strings", () => {
     expect(() => text("errors.nothing.message")).toThrow(MissingStringError);
   });
 
-  it("すべての文言がですます調で終わります", () => {
+  it("日本語の文言はすべてですます調で終わります", () => {
     const collect = (value: unknown): string[] =>
       typeof value === "string"
         ? [value]
@@ -27,8 +27,11 @@ describe("strings", () => {
       require("@/strings/ja").strings,
     );
 
-    expect(all.length).toBeGreaterThan(0);
-    for (const value of all) {
+    // 製品名など日本語を含まない値は文ではないため、対象にしません。
+    const sentences = all.filter((value) => /[぀-ゟ゠-ヿ一-鿿]/.test(value));
+
+    expect(sentences.length).toBeGreaterThan(0);
+    for (const value of sentences) {
       expect(value.endsWith("。")).toBe(true);
     }
   });
