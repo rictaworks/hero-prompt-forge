@@ -1,0 +1,35 @@
+/**
+ * 画面に出す文言です。
+ *
+ * 文言をコンポーネントへ直書きしません。ここへ追加します。
+ * 日本語版のみを提供するため、他の言語のファイルを置きません。
+ */
+export const strings = {
+  errors: {
+    common: {
+      nextActionUnknown: "解決しない場合は info@rictaworks.jp までご連絡ください。",
+    },
+    unauthorized: {
+      message: "ログインが必要です。",
+      nextAction: "X でログインしてから、もう一度お試しください。",
+    },
+    forbidden: {
+      message: "この操作を行う権限がありません。",
+      nextAction: "利用条件をご確認ください。",
+    },
+    notFound: {
+      message: "お探しのものが見つかりませんでした。",
+      nextAction: "一覧から選び直してください。",
+    },
+    invalidInput: {
+      message: "入力の内容に誤りがあります。",
+      nextAction: "赤く示された項目を直してから、もう一度お試しください。",
+    },
+    serviceUnavailable: {
+      message: "ただいま処理を受け付けられません。",
+      nextAction: "時間をおいて、もう一度お試しください。",
+    },
+  },
+} as const;
+
+export type Strings = typeof strings;
