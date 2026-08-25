@@ -77,17 +77,19 @@ jobs:
         working-directory: src/frontend
         run: npx eslint .
 
-      - name: 型検査
-        working-directory: src/frontend
-        run: npx tsc --noEmit
-
       - name: テスト
         working-directory: src/frontend
         run: npm test
 
+      # ビルドを型検査より先に実行します。Next.js は画面の型（LayoutProps 等）を
+      # ビルド時に生成するため、先に型検査を走らせると生成前の状態で失敗します。
       - name: ビルド
         working-directory: src/frontend
         run: npm run build
+
+      - name: 型検査
+        working-directory: src/frontend
+        run: npx tsc --noEmit
 
   production-boot:
     name: 本番と同じ設定での読み込み確認
