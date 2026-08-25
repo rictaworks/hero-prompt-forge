@@ -10,9 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "rule_dictionaries", force: :cascade do |t|
+    t.jsonb "anti_ai_rules", default: {}, null: false, comment: "クリシェ排除規則"
+    t.datetime "created_at", null: false
+    t.jsonb "industry_defaults", default: {}, null: false, comment: "業種既定値"
+    t.datetime "published_at", comment: "公開した時刻。未公開は空です"
+    t.jsonb "style_spec_rules", default: {}, null: false, comment: "スタイル仕様化規則"
+    t.datetime "updated_at", null: false
+    t.string "version", null: false, comment: "版の識別子"
+    t.index ["published_at"], name: "index_rule_dictionaries_on_published_at"
+    t.index ["version"], name: "index_rule_dictionaries_on_version", unique: true
+  end
 
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
