@@ -16,7 +16,8 @@
 | 本業から切り離す入口（**今回の追加**） | `src/backend/app/services/metrics/side_channel.rb` |
 | 呼び出し | `src/backend/app/services/quota/reservation.rb` |
 | 決着の引き当て | `src/backend/app/services/quota/settlement.rb` |
-| テスト | `src/backend/spec/services/metrics/recorder_spec.rb`・`side_channel_spec.rb`・`spec/services/quota/reservation_spec.rb` |
+| 文言 | `src/backend/config/locales/ja.yml` |
+| テスト | `src/backend/spec/services/metrics/recorder_spec.rb`・`side_channel_spec.rb`・`spec/services/quota/reservation_spec.rb`・`reservation_race_spec.rb`・`spec/config/validation_messages_spec.rb` |
 
 **画面を作るファイル（`.tsx`）を 1 件も含みません。** 経路・認証の変更もありません。
 
@@ -39,13 +40,13 @@
 | 記録の失敗の見つけやすさ | テスト | **`warn` で残します。** 「完了」の行に埋もれません |
 | 記録の失敗と上限到達のお知らせ | テスト | **お知らせが置き換わりません。** 次回のリセット時刻も届きます |
 | 記録の失敗と返還の決着 | テスト | **返還は成功したままです。** やり直しの効かない状態を残しません |
-| 記録の失敗の追跡 | テスト | `metrics.record_failed` として残します。**握りつぶしません** |
+| 記録の失敗の追跡 | テスト | `[metrics] record_failed ...` として `warn` で残します。**握りつぶしません** |
 | 並列の数え上げ | テスト（`reservation_race_spec.rb`） | 同時に予約して先を越された人数が、**行 1 件へ数え上がります** |
 | 軸の名前の置き場 | 目視 | `MetricEvent` の定数だけです。書き写していません |
 | SQL の組み立て | 目視 | `Arel.sql` へ渡すのは定数の文字列だけです。外から来た値を差し込みません |
 | 秘匿値の混入 | 目視 | ありません |
 | 書き方の検査 | RuboCop | 173 ファイル、指摘 0 件 |
-| テスト | RSpec | 1525 例、失敗 0 件 |
+| テスト | RSpec | 1545 例、失敗 0 件 |
 | ハードコードの検査 | 検査 | 検出 0 件 |
 
 ## 判断したこと
