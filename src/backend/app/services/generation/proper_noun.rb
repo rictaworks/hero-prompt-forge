@@ -28,6 +28,9 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :proper_noun_preserved
 
+    # 会社の名前を表す種別です。**末尾の語を落とすのは、この種別だけです。**
+    COMPANY_KIND = :company
+
     # 読みが添えられている書き方です。「櫻花堂（おうかどう）」の形です。
     READING_IN_PARENTHESES = /[（(]([ぁ-ゖァ-ヴー]{1,20})[）)]/
     # かぎ括弧の閉じです。読みは閉じ括弧の後ろに続きます。
@@ -65,6 +68,7 @@ module Generation
       @rules = rules
       @suffix_readings = suffix_readings
       @company_name = CompanyName.new(attribute_words)
+      @name_reading = NameReading.new(suffix_readings)
     end
 
     class << self
@@ -110,7 +114,7 @@ module Generation
 
     private
 
-    attr_reader :rules, :suffix_readings, :company_name
+    attr_reader :rules, :suffix_readings, :company_name, :name_reading
 
     def found_in(text)
       rules.flat_map { |rule| matches_for(rule, text) }
@@ -131,51 +135,22 @@ module Generation
 
     # **同じ名前を 2 度足しません。**
     def build_found(rule, matched, text)
-      name = company_name.trimmed(matched[1])
+      name = named(rule, matched[1])
       return nil if name.nil? || name.strip.empty?
 
       Found.new(original: name, romaji: romaji_for(name, matched, text),
                 gloss: rule[:gloss], kind: rule[:kind])
     end
 
-    # 読みが決まる場合だけ、ローマ字にします。
-    #
-    #   1. 名前そのものがかなであれば、そのまま写します
-    #   2. 名前の直後に丸括弧で読みが添えられていれば、それを使います
-    #   3. どちらでもなければ、読みは決まりません
+    # **末尾の「の◯◯」を落とすのは、会社の名前だけです。**
+    # かぎ括弧で明示された名前は、そのまま使います（PR #157 のレビューより）。
+    def named(rule, captured)
+      rule[:kind] == COMPANY_KIND ? company_name.trimmed(captured) : captured
+    end
+
+    # 読みの決め方は NameReading が持ちます。
     def romaji_for(name, matched, text)
-      return Romaji.of(name) if Romaji.kana?(name)
-
-      reading = reading_after(matched, text) || suffix_reading(name)
-      reading ? Romaji.of(reading) : nil
-    end
-
-    # **屋号の語尾は読みが決まっています。**
-    # かなと語尾だけでできた名前であれば、読みが決まります。
-    # 「櫻花堂」のように語尾以外へ漢字が入る場合は、読みが決まりません。
-    #
-    # **長い語尾から先に引きます。** 「工房」を「房」として読みません。
-    def suffix_reading(name)
-      suffix_readings.keys.sort_by { |key| -key.length }.each do |suffix|
-        next unless name.end_with?(suffix)
-
-        body = name.delete_suffix(suffix)
-        return body + suffix_readings[suffix] if !body.empty? && Romaji.kana?(body)
-      end
-
-      nil
-    end
-
-    # **その名前が見つかった位置の、すぐ後ろだけを見ます。**
-    #
-    # かぎ括弧でくくられている場合は、閉じ括弧を挟んで読みが続きます
-    # （「櫻花堂」（おうかどう））。閉じ括弧 1 文字だけを飛ばします。
-    def reading_after(matched, text)
-      following = text[matched.end(1)..]
-      return nil if following.nil?
-
-      found = following.match(/\A#{CLOSING_QUOTE.source}?#{READING_IN_PARENTHESES.source}/)
-      found && found[1]
+      name_reading.romaji_for(name, matched, text)
     end
 
     # 見つけた事実を記録へ残します。

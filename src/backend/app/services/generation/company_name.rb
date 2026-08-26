@@ -24,7 +24,10 @@ module Generation
     # 末尾の「の◯◯」を落とした名前を返します。
     #
     # **重ねて落とします。** 「みらいの事業の強み」は「みらい」になります。
-    # **名前そのものが消える切り方はしません。**
+    #
+    # **すべて落ちた場合は、名前がなかったものとして扱います。**
+    # 「株式会社の設立をご支援します。」の `の設立` は、会社名ではありません
+    # （PR #157 の 2 回目のレビューより）。
     # @return [String, nil]
     def trimmed(name)
       return name if name.nil?
@@ -34,7 +37,7 @@ module Generation
         trimmed = trimmed[0..-(particle.length + word.length + 1)]
       end
 
-      trimmed
+      trimmed.empty? ? nil : trimmed
     end
 
     private
@@ -43,10 +46,7 @@ module Generation
 
     # 末尾に付いている、会社そのものを指さない語です。**無ければ空です。**
     def trailing_attribute(name)
-      attribute_words.find do |word|
-        suffix = "#{particle}#{word}"
-        name.end_with?(suffix) && name.length > suffix.length
-      end
+      attribute_words.find { |word| name.end_with?("#{particle}#{word}") }
     end
   end
 end
