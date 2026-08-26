@@ -1,0 +1,106 @@
+# frozen_string_literal: true
+
+require 'rails_helper'
+
+# 検証で使う文言が、すべて `config/locales/ja.yml` にあることを確かめます。
+#
+# 本アプリは日本語のみを提供し、未定義の文言を例外にします
+# （`raise_on_missing_translations`）。標準の日本語訳を持たないため、
+# **文言が欠けていると、検証の失敗ではなく文言の欠落として失敗します。**
+# 起きる例外の種類が変わり、原因の切り分けが遠回りになります（issue #124）。
+#
+# **新しい検証を足したときに、文言の足し忘れをこのテストが知らせます。**
+RSpec.describe '検証で使う文言' do
+  # 検証の種類から、使う文言の鍵を求めます。
+  # ここに無い種類の検証を足した場合は、この対応表へも足します。
+  def keys_for(validator)
+    case validator
+    when ActiveRecord::Validations::PresenceValidator then %i[blank]
+    when ActiveRecord::Validations::UniquenessValidator then %i[taken]
+    when ActiveModel::Validations::InclusionValidator then %i[inclusion]
+    when ActiveModel::Validations::ExclusionValidator then %i[exclusion]
+    when ActiveModel::Validations::FormatValidator then %i[invalid]
+    when ActiveModel::Validations::LengthValidator then length_keys(validator)
+    else []
+    end
+  end
+
+  # 長さの検証は、指定した条件によって使う文言が変わります。
+  def length_keys(validator)
+    { maximum: :too_long, minimum: :too_short, is: :wrong_length }
+      .filter_map { |option, key| key if validator.options.key?(option) }
+  end
+
+  # 自前の検証（`validate :method` の中で `errors.add` する形）と、
+  # 関連の欠落（`belongs_to`）が使う文言です。
+  #
+  # 自前の検証はコードを読まないと分かりませんので、ここへ列挙します。
+  #   - `evaluation_note.rb` の `must_have_content` が `:blank`
+  #   - `preset.rb` の `conditions_must_be_allowed` が `:invalid`
+  #   - `belongs_to` の欠落が `:required`
+  #   - 保存に失敗したことを開発者へ知らせる `RecordInvalid` が `:record_invalid`
+  def custom_keys
+    %i[blank invalid required record_invalid]
+  end
+
+  def models
+    Rails.application.eager_load!
+    ApplicationRecord.descendants.reject(&:abstract_class?)
+  end
+
+  def defined_message?(key)
+    I18n.t("activerecord.errors.messages.#{key}")
+    true
+  rescue I18n::MissingTranslationData
+    false
+  end
+
+  it '調べる対象のモデルがあります' do
+    expect(models).not_to be_empty
+  end
+
+  it 'すべての検証の文言が定義されています' do
+    used = models.flat_map(&:validators)
+                 .flat_map { |validator| keys_for(validator) }
+                 .uniq
+
+    expect(used.reject { |key| defined_message?(key) }).to be_empty
+  end
+
+  it '自前の検証と関連の欠落で使う文言が定義されています' do
+    expect(custom_keys.reject { |key| defined_message?(key) }).to be_empty
+  end
+
+  it 'すべての文言がですます調で終わります' do
+    values = I18n.t('activerecord.errors.messages').values
+
+    expect(values).to all(end_with('。'))
+  end
+
+  # 実際に起きる例外の種類をそろえます。issue #124 の症状そのものです。
+  describe '起きる例外の種類' do
+    it '利用者を欠いた保存は、検証の失敗になります' do
+      expect { QuotaConsumption.create!(quota_day: Date.new(2026, 8, 26)) }
+        .to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it 'クォータ日を欠いた保存も、検証の失敗になります' do
+      user = User.create!(x_user_id: '9001', display_name: '文言の確認', plan: 'active')
+
+      expect { QuotaConsumption.create!(user: user, quota_day: nil) }
+        .to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it '書式が違う保存も、検証の失敗になります' do
+      expect { User.create!(x_user_id: 'not-a-number', display_name: '文言の確認') }
+        .to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it '長すぎる保存も、検証の失敗になります' do
+      user = User.create!(x_user_id: '9002', display_name: '文言の確認', plan: 'active')
+
+      expect { Project.create!(user: user, industry: 'saas', style_family: 'photoreal', name: 'あ' * 101) }
+        .to raise_error(ActiveRecord::RecordInvalid)
+    end
+  end
+end

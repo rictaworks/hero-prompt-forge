@@ -151,6 +151,42 @@ RSpec.describe Generation::InputNormalizer do
     it '大文字小文字を揃えます' do
       expect(normalizer.call(given(brand_colors: ['#aabbcc']))[:brand_colors]).to eq(['#AABBCC'])
     end
+
+    # **未指定の欄と、同じ色の重ねがけは、扱いを分けます。**
+    # 空の欄は「指定していない」ことの素直な表れです。同じ色を 2 度書くのは
+    # 「2 色指定したつもり」との食い違いですので、誤りとして返します。
+    describe '空の要素と重ねがけの扱い' do
+      it '空（nil）の要素は、未指定として落とします' do
+        expect(normalizer.call(given(brand_colors: ['#111111', nil]))[:brand_colors])
+          .to eq(['#111111'])
+      end
+
+      it '空白だけの要素は、未指定として落とします' do
+        expect(normalizer.call(given(brand_colors: ['#111111', '  ']))[:brand_colors])
+          .to eq(['#111111'])
+      end
+
+      it '落としたあとの件数で上限を見ます' do
+        expect(normalizer.call(given(brand_colors: ['#111111', nil, '#222222']))[:brand_colors])
+          .to eq(%w[#111111 #222222])
+      end
+
+      it '空の要素だけなら、未指定として扱います' do
+        expect(normalizer.call(given(brand_colors: [nil, '  ']))[:brand_colors]).to eq([])
+      end
+
+      it '同じ色の重ねがけは、黙って減らさずに失敗します' do
+        expect { normalizer.call(given(brand_colors: %w[#111111 #111111])) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :brand_colors, reason: :duplicated)
+          }
+      end
+
+      it '大文字小文字だけが違う重ねがけも失敗します' do
+        expect { normalizer.call(given(brand_colors: %w[#aabbcc #AABBCC])) }
+          .to raise_error(described_class::InvalidInputError)
+      end
+    end
   end
 
   describe 'サービス概要' do
@@ -206,6 +242,176 @@ RSpec.describe Generation::InputNormalizer do
     it '型の誤りでも素の NoMethodError にしません' do
       expect { normalizer.call(given(service_summary: 123)) }
         .to raise_error(described_class::InvalidInputError)
+    end
+
+    # **鍵で引ける形かどうかを、形そのもので見ます。**
+    # `[]` を持つかどうかで見ると、文字列・配列・数値・構造体がいずれも
+    # 通り抜け、そのあとで項目名の無い TypeError や NameError になります。
+    # JSON の本体へ `{"input": ["saas"]}` と送る誤りは、普通に起こります。
+    describe '入力そのものが連想配列でない場合' do
+      let(:point) { Struct.new(:industry).new('saas') }
+
+      it '配列なら、項目を添えて失敗します' do
+        expect { normalizer.call(['industry']) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :root, reason: :invalid_type)
+          }
+      end
+
+      it '文字列なら、項目を添えて失敗します' do
+        expect { normalizer.call('industry') }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :root, reason: :invalid_type)
+          }
+      end
+
+      it '数値なら、項目を添えて失敗します' do
+        expect { normalizer.call(123) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :root, reason: :invalid_type)
+          }
+      end
+
+      it '構造体なら、項目を添えて失敗します' do
+        expect { normalizer.call(point) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :root, reason: :invalid_type)
+          }
+      end
+
+      it '真偽値なら、項目を添えて失敗します' do
+        expect { normalizer.call(true) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :root, reason: :invalid_type)
+          }
+      end
+
+      it '素の TypeError や NameError にしません' do
+        [['industry'], 'industry', 123, point, true, nil].each do |raw|
+          expect { normalizer.call(raw) }
+            .to raise_error(described_class::InvalidInputError)
+        end
+      end
+
+      # 入口（issue #55）は ActionController::Parameters で受け取ります。
+      it 'ActionController::Parameters は受け取れます' do
+        params = ActionController::Parameters.new(
+          industry: 'saas', style_family: 'photoreal', target_model: 'midjourney'
+        )
+
+        expect(normalizer.call(params)).to include(industry: 'saas')
+      end
+    end
+  end
+
+  # **1つのインスタンスを複数のスレッドから同時に使っても、結果が混ざりません。**
+  # 誤りの一覧をインスタンスへ持つと、正しい入力に対して誤りが返ります
+  # （issue #133 で、800 回のうち 20 回の混ざりを実測しました）。
+  #
+  # **回帰を防ぐのは、次の「途中の状態を持たないこと」の例です。**
+  # 直す前の実装に対して確実に失敗します。同時に呼ぶ例のほうは、
+  # 8000 回まで増やしても直す前の実装が通ってしまいました。混ざりが起きる
+  # 窓が狭く、実行のたびに当たり外れがあるためです。**当たり外れのある例を
+  # 守りとして数えません。** 実際に同時に呼んで壊れないことの確認として置きます。
+  # 差し戻した事実を記録へ残します。**入力そのものを残しません。**
+  # 記録は保管期間が長く、閲覧できる範囲も広くなります。
+  describe '差し戻しの記録' do
+    before { allow(Rails.logger).to receive(:info) }
+
+    it '項目名と理由を残します' do
+      expect { normalizer.call(given(industry: 'ひみつのことば')) }
+        .to raise_error(described_class::InvalidInputError)
+
+      expect(Rails.logger).to have_received(:info)
+        .with(a_string_including('generation.input_rejected')).at_least(:once)
+      expect(Rails.logger).to have_received(:info)
+        .with(a_string_including('unknown_value')).at_least(:once)
+    end
+
+    it '入力そのものを残しません' do
+      expect { normalizer.call(given(industry: 'ひみつのことば')) }
+        .to raise_error(described_class::InvalidInputError)
+
+      expect(Rails.logger).not_to have_received(:info)
+        .with(a_string_including('ひみつのことば'))
+    end
+
+    it '読み取れない形の入力でも、中身を残しません' do
+      expect { normalizer.call(['ひみつのことば']) }
+        .to raise_error(described_class::InvalidInputError)
+
+      expect(Rails.logger).not_to have_received(:info)
+        .with(a_string_including('ひみつのことば'))
+    end
+  end
+
+  describe '途中の状態を持たないこと' do
+    it '誤りのある呼び出しのあとも、instance へ状態が残りません' do
+      expect { normalizer.call(given(style_family: 'watercolor')) }
+        .to raise_error(described_class::InvalidInputError)
+
+      expect(normalizer.instance_variables).to contain_exactly(:@dictionary)
+    end
+
+    it '誤った入力の直後でも、正しい入力は通ります' do
+      expect { normalizer.call(given(style_family: 'watercolor')) }
+        .to raise_error(described_class::InvalidInputError)
+
+      expect(normalizer.call(given)).to include(style_family: 'photoreal')
+    end
+  end
+
+  describe '同時に呼び出したとき' do
+    # **関門を置いて、足並みをそろえてから同時に呼びます。**
+    # ばらばらに呼ぶと競合の窓に入らず、直す前の実装でもたまたま通ります。
+    # それでは回帰を防げません（issue #132 の指摘と同じ理由です）。
+    it '正しい入力が、誤った入力の巻き添えになりません' do
+      normalizer.call(given) # 規則辞書の読み込みを先に済ませます
+
+      expect(outcomes_of_concurrent_calls.count(:unexpected)).to eq(0)
+    end
+
+    # 40 のスレッドを関門の前に集め、いっせいに呼び出します。
+    def outcomes_of_concurrent_calls
+      results = Queue.new
+      ready = Queue.new
+      gate = Queue.new
+      threads = waiting_threads(results, ready, gate)
+
+      40.times { ready.pop }
+      40.times { gate << true }
+      threads.each(&:join)
+
+      drain(results)
+    end
+
+    def waiting_threads(results, ready, gate)
+      Array.new(40) do |index|
+        Thread.new do
+          ready << true
+          gate.pop
+          20.times { results << attempt(index) }
+        end
+      end
+    end
+
+    def drain(queue)
+      outcomes = []
+      outcomes << queue.pop until queue.empty?
+      outcomes
+    end
+
+    # 偶数のスレッドは正しい入力を、奇数のスレッドは誤った入力を渡します。
+    def attempt(index)
+      if index.even?
+        normalizer.call(given)
+        :accepted
+      else
+        normalizer.call(given(style_family: 'watercolor'))
+        :unexpected
+      end
+    rescue Generation::InputNormalizer::InvalidInputError
+      index.even? ? :unexpected : :rejected
     end
   end
 

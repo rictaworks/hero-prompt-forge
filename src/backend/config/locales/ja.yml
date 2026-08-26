@@ -5,6 +5,11 @@
 ja:
   # 検証で弾いたときの文言です。日本語版のみを提供するため、標準の訳を持ちません。
   # 使っている検証の分だけを定義します。
+  #
+  # **文言が欠けていると、検証の失敗ではなく文言の欠落として失敗します。**
+  # 起きる例外の種類が変わり、原因の切り分けが遠回りになります。
+  # 検証と文言の対応がそろっていることは、
+  # `spec/config/validation_messages_spec.rb` が確かめます。
   activerecord:
     errors:
       messages:
@@ -13,6 +18,12 @@ ja:
         record_invalid: "%{errors}のため保存できませんでした。"
         inclusion: "に選べない値が指定されています。"
         taken: "はすでに使われています。"
+        # 関連が欠けている場合の文言です（belongs_to）。
+        required: "を指定してください。"
+        # 書式が合わない場合の文言です（format）。
+        invalid: "の形式が正しくありません。"
+        # 長さの上限を超えた場合の文言です（length の maximum）。
+        too_long: "は%{count}文字以内で入力してください。"
   errors:
     common:
       next_action_unknown: "解決しない場合は info@rictaworks.jp までご連絡ください。"
