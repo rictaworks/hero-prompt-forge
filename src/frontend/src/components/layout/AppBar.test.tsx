@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { AppBar } from "@/components/layout/AppBar";
 import { SCREENS, screenOf, UnknownScreenError } from "@/config/screens";
+import { text } from "@/strings";
 
 describe("AppBar", () => {
   it("プラン値と利用者名を表示します", () => {
