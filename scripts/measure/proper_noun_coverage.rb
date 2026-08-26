@@ -42,6 +42,20 @@ class ProperNounCoverage
       '株式会社へいあんをご紹介します。' => 'へいあん',
       '株式会社よりみちは喫茶店です。' => 'よりみち',
       '株式会社からだ工房が運営します。' => 'からだ工房',
+      # **助詞が 2 つ続く、ありふれた書き出しです。**
+      '株式会社みらいでは家づくりを承ります。' => 'みらい'
+    }
+  end
+
+  # **いま拾いきれていない名前です**（PR #157 の 4 回目のレビューより）。
+  #
+  # 名前の終わりが助詞と同じ字の場合、**助詞 1 文字で切るため短くなります。**
+  # 助詞の次の字まで見る形も試しましたが、「株式会社みらいでは」のような
+  # ありふれた書き出しで取りすぎました。**文字だけでは見分けられません。**
+  #
+  # **数として書き残します。** 減らせたら、この一覧から `exact` へ移してください。
+  def shortfall
+    {
       '株式会社やまとが運営します。' => 'やまと',
       '株式会社このはをご紹介します。' => 'このは',
       '株式会社あきはが運営します。' => 'あきは',
@@ -89,6 +103,7 @@ class ProperNounCoverage
     report_exact
     report_spanning
     report_untouched
+    report_shortfall
   end
 
   private
@@ -113,6 +128,15 @@ class ProperNounCoverage
 
     puts "「の」をまたぐべき #{spanning.size} 件 : 取りこぼし #{missed.size} 件"
     missed.each { |text, name| puts "  取りこぼし: #{text} 期待=#{name} 実際=#{names_in(text).inspect}" }
+  end
+
+  # **いま拾いきれていない名前の数を残します。**
+  def report_shortfall
+    solved = shortfall.select { |text, name| names_in(text) == [name] }
+
+    puts "拾いきれていない #{shortfall.size} 件 : 解けたもの #{solved.size} 件"
+    solved.each_key { |text| puts "  解けました（exact へ移してください）: #{text}" }
+    shortfall.each { |text, name| puts "  未解決: #{text} 期待=#{name} 実際=#{names_in(text).inspect}" }
   end
 
   def report_untouched

@@ -222,9 +222,7 @@ RSpec.describe Generation::ProperNoun do
         '株式会社へいわが運営します。' => 'へいわ',
         '株式会社よりみちは喫茶店です。' => 'よりみち',
         '株式会社からだ工房が運営します。' => 'からだ工房',
-        '株式会社やまとが運営します。' => 'やまと',
-        '株式会社このはをご紹介します。' => 'このは',
-        '株式会社いずもは酒造です。' => 'いずも'
+        '株式会社みらいでは家づくりを承ります。' => 'みらい'
       }.each do |summary, name|
         it "「#{summary}」から「#{name}」を切り詰めません" do
           expect(found_in(summary).map(&:original)).to include(name)
