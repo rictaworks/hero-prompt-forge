@@ -21,6 +21,14 @@ module PromptRequests
     # 利用者へ理由を添える状態です。
     EXPLAINED = %w[rejected failed].freeze
 
+    # 案がそのまま返す項目です。
+    #
+    # **識別子を含みます**（issue #74）。評価メモは案ごとに記録しますので、
+    # 識別子が無いと、画面から記録の経路へ辿れません。
+    OUTPUT_FIELDS = %i[
+      id variation_no composition_type main_prompt negative_prompt parameters
+    ].freeze
+
     # 常に返す項目です。
     #
     # **どのプロジェクトのものかも返します。** 一覧から辿れないと、
@@ -63,20 +71,33 @@ module PromptRequests
       )
     end
 
+    # **評価メモも一緒に引きます。** 案ごとに引き直すと、3 案で 3 回の
+    # 問い合わせになります。
     def outputs
-      prompt_request.prompt_outputs.in_order.map { |output| output_of(output) }
+      prompt_request.prompt_outputs.in_order.includes(:evaluation_note)
+                    .map { |output| output_of(output) }
     end
 
+    # **案の識別子を返します**（issue #74）。評価メモは案ごとに記録しますので、
+    # 識別子が無いと、画面から記録の経路へ辿れません。
+    #
+    # **すでにある評価メモも一緒に返します。** 案ごとに問い合わせ直すと、
+    # 記録の無い案では「見つかりません」を制御の代わりに使うことになります。
+    # **無い場合は `null` です。**
     def output_of(output)
-      {
-        variation_no: output.variation_no,
-        composition_type: output.composition_type,
-        main_prompt: output.main_prompt,
-        negative_prompt: output.negative_prompt,
-        parameters: output.parameters,
+      output.slice(*OUTPUT_FIELDS).symbolize_keys.merge(
         art_direction_note: JSON.parse(output.art_direction_note),
-        degraded: output.degraded?
-      }
+        degraded: output.degraded?,
+        evaluation_note: note_of(output)
+      )
+    end
+
+    # **記録が無ければ `null` です。** 空の入れ物を返しません。
+    def note_of(output)
+      note = output.evaluation_note
+      return nil if note.nil?
+
+      { id: note.id, rating: note.rating, memo: note.memo }
     end
 
     # **理由は文言で返します。** 記録の中身をそのまま出しません。

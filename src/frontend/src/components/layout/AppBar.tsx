@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { Button, Logo } from "@/components/ui";
-import { screenOf, type ScreenKey } from "@/config/screens";
+import { linkTo, type ScreenKey } from "@/config/screens";
 import { text } from "@/strings";
 import styles from "./AppBar.module.css";
 
-/** 上部バーに並べる項目です。 */
-const NAV_ITEMS: readonly ScreenKey[] = ["projects", "presets", "admin"];
+/**
+ * 上部バーに並べる項目です。
+ *
+ * **管理（09）を並べません**（issue #77、requirements.md 4.3、CLAUDE.md）。
+ * 管理画面は開発者用で、入口そのものを分けています（Rails 側・BASIC 認証）。
+ * **一般の利用者の画面に、管理の導線を出しません。**
+ *
+ * **モックには「Admin 管理」が並んでいます**（`app-ui/scripts/chrome.js`）。
+ * **モックは書き換えません。** 実装側で、この 1 点だけを意図して外します。
+ */
+const NAV_ITEMS: readonly ScreenKey[] = ["projects", "presets"];
 
 export interface AppBarProps {
   /** 現在地です。どこにも該当しない場合は渡しません。 */
@@ -28,7 +37,7 @@ export function AppBar({ active, plan, user }: AppBarProps) {
         <Logo href="/" wordmark={text("app.wordmark")} />
         <nav className={styles.nav}>
           {NAV_ITEMS.map((key) => {
-            const screen = screenOf(key);
+            const path = linkTo(key);
             const label = text(`nav.${key}.en`);
             const sublabel = text(`nav.${key}.ja`);
             const isActive = active === key;
@@ -40,7 +49,7 @@ export function AppBar({ active, plan, user }: AppBarProps) {
               </>
             );
 
-            if (screen.path === null) {
+            if (path === null) {
               return (
                 <span
                   key={key}
@@ -54,7 +63,7 @@ export function AppBar({ active, plan, user }: AppBarProps) {
             return (
               <Link
                 key={key}
-                href={screen.path}
+                href={path}
                 className={
                   isActive
                     ? `${styles.navItem} ${styles.navItemActive}`
@@ -76,8 +85,8 @@ export function AppBar({ active, plan, user }: AppBarProps) {
           variant="solid"
           icon="plus"
           iconPosition="start"
-          href={screenOf("newRequest").path ?? undefined}
-          disabled={screenOf("newRequest").path === null}
+          href={linkTo("newRequest") ?? undefined}
+          disabled={linkTo("newRequest") === null}
         >
           {text("nav.newRequest.action")}
         </Button>

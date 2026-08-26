@@ -205,6 +205,21 @@
 | `inputs.copy_space_position` | − | 文字を置く余白の位置です。既定は `left` です |
 | `inputs.aspect_ratio` | − | 画角です。既定は `16:9` です |
 
+**入力条件で選べる値**
+
+**この一覧が契約です。** 画面（`src/frontend/src/types/resources.ts`）とバックエンド（`Generation::InputChoices`）は、いずれもこの表を実装します。**片方だけを増やすと、画面では選べるのに投入で弾かれます。**
+
+| 項目 | 選べる値 | 既定値 |
+|---|---|---|
+| `industry` | `saas` ・ `restaurant` ・ `medical` ・ `education` ・ `real_estate` ・ `manufacturing` ・ `professional_services` ・ `ecommerce` ・ `beauty` ・ `other` | 既定値はありません（必須です） |
+| `style_family` | `photoreal` ・ `illustration` ・ `three_d` ・ `abstract` | 既定値はありません（必須です） |
+| `target_model` | `midjourney` ・ `dalle` ・ `stable_diffusion` ・ `nano_banana` | 既定値はありません（必須です） |
+| `brand_tone` | `trust` ・ `advanced` ・ `warmth` ・ `premium` ・ `friendly` ・ `minimal` | 業種ごとの標準 |
+| `copy_space_position` | `left` ・ `right` ・ `bottom_center` | `left` |
+| `aspect_ratio` | `16:9` ・ `21:9` ・ `3:2` | `16:9` |
+| `service_summary` | 自由記述です。**1000 文字まで**です | 空です |
+| `brand_colors` | `#RRGGBB` の形の文字列を**2 つまで**です | 空です |
+
 **応答（`201`）**
 
 ```json
@@ -283,17 +298,23 @@
   "updated_at": "2026-08-27T10:30:42+09:00",
   "outputs": [
     {
+      "id": 42,
       "variation_no": 1,
       "composition_type": "subject_led",
       "main_prompt": "...",
       "negative_prompt": "...",
       "parameters": { "aspect_ratio": "16:9" },
       "art_direction_note": { "checkpoints": [] },
-      "degraded": true
+      "degraded": true,
+      "evaluation_note": { "id": 11, "rating": 4, "memo": "余白が読みやすいです。" }
     }
   ]
 }
 ```
+
+**案には識別子（`id`）が付きます。** 評価メモは案ごとに記録しますので、識別子が無いと記録の経路へ辿れません。
+
+**すでに記録された評価メモは、案と一緒に返します。** 記録が無い案は `null` です。**案ごとに問い合わせ直しません。**
 
 **失敗**
 
