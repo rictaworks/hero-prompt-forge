@@ -19,6 +19,7 @@ PR ごとにディレクトリを分けます。各ファイルは、その PR �
 ```
 test/hooks/*.test.mjs        マージ前フックの検査
 test/hardcode/*.test.mjs     ハードコード検出の検査
+test/harness/*.test.mjs      テストの置き場が実行から漏れていないかの検査
 ```
 
 いずれも `node --test` で動かします。**一時ディレクトリへ作った最小の
@@ -28,7 +29,21 @@ test/hardcode/*.test.mjs     ハードコード検出の検査
 ```bash
 npm run test:hooks
 npm run test:hardcode
+npm run test:harness
 ```
+
+### 束ねる実行
+
+```bash
+npm run test:all
+```
+
+**Playwright（`npm run test:e2e`）は束ねません。** 開発サーバーが動いていないと
+実行できず、束ねると「サーバーが無い」だけで全体が落ちます。CI でも別のジョブです。
+
+**新しい置き場を `test/` へ足したら、`package.json` へ実行を足してください。**
+足さないと `npm run test:harness` が失敗します（issue #142）。
+`pr` で始まる置き場は Playwright が拾いますので、実行を足す必要はありません。
 
 ## レビューのための一時的な作業ツリー
 

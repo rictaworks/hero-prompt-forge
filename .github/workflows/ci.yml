@@ -158,6 +158,10 @@ jobs:
       - name: マージ前フックの検査
         run: timeout 120 npm run test:hooks
 
+      # **置き場が実行から漏れていないかを確かめます**（issue #142）。
+      - name: テストの置き場の検査
+        run: timeout 120 npm run test:harness
+
   hardcode:
     name: ハードコードの検査
     runs-on: ubuntu-latest

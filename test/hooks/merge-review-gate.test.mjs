@@ -144,3 +144,60 @@ test("PR 番号が無ければ止めます", () => {
   const root = makeRepo({ reviewer: "## 判定\n\n合格\n" });
   assert.equal(runHook(root, `${MERGE_COMMAND} --squash`).code, 2);
 });
+
+// **最後の判定の節だけを読みます**（issue #142）。
+// 本プロジェクトは、再レビューの結果を同じ記録へ追記します。
+test("追記された記録は、最後の判定だけを読みます", () => {
+  const root = makeRepo({
+    reviewer:
+      "# コードレビュー\n\n## 判定\n\n要修正\n\n1 件あります。\n\n---\n\n## 判定\n\n合格\n\n直っています。\n",
+  });
+  assert.equal(runHook(root).code, 0);
+});
+
+test("最後の判定が芳しくなければ、先に合格があっても止めます", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 判定\n\n合格\n\n---\n\n## 判定\n\n要修正\n",
+  });
+  assert.equal(runHook(root).code, 2);
+});
+
+// **先頭行が既定の語と一致することを求めます**（issue #142）。
+// 語の有無で見ると、否定した書き方が通ります。
+test("判定を否定した書き方は止めます", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 判定\n\n合格ではありません\n",
+  });
+  const { code, stderr } = runHook(root);
+  assert.equal(code, 2);
+  assert.match(stderr, /既定の語/);
+});
+
+test("合格に届かないと書いた記録は止めます", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 判定\n\n要修正のため合格に届きません\n",
+  });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("強調の記号が付いていても読めます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\n**合格**\n" });
+  assert.equal(runHook(root).code, 0);
+});
+
+test("末尾の句点が付いていても読めます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\n**条件付き合格。**\n" });
+  assert.equal(runHook(root).code, 0);
+});
+
+test("先頭行に理由まで書いてあれば止めます", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 判定\n\n**合格** です。マージして構いません。\n",
+  });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("空行を挟んでも、最初の中身のある行を読みます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\n\n\n合格\n" });
+  assert.equal(runHook(root).code, 0);
+});
