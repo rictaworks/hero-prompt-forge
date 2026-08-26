@@ -126,6 +126,95 @@ RSpec.describe Generation::RuleEngine do
     end
   end
 
+  # 語の形の違いを吸収します（issue #136）。
+  #
+  # **単数と複数、英国式と米国式のつづり、語の前後の記号、全角の英字は、
+  # いずれも「同じ語の別の書き方」です。** 語彙の問題ではありませんので、
+  # 照合の側で吸収します。語順の違いと言い換えは、規則辞書の側で扱います。
+  describe '語の形の違い' do
+    def applied(main_terms)
+      engine.apply(engine.start(input).add(main_terms: main_terms))
+    end
+
+    # 語の形だけが違う辞書で確かめます。
+    let(:forms_dictionary) do
+      RuleDictionary.create!(
+        version: 'vspec.forms',
+        anti_ai_rules: {
+          'forbidden_terms' => ['glowing particles', 'oversaturated colors',
+                                'purple to teal gradient'],
+          'negative_prompt_terms' => ['deformed hands']
+        }
+      )
+    end
+
+    let(:forms_engine) { described_class.new(dictionary: forms_dictionary) }
+
+    def forms_applied(main_terms)
+      forms_engine.apply(forms_engine.start(input).add(main_terms: main_terms))
+    end
+
+    [
+      ['複数形が違います', 'glowing particle effects'],
+      ['単数形が違います', 'a glowing particle in the air'],
+      ['英国式のつづりです', 'oversaturated colours'],
+      ['全角の英字です', 'ＰＵＲＰＬＥ ＴＯ ＴＥＡＬ ＧＲＡＤＩＥＮＴ']
+    ].each do |reason, term|
+      it "#{reason}：「#{term}」を取り除きます" do
+        expect(forms_applied([term]).main_terms).to be_empty
+      end
+    end
+
+    # **記号を語の一部として扱いません。**
+    # `art,` を登録すると `smart, clean layout` が丸ごと落ちていました。
+    it '記号を含む語を登録しても、別の語を巻き込みません' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.marks',
+        anti_ai_rules: { 'forbidden_terms' => ['art,'], 'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ['smart, clean layout'])
+
+      expect(marks_engine.apply(draft).main_terms).to eq(['smart, clean layout'])
+    end
+
+    # **語の内側に記号がある語も、語の切れ目で見ます**（PR #144 のレビューより）。
+    it '語の内側に記号がある語でも、別の語を巻き込みません' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.inner-marks',
+        anti_ai_rules: { 'forbidden_terms' => ["art's"],
+                         'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ["smart's clean layout"])
+
+      expect(marks_engine.apply(draft).main_terms).to eq(["smart's clean layout"])
+    end
+
+    it '語の内側に記号がある語そのものは取り除きます' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.inner-marks2',
+        anti_ai_rules: { 'forbidden_terms' => ["art's"],
+                         'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ["an art's studio"])
+
+      expect(marks_engine.apply(draft).main_terms).to be_empty
+    end
+
+    it '記号を含む語そのものは取り除きます' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.marks2',
+        anti_ai_rules: { 'forbidden_terms' => ['art,'], 'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ['abstract art, floating'])
+
+      expect(marks_engine.apply(draft).main_terms).to be_empty
+    end
+  end
+
   # **関係のない素材を巻き込みません。**
   # 撮影の指示が消えると、requirements.md 4.2 が求める撮影指示を満たせません。
   describe '通してよい素材' do
@@ -139,7 +228,13 @@ RSpec.describe Generation::RuleEngine do
       '85mm lens, shallow depth of field',
       'a single subtle rim light',
       'bounced fill from a white wall',
-      'path traced rendering, neutral tone mapping'
+      'path traced rendering, neutral tone mapping',
+      'stealth startup founders',
+      'artisan coffee roastery',
+      'a factory line with metal parts',
+      '35mm lens',
+      'soft lens flare through a window',
+      'a glass storefront at dusk'
     ].each do |term|
       it "「#{term}」を残します" do
         expect(applied([term]).main_terms).to eq([term])
