@@ -1,10 +1,8 @@
 import Image from "next/image";
 import { Button, FaqItem, Logo, ProcessStep, SectionHeading, StrengthCard } from "@/components/ui";
+import { LOGIN_PATH } from "@/config/backend";
 import { text } from "@/strings";
 import styles from "./landing.module.css";
-
-/** X ログインの入口です。**画面と同じ場所です。** 中継はサーバー側が行います。 */
-const LOGIN_PATH = "/auth/start";
 
 /** 特徴の 3 枚です。文言は設定から引きます。 */
 const CARDS = [
@@ -48,7 +46,7 @@ export function Landing() {
               {text(`landing.labels.nav${anchor.label}`)}
             </a>
           ))}
-          <Button variant="solid" href={LOGIN_PATH}>
+          <Button variant="solid" href={LOGIN_PATH} external>
             {text("landing.labels.navLogin")}
           </Button>
         </nav>
@@ -85,13 +83,19 @@ function HeroSection() {
         </h1>
         <p className={styles.heroLead}>{text("landing.hero.lead")}</p>
         <div className={styles.heroActions}>
-          <Button variant="outline" href={LOGIN_PATH} icon="chevron-right">
+          <Button variant="outline" href={LOGIN_PATH} icon="chevron-right" external>
             {text("landing.labels.heroAction")}
           </Button>
+          {/* **アカウント名を立たせます。** 誰のフォロワーであればよいかは、
+              利用できるかどうかの判断材料です（`app-ui/index.html` と同じ体裁）。 */}
           <span className={styles.heroNote}>
             {text("landing.labels.heroNoteBefore")}
-            {text("landing.labels.heroNoteAccount")}
+            <span className={styles.heroNoteAccount}>
+              {text("landing.labels.heroNoteAccount")}
+            </span>
             {text("landing.labels.heroNoteAfter")}
+            <br />
+            {text("landing.labels.heroNoteTail")}
           </span>
         </div>
       </div>
@@ -191,7 +195,7 @@ function ContactSection() {
           {text("landing.contact.body")}
         </SectionHeading>
         <div className={styles.contactCta}>
-          <Button variant="submit" href={LOGIN_PATH} fullWidth>
+          <Button variant="submit" href={LOGIN_PATH} fullWidth external>
             {text("landing.labels.contactAction")}
           </Button>
         </div>

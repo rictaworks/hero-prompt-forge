@@ -25,13 +25,30 @@ describe("strings", () => {
       "app.wordmark",
       "nav.",
       "errors.unexpected.traceLabel",
+      // モックの見出しです（`app-ui/index.html`）。**体言止めです。**
+      // 句点で終わりますが、述語を持ちませんので `labels` へ置けません。
+      // **モックを書き換えませんので、ここで明示して外します。**
+      "landing.contact.title",
     ];
 
     const isLabel = (path: string): boolean =>
       path.split(".").includes("labels");
 
+    // **語尾で見ます。** 終わりの記号だけを見ると、「だ・である調」が
+    // 句点付きで素通りします（PR #170 のレビューで実測されました）。
+    //
     // **問いかけも、ですます調です。** 句点ではなく疑問符で終わります。
-    const ENDINGS = ["。", "？"];
+    const ENDINGS = [
+      "です。",
+      "ます。",
+      "ません。",
+      "でした。",
+      "ました。",
+      "ください。",
+      "ますか？",
+      "ですか？",
+      "できますか？",
+    ];
 
     const collect = (value: unknown, path: string): [string, string][] =>
       typeof value === "string"
@@ -58,6 +75,9 @@ describe("strings", () => {
   });
 
   // **`labels` を句点回避の逃げ道にしません。**
+  //
+  // **述語を含む語を置きません。** 長さと句点の有無だけでは、
+  // 「だ・である調」の短い文が素通りします（PR #170 のレビューより）。
   it("labels の下は短い語だけです", () => {
     const collect = (value: unknown, path: string): [string, string][] =>
       typeof value === "string"
@@ -72,11 +92,33 @@ describe("strings", () => {
       path.split(".").includes("labels"),
     );
 
+    // 文であることを示す語尾です。**`labels` はここで終わりません。**
+    //
+    // **「含む」ではなく「終わる」で見ます。** 「フォロワーであること」の
+    // ような名詞のまとまりは、条件の言い表し方として正しいものです。
+    const PREDICATE_ENDINGS = [
+      "です",
+      "ます",
+      "ません",
+      "でした",
+      "ました",
+      "ください",
+      "だ",
+      "である",
+      "する",
+      "した",
+      "ない",
+      "無い",
+    ];
+
     expect(labels.length).toBeGreaterThan(0);
     for (const [path, value] of labels) {
-      expect([path, value.length <= 30, value.includes("。")]).toEqual([
+      const hasPredicate = PREDICATE_ENDINGS.some((word) => value.endsWith(word));
+
+      expect([path, value.length <= 30, value.includes("。"), hasPredicate]).toEqual([
         path,
         true,
+        false,
         false,
       ]);
     }

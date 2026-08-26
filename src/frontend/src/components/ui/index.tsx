@@ -45,6 +45,15 @@ export interface ButtonProps
   icon?: string;
   iconPosition?: "start" | "end";
   fullWidth?: boolean;
+  /**
+   * 画面の外へ出る入口かどうかです。
+   *
+   * **外への出口では、画面の中の移動の仕組みを使いません。**
+   * その仕組みは、移動先を先に読み込みます。**押していないのに
+   * 呼ばれますので、ログインの手続きが勝手に始まります**
+   * （PR #170 のレビューで実測されました）。
+   */
+  external?: boolean;
   children: ReactNode;
 }
 
@@ -53,6 +62,9 @@ export interface ButtonProps
  *
  * href を渡した場合は移動、渡さない場合は操作として描画します。
  * 押せない状態のときは移動先を張りません。
+ *
+ * **外への出口（`external`）では、素の入口を描きます。** 先読みを
+ * 起こしません。
  */
 export function Button({
   variant = "outline",
@@ -60,6 +72,7 @@ export function Button({
   icon,
   iconPosition = "end",
   fullWidth = false,
+  external = false,
   disabled = false,
   children,
   className,
@@ -87,7 +100,12 @@ export function Button({
   );
 
   if (href && !disabled) {
-    return (
+    // **外への出口は、素の入口で描きます。** 先読みを起こしません。
+    return external ? (
+      <a href={href} className={classes}>
+        {content}
+      </a>
+    ) : (
       <Link href={href} className={classes}>
         {content}
       </Link>
