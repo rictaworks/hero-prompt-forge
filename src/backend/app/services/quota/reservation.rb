@@ -45,18 +45,20 @@ module Quota
         consumption = QuotaConsumption.find_for(user, quota_day)
 
         return create!(user, quota_day, prompt_request) if consumption.nil?
-        return reuse!(consumption, prompt_request) if reusable?(consumption, prompt_request)
 
-        raise exhausted(quota_day)
+        claim!(consumption, prompt_request, quota_day)
       end
 
       # 生成リクエストの結果に合わせて、確定または返還します。
+      #
+      # 決着できるのは予約中の記録だけです。返還済み・確定済みは履歴として残るため、
+      # 生成リクエストの識別子だけで引くと、日をまたぐ再実行で前日の記録に当たります。
       # @return [QuotaConsumption]
       def settle!(prompt_request)
-        consumption = QuotaConsumption.find_by(prompt_request_id: prompt_request.id)
+        consumption = reserved_for(prompt_request)
         if consumption.nil?
           raise MissingReservationError,
-                "予約がありません: prompt_request=#{prompt_request.id}" # 開発者向け
+                "予約中の記録がありません: prompt_request=#{prompt_request.id}" # 開発者向け
         end
 
         consumption.transition_to!(next_status_for(prompt_request))
@@ -83,26 +85,52 @@ module Quota
 
       def create!(user, quota_day, prompt_request)
         QuotaConsumption.create!(user: user, quota_day: quota_day,
-                                 prompt_request: prompt_request)
+                                 **request_attributes(prompt_request))
       rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-        # 並列に投入され、先を越されました。上限に達したものとして扱います。
-        raise exhausted(quota_day)
+        # その日の記録がすでにあるなら、並列に投入されて先を越されています。
+        # それ以外の理由で保存できなかった場合は、上限到達として隠しません。
+        raise exhausted(quota_day) if QuotaConsumption.find_for(user, quota_day)
+
+        raise
       end
 
-      # 返還済みは作り直せます。同じ生成リクエストの予約は繰り返しても増やしません。
-      def reusable?(consumption, prompt_request)
-        return true if consumption.status == 'refunded'
+      # すでにある記録から枠を取り直します。
+      #
+      # **行に錠をかけてから状態を見ます。** 読むところと書くところの間に他の
+      # 呼び出しが割り込むと、返還済みの枠を2つの呼び出しが同時に取れてしまいます。
+      # 作り直しは行の更新であり、利用者 × クォータ日の一意制約では止まりません。
+      def claim!(consumption, prompt_request, quota_day)
+        consumption.with_lock do
+          if same_request_reserved?(consumption, prompt_request)
+            consumption
+          elsif consumption.status == 'refunded'
+            consumption.transition_to!('reserved', **request_attributes(prompt_request))
+            consumption
+          else
+            raise exhausted(quota_day)
+          end
+        end
+      end
 
+      # 同じ生成リクエストの予約を繰り返し呼んでも増やしません。
+      def same_request_reserved?(consumption, prompt_request)
         consumption.status == 'reserved' &&
           prompt_request.present? &&
           consumption.prompt_request_id == prompt_request.id
       end
 
-      def reuse!(consumption, prompt_request)
-        return consumption if consumption.status == 'reserved'
+      # 生成リクエストが無ければ、結び付きに触れません。触れると、返還のもとに
+      # なった生成リクエストとの結び付きが空で上書きされ、履歴を追えなくなります。
+      def request_attributes(prompt_request)
+        return {} if prompt_request.nil?
 
-        consumption.transition_to!('reserved', prompt_request: prompt_request)
-        consumption
+        { prompt_request: prompt_request }
+      end
+
+      def reserved_for(prompt_request)
+        QuotaConsumption.where(prompt_request_id: prompt_request.id, status: 'reserved')
+                        .order(quota_day: :desc)
+                        .first
       end
 
       def next_status_for(prompt_request)

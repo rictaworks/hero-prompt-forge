@@ -172,6 +172,74 @@ RSpec.describe Quota::Reservation do
     end
   end
 
+  describe '日をまたぐ再実行' do
+    let(:next_day) { Time.find_zone!('Asia/Tokyo').parse('2026-08-26 12:00:00') }
+
+    before do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('failed')
+      described_class.settle!(prompt_request)
+    end
+
+    it '翌日に取り直すと、その日の枠を使います' do
+      consumption = described_class.reserve!(user: user, prompt_request: prompt_request,
+                                             now: next_day)
+
+      expect(consumption.quota_day).to eq(Date.new(2026, 8, 26))
+      expect(consumption.status).to eq('reserved')
+    end
+
+    it '決着は当日の予約に当たります' do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('completed')
+
+      settled = described_class.settle!(prompt_request)
+
+      expect(settled.quota_day).to eq(Date.new(2026, 8, 26))
+      expect(settled.status).to eq('confirmed')
+    end
+
+    it '前日の返還済みの記録はそのまま残ります' do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('completed')
+      described_class.settle!(prompt_request)
+
+      previous = QuotaConsumption.find_for(user, Date.new(2026, 8, 25))
+
+      expect(previous.status).to eq('refunded')
+    end
+  end
+
+  describe '返還のもとになった生成リクエストとの結び付き' do
+    it '生成リクエストを渡さずに取り直しても、結び付きは消えません' do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('failed')
+      described_class.settle!(prompt_request)
+
+      consumption = described_class.reserve!(user: user, now: now)
+
+      expect(consumption.prompt_request_id).to eq(prompt_request.id)
+    end
+  end
+
+  describe '保存できない理由が上限到達でない場合' do
+    it '上限到達として隠しません' do
+      allow(QuotaConsumption).to receive(:create!)
+        .and_raise(ActiveRecord::RecordNotUnique, '別の理由です')
+
+      expect { described_class.reserve!(user: user, now: now) }
+        .to raise_error(ActiveRecord::RecordNotUnique)
+    end
+  end
+
   describe '.remaining_for?' do
     it '使っていなければ残っています' do
       expect(described_class.remaining_for?(user, now: now)).to be(true)
