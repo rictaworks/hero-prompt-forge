@@ -1,44 +1,37 @@
 # frozen_string_literal: true
 
 module Adapters
-  # nano banana 系の記法です（requirements.md 4.1 の 7）。
+  # nano banana 系（Gemini 系の画像生成）の記法です（requirements.md 4.1 の 7）。
   #
-  # **自然文で書きます。** 語を並べるより、文で伝えるほうが意図が通ります。
-  # **打ち消しは別の欄です。** 本文とは分けて渡します。
+  # **自然文で書きます。** 組み立ては NarrativeAdapter が持ちます。
   #
-  # DALL-E 系と違い打ち消しの欄を持ちますので、**避けたい表現をそちらへ
-  # 回せます。**
-  class NanoBananaAdapter < ModelAdapter
-    # 文の区切りです。
-    SENTENCE_END = '. '
-    # 文の終わりです。
-    PERIOD = '.'
-    # 素材の区切りです。打ち消しの欄で使います。
-    SEPARATOR = ', '
-    # 先頭に置く言い回しです。
-    OPENING = 'A website hero image'
+  # **打ち消しの欄を持ちません。** 会話文で指示する作りで、負の指定を渡す項目が
+  # ありません。同系統の Imagen でも、その項目は新しい版で廃止され、
+  # 「出したいものを肯定形で書く」ことが案内されています（PR #154 のレビューより）。
+  #
+  # **欄を持つと偽ると、行き場の無い打ち消しを受け取った側が本文へ書き込みます。**
+  # それは、DALL-E 系について避けている失敗そのものです。
+  class NanoBananaAdapter < NarrativeAdapter
+    MODEL_KEY = 'nano_banana'
 
-    # **打ち消しの欄を持ちます。**
+    class << self
+      def model_key = MODEL_KEY
+    end
+
+    # **打ち消しの欄を持ちません。**
     def negative_prompt?
-      true
+      false
     end
 
     private
 
-    def main_prompt_for(draft)
-      aspect_ratio = input_value(draft, :aspect_ratio)
-      sentences = ["#{OPENING} in a #{aspect_ratio} frame"]
-      sentences += draft.main_terms.map { |term| term.sub(/\A[a-z]/, &:upcase) }
-
-      "#{sentences.join(SENTENCE_END)}#{PERIOD}"
+    def negative_prompt_for(_draft)
+      nil
     end
 
-    def negative_prompt_for(draft)
-      draft.negative_terms.join(SEPARATOR)
-    end
-
+    # **鍵の名前はモデル共通です。**
     def parameters_for(draft)
-      { 'aspect_ratio' => input_value(draft, :aspect_ratio) }
+      { ASPECT_RATIO_PARAMETER => input_value(draft, :aspect_ratio) }
     end
   end
 end
