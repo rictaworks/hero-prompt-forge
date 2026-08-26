@@ -23,14 +23,26 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  # **`assume_ssl` を有効にしません。**
+  # 有効にすると、Rails はすべての要求を TLS の上のものとして扱います。
+  # その結果、**平文の要求でも転送が起きず、`force_ssl` が働きません**
+  # （PR #150 のレビューで実測されました）。
+  #
+  # 配置先（Railway）は TLS を終端し、`X-Forwarded-Proto` を付けて渡します。
+  # Rails はその印を見て、TLS の上かどうかを判断します。**印がある要求は
+  # 転送されず、印の無い平文の要求だけが転送されます。**
 
-  # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  # config.force_ssl = true
+  # **すべての通信を TLS の上でだけ行います。**
+  # 管理画面は BASIC 認証です。BASIC 認証の資格情報は、TLS が無ければ
+  # そのまま読み取れる形で流れます（requirements.md 5.2）。
+  config.assume_ssl = false
+  config.force_ssl = true
 
-  # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
+  # 死活監視だけは、平文の要求でも答えます。外形監視サービスが
+  # 追従できない場合に、稼働しているのに落ちていると判定されるためです。
+  config.ssl_options = {
+    redirect: { exclude: ->(request) { ['/up', '/health'].include?(request.path) } }
+  }
 
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [:request_id]

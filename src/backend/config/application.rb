@@ -21,6 +21,9 @@ require 'action_cable/engine'
 Bundler.require(*Rails.groups)
 
 module Backend
+  # 管理画面のセッションの鍵です。利用者向けのクッキーと名前を分けます。
+  ADMIN_SESSION_KEY = '_hpf_admin_session'
+
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
@@ -40,6 +43,17 @@ module Backend
     # API モードでは、クッキーを扱う仕組みが既定で外れています。
     # ログイン状態の受け渡しに署名付きクッキーを使うため、明示的に組み込みます。
     config.middleware.use ActionDispatch::Cookies
+
+    # **管理画面の CSRF 対策には、セッションが要ります。**
+    # API モードではセッションの仕組みも外れており、`protect_from_forgery` を
+    # 書いても働きません（`protect_against_forgery?` が偽になるためです）。
+    # 書いたつもりで守られていない状態になりますので、明示的に組み込みます。
+    #
+    # **利用者向けの API はセッションを使いません。** ログイン状態は署名付き
+    # クッキーで受け渡します。このセッションは管理画面のためだけに使います。
+    config.session_store :cookie_store, key: ADMIN_SESSION_KEY, same_site: :lax, httponly: true
+    config.middleware.use ActionDispatch::Session::CookieStore,
+                          key: ADMIN_SESSION_KEY, same_site: :lax, httponly: true
 
     # 時刻は JST です。
     config.time_zone = 'Asia/Tokyo'
