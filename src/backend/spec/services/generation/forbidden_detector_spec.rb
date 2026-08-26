@@ -298,8 +298,44 @@ RSpec.describe Generation::ForbiddenDetector do
       end
     end
 
-    it '画面へ置く意図があれば止めます' do
-      expect(detect('他社のロゴを載せたいです。')).to be_forbidden
+    # **通す側と止める側を対にして固定します。** 片方だけを確かめると、
+    # 意図の語を必須にした判定が正しく働く範囲を見落とします。
+    [
+      ['他社のロゴを載せたいです。', '他社のロゴの調査を承ります。'],
+      ['他社のロゴを再現してください。', '他社のロゴの類似性を確認します。'],
+      ['第三者の商標を無断で使用します。', '第三者の商標を侵害しないか確認します。'],
+      ['他社のロゴを表示したいです。', '他社の商標調査を代行します。'],
+      ['競合のロゴマークをそのまま持ってきてください。', '競合の商標の出願状況を調べます。'],
+      ['よそのエンブレムを大きく描き込んでください。', 'よその商標と紛らわしくないか確認します。']
+    ].each do |blocked, allowed|
+      it "「#{blocked}」を止めます" do
+        expect(detect(blocked)).to be_forbidden
+      end
+
+      it "「#{allowed}」を止めません" do
+        expect(detect(allowed)).not_to be_forbidden
+      end
+    end
+  end
+
+  # **読点があるだけで判定が変わってはいけません。**
+  # 日本語の商用文で読点を挟むのはごく普通の書き方です。
+  describe '読点の有無' do
+    [
+      ['他社のロゴマークを画面の中央に配置してください。',
+       '他社のロゴマークを、画面の中央に配置してください。'],
+      ['他社のロゴを大きく載せてください。',
+       '他社のロゴを、大きく載せてください。'],
+      ['第三者の商標をそのまま使用します。',
+       '第三者の商標を、そのまま使用します。']
+    ].each do |without_comma, with_comma|
+      it "読点が無くても止めます：「#{without_comma}」" do
+        expect(detect(without_comma)).to be_forbidden
+      end
+
+      it "読点があっても止めます：「#{with_comma}」" do
+        expect(detect(with_comma)).to be_forbidden
+      end
     end
   end
 
