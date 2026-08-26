@@ -3,8 +3,10 @@
 require 'rails_helper'
 
 RSpec.describe RuleDictionary do
+  # 版名はテスト専用の値です。初期データ（db/seeds.rb）の版名と重ねません。
+  # 重ねると、初期データが入った状態では一意制約に当たって落ちます。
   def build_dictionary(**overrides)
-    described_class.new({ version: 'v2026.08.1' }.merge(overrides))
+    described_class.new({ version: 'vspec.1' }.merge(overrides))
   end
 
   describe '検証' do

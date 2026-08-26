@@ -47,9 +47,12 @@ jobs:
         working-directory: src/backend
         run: bundle exec rubocop --format simple
 
+      # テスト用のデータベースは、スキーマだけを作ります。
+      # db:prepare は表の無いデータベースへ初期データ（db/seeds.rb）まで流すため、
+      # 初期データとテストの作るデータが衝突します。テストは初期データを前提にしません。
       - name: データベースの準備
         working-directory: src/backend
-        run: bin/rails db:prepare
+        run: bin/rails db:test:prepare
 
       - name: テスト
         working-directory: src/backend
