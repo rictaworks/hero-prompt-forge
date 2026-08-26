@@ -37,6 +37,10 @@ class PromptRequest < ApplicationRecord
   # 成果物を提供した状態です。クォータを確定します。
   DELIVERED_STATUSES = %w[completed degraded_completed].freeze
 
+  # まだ決着していない状態です。**枠を予約したまま、確定も返還もしていません。**
+  # 失敗として記録できるのは、この状態だけです。
+  UNSETTLED_STATUSES = %w[queued generating].freeze
+
   belongs_to :project
   has_one :user, through: :project
   has_many :prompt_outputs, dependent: :restrict_with_exception
