@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { AppBar } from "@/components/layout/AppBar";
 import { SCREENS, screenOf, UnknownScreenError } from "@/config/screens";
+import { text } from "@/strings";
 
 describe("AppBar", () => {
   it("プラン値と利用者名を表示します", () => {
@@ -14,7 +15,10 @@ describe("AppBar", () => {
   it("ロゴから先頭の画面へ移動できます", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
-    expect(screen.getByRole("link", { name: /Veyra Dragon/ })).toHaveAttribute(
+    // **名前を書き写しません。** 設定から引きます。
+    expect(
+      screen.getByRole("link", { name: new RegExp(text("app.wordmark")) }),
+    ).toHaveAttribute(
       "href",
       "/",
     );

@@ -43,6 +43,31 @@ services:
       # 開発者用の管理画面の資格情報です。未設定なら管理画面は開けません。
       ADMIN_BASIC_AUTH_USER: ${ADMIN_BASIC_AUTH_USER:-}
       ADMIN_BASIC_AUTH_PASSWORD: ${ADMIN_BASIC_AUTH_PASSWORD:-}
+      # X ログインです。**未設定でも起動します。** ログインの経路だけが使えません。
+      # `.env` に値があっても、ここへ並べないとコンテナへ届きません
+      # （PR #166 の pr-checker で実測されました）。
+      X_OAUTH_CLIENT_ID: ${X_OAUTH_CLIENT_ID:-}
+      X_OAUTH_CLIENT_SECRET: ${X_OAUTH_CLIENT_SECRET:-}
+      X_OAUTH_REDIRECT_URI: ${X_OAUTH_REDIRECT_URI:-}
+      # フォロワー判定サービスです。**ドメインを公開しません。**
+      FOLLOWER_GATE_BASE_URL: ${FOLLOWER_GATE_BASE_URL:-}
+      FOLLOWER_GATE_CLIENT_ID: ${FOLLOWER_GATE_CLIENT_ID:-}
+      FOLLOWER_GATE_CREDENTIAL: ${FOLLOWER_GATE_CREDENTIAL:-}
+      # ログインの後に戻す先です。
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      # 画面の公開先です。**ブラウザへ配ってよい値です。**
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-}
+      # 画面からバックエンドへの中継先です。**ブラウザへ配りません。**
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-}
+      # 開発・テストでのみ効く自動ログインです。**本番では効きません。**
+      DEVELOPMENT_AUTO_LOGIN_X_USER_ID: ${DEVELOPMENT_AUTO_LOGIN_X_USER_ID:-}
+      # LLM による精緻化です。未設定なら呼び出さずに縮退します。
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Bot 対策です。開発では未設定なら照合を飛ばします。**本番では必須です。**
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY:-}
+      # ブラウザ操作による確認の接続先です。**開発サーバーだけを指します。**
+      E2E_BASE_URL: ${E2E_BASE_URL:-}
     volumes:
       - .:/workspace
       - bundle:/bundle

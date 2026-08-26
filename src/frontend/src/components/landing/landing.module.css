@@ -1,0 +1,205 @@
+/* ─────────────────────────────────────────────────────────────
+   ランディング（01）です。
+
+   `app-ui/index.html` ・ `app-ui/styles/landing.css` の移植です。
+   数値・色・余白は原本のままにします。**モックを書き換えません。**
+   ───────────────────────────────────────────────────────────── */
+
+.page {
+  background: var(--dark);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+/* ── ランディング専用のヘッダー ───────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 6%;
+  background: var(--scrim-92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.navMenu {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+.navLink {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--grey-999);
+  text-decoration: none;
+}
+.navLink:hover {
+  color: var(--gold-light);
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 640px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.heroImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.45) saturate(1.3);
+}
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(10, 10, 10, 0.94) 0%,
+    rgba(10, 10, 10, 0.6) 55%,
+    rgba(10, 10, 10, 0) 80%
+  );
+}
+.heroInner {
+  position: relative;
+  max-width: 560px;
+  margin-left: 6%;
+  padding: 100px 0;
+}
+.heroEyebrow {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 22px;
+}
+.heroTitle {
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  margin: 0 0 26px;
+}
+.accent {
+  color: var(--red);
+}
+.heroLead {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--grey-bbb);
+  margin: 0 0 34px;
+}
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.heroNote {
+  font-size: 11.5px;
+  color: var(--grey-777);
+  line-height: 1.7;
+}
+.heroNoteAccount {
+  color: var(--gold);
+}
+
+.heroScrollCue {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  width: 1px;
+  height: 44px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), var(--gold));
+}
+
+/* ── 2 列構成のセクション（左に見出し・右に本体） ───────────── */
+.section {
+  padding: 80px 6%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 72px;
+  align-items: start;
+  background: var(--dark);
+}
+.sectionAlt {
+  background: var(--dark2);
+}
+.sectionBody {
+  grid-column: span 2;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2px;
+  grid-column: span 2;
+}
+
+/* ── Contact ──────────────────────────────────────────────── */
+.contact {
+  position: relative;
+  padding: 90px 6%;
+  overflow: hidden;
+}
+.contactImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.45) saturate(1.2);
+}
+.contactScrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-85);
+}
+.contactInner {
+  position: relative;
+  max-width: 520px;
+}
+.contactCta {
+  margin-top: 32px;
+  max-width: 280px;
+}
+
+/* ── 狭い画面での最小限の保護（元デザインには無い追加分） ───── */
+@media (max-width: 768px) {
+  .nav {
+    padding: 12px 5%;
+    height: auto;
+    gap: 12px;
+  }
+  .navMenu {
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .heroInner {
+    margin-left: 5%;
+    margin-right: 5%;
+    padding: 72px 0;
+  }
+  .section {
+    padding: 60px 5%;
+    gap: 40px;
+  }
+  .contact {
+    padding: 60px 5%;
+  }
+}

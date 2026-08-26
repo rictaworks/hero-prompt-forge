@@ -1,69 +1,34 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import type { Metadata } from "next";
+import { Landing } from "@/components/landing";
+import { publicBaseUrl } from "@/config/site";
+import { text } from "@/strings";
+
+/**
+ * 共有されたときの見え方です（OGP）。
+ *
+ * **B2B の公開画面です。** X で共有される前提ですので、題・説明・画像・
+ * 正となる場所を明示します（PR #170 のレビューより）。
+ */
+export const metadata: Metadata = {
+  metadataBase: new URL(publicBaseUrl()),
+  title: text("landing.meta.title"),
+  description: text("app.description"),
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: text("landing.meta.title"),
+    description: text("landing.meta.shareDescription"),
+    images: [{ url: "/images/hero-background.webp" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: text("landing.meta.title"),
+    description: text("landing.meta.shareDescription"),
+    images: ["/images/hero-background.webp"],
+  },
+};
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+  return <Landing />;
 }

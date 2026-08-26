@@ -63,6 +63,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_APP_ENV: test
+      # 画面の組み立ては、この 2 つが無いとその場で失敗します（既定値を持たせていません）。
+      # **どちらも検査のためだけの値です。** 本番の値は配置先の設定から渡します。
+      # `BACKEND_INTERNAL_URL` はブラウザへ配りません（バックエンドのドメインを隠蔽します）。
+      BACKEND_INTERNAL_URL: http://backend.invalid
+      NEXT_PUBLIC_BASE_URL: http://frontend.invalid
     steps:
       - uses: actions/checkout@v4
 
