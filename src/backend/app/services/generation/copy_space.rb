@@ -44,6 +44,9 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :copy_space_reserved
 
+    # 画面の比を述べる指示の役割です。**位置の役割と同じ入れ物で持ちます。**
+    ASPECT_RATIO_ROLE = 'aspect_ratio'
+
     # 余白の指定に必ず含まれる語です。素材が残っているかを見分けます。
     # `config/copy_space_rules.yml` の `reserved` は、いずれもこの語を含みます。
     RESERVED_MARK = 'copy space'
@@ -57,8 +60,10 @@ module Generation
       aspect_ratio = aspect_ratio_of(draft)
       instructions = CopySpaceRules.instructions_for(position)
       ratio_instruction = CopySpaceRules.aspect_ratio_instruction(aspect_ratio)
+      roles = CopySpaceRules::ROLES.zip(instructions).to_h
 
-      traced(draft, position, aspect_ratio, instructions + [ratio_instruction], ratio_instruction)
+      traced(draft, position, aspect_ratio, instructions + [ratio_instruction],
+             roles.merge(ASPECT_RATIO_ROLE => ratio_instruction))
     end
 
     # その下書きがコピースペースの指定を持っているかどうかを返します。
@@ -100,11 +105,14 @@ module Generation
             'コピースペースはすでに規定されています。' # 開発者向け
     end
 
-    # **画面の比を述べる素材そのものを、ノートへ残します。**
-    # 整形の段（issue #47、#49）は、この素材を独立した 1 文として述べます。
-    # 素材の文字列を照合して見分けると、言い回しが変わったときに黙って外れます
-    # （PR #154 の 2 回目のレビューより）。
-    def traced(draft, position, aspect_ratio, instructions, ratio_instruction)
+    # **どの指示がどの役割かを、控えへ残します。**
+    #
+    # あとの段（バリエーションの展開・整形）は、被写体の置き場所・余白の確保・
+    # 画面の比を見分ける必要があります。**素材の文字列を照合して見分けると、
+    # 言い回しが変わったときに黙って外れます**（PR #154 ・ #155 のレビューより）。
+    #
+    # 整形の段（issue #47、#49）は、画面の比を述べる素材を独立した 1 文にします。
+    def traced(draft, position, aspect_ratio, instructions, roles)
       Trace.step('generation.copy_space_applied',
                  position: position,
                  aspect_ratio: aspect_ratio,
@@ -112,7 +120,7 @@ module Generation
         draft.add(
           main_terms: instructions,
           notes: [{ kind: NOTE_KIND, position: position, aspect_ratio: aspect_ratio,
-                    aspect_ratio_term: ratio_instruction }]
+                    aspect_ratio_term: roles[ASPECT_RATIO_ROLE], roles: roles }]
         )
       end
     end

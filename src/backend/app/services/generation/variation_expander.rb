@@ -15,10 +15,14 @@ module Generation
   # 選び直します。** 同じレンズ・同じ構図のまま主役だけを入れ替えても、
   # 3 案が似通います。
   #
-  # **抽象背景の案からは、人物を避ける構図を外します。** 具体物を置かない案に
-  # 「後ろ姿の被写体」を指示すると、抽象背景という指定と食い違います。
+  # **抽象背景の案からは、被写体があることを前提にした指示を外します。**
+  # 具体物を置かない案に「後ろ姿の被写体」「被写体の面の被写界深度」
+  # 「被写体を三分割の交点へ置く」を指示すると、抽象背景という指定と食い違います。
+  # **外す素材は、規則の側で役割の名前として持ちます。**
   #
   # **元の下書きを変えません。** 3 案はそれぞれ別の下書きとして返します。
+  #
+  # 1 案の組み立ては VariationBuilder が持ちます。
   class VariationExpander
     # 規則辞書が渡されていない場合に投げます。
     class MissingDictionaryError < StandardError; end
@@ -32,11 +36,14 @@ module Generation
     # スタイル仕様化を通っていない下書きを渡された場合に投げます。
     class MissingSpecificationsError < StandardError; end
 
+    # 別の版の規則辞書で作られた下書きを渡された場合に投げます。
+    class VersionMismatchError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :variation
 
-    # 抽象背景の案から人物の構図を外したことを残す印です。
-    PERSON_SAFETY_DROPPED_NOTE_KIND = :person_safety_dropped
+    # 案ごとに素材を外したことを残す印です。
+    DROPPED_NOTE_KIND = :variation_dropped
 
     def initialize(dictionary:)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
@@ -49,12 +56,10 @@ module Generation
     # @return [Array<Draft>]
     def expand(draft)
       ensure_not_expanded!(draft)
-      applied = specifications_note_of(draft)
+      ensure_specifications!(draft)
+      ensure_same_version!(draft)
 
-      Trace.step('generation.variations_expanded',
-                 style_family: applied[:style_family], variations: order.size) do
-        order.each_with_index.map { |name, index| variation(draft, applied, name, index) }
-      end
+      order.each_with_index.map { |name, index| builder_for(name, index).build(draft) }
     end
 
     # その下書きが展開済みかどうかを返します。
@@ -70,81 +75,29 @@ module Generation
       definition.fetch(VariationRules::ORDER_KEY)
     end
 
-    def composition_for(name)
-      definition.fetch(VariationRules::COMPOSITIONS_KEY).fetch(name)
-    end
+    def builder_for(name, index)
+      composition = definition.fetch(VariationRules::COMPOSITIONS_KEY).fetch(name)
 
-    # 1 案を組み立てます。
-    def variation(draft, applied, name, index)
-      composition = composition_for(name)
-      terms = swapped_terms(draft, applied, name, index)
-
-      draft.replace(main_terms: terms).add(
-        main_terms: [composition.fetch(VariationRules::FOCUS_KEY)],
-        notes: [variation_note(name, index)] + dropped_notes(draft, composition)
-      )
-    end
-
-    def variation_note(name, index)
-      { kind: NOTE_KIND, composition: name, number: index + 1 }
-    end
-
-    # **抽象背景の案から外した事実を残します。**
-    def dropped_notes(draft, composition)
-      return [] if composition.fetch(VariationRules::KEEPS_PEOPLE_KEY)
-
-      dropped = person_safety_terms(draft)
-      return [] if dropped.empty?
-
-      [{ kind: PERSON_SAFETY_DROPPED_NOTE_KIND, compositions: dropped }]
-    end
-
-    # 案ごとに、一覧で選べる値を選び直します。
-    def swapped_terms(draft, applied, name, index)
-      replacements = specification_replacements(applied, index)
-                     .merge(person_safety_replacements(draft, name, index))
-
-      draft.main_terms.filter_map { |term| replacements.key?(term) ? replacements[term] : term }
-    end
-
-    # スタイル仕様化が当てた指示を、案ごとの値へ差し替えます。
-    def specification_replacements(applied, index)
-      chosen = rules.specifications_for(applied[:style_family], variation: index)
-
-      applied[:specifications].zip(chosen).to_h
-    end
-
-    # 人物を避ける構図を、案ごとの構図へ差し替えます。
-    #
-    # **抽象背景の案では外します。** `nil` を返すと、その素材は落ちます。
-    def person_safety_replacements(draft, name, index)
-      applied = person_safety_terms(draft)
-      return {} if applied.empty?
-
-      keeps_people = composition_for(name).fetch(VariationRules::KEEPS_PEOPLE_KEY)
-      return applied.index_with { nil } unless keeps_people
-
-      choices = rules.person_safety_for(style_family_of(draft))
-      applied.each_with_index.to_h { |term, offset| [term, choices[(index + offset) % choices.size]] }
-    end
-
-    def person_safety_terms(draft)
-      note = draft.notes.find { |item| item[:kind] == StyleSpec::PERSON_SAFETY_NOTE_KIND }
-      note ? Array(note[:compositions]) : []
-    end
-
-    def style_family_of(draft)
-      specifications_note_of(draft)[:style_family]
+      VariationBuilder.new(rules: rules, composition: composition, name: name, index: index)
     end
 
     # **スタイル仕様化を通っていない下書きは展開しません。**
     # どの指示を選び直せばよいのか決められません。
-    def specifications_note_of(draft)
-      note = draft.notes.find { |item| item[:kind] == StyleSpec::SPECIFICATIONS_NOTE_KIND }
-      return note if note
+    def ensure_specifications!(draft)
+      return if draft.notes.any? { |item| item[:kind] == StyleSpec::SPECIFICATIONS_NOTE_KIND }
 
       raise MissingSpecificationsError,
             'スタイル仕様化を通っていない下書きは展開できません。' # 開発者向け
+    end
+
+    # **別の版の規則辞書で作られた下書きは展開しません。**
+    # 控えの指示と、いま引ける指示が食い違い、素材が黙って落ちます。
+    def ensure_same_version!(draft)
+      applied_version = draft.dictionary_version
+      return if applied_version.nil? || applied_version == rules.version
+
+      raise VersionMismatchError,
+            "別の版の下書きは展開できません: #{applied_version} -> #{rules.version}" # 開発者向け
     end
 
     # **2 回展開しません。** 案の中でさらに 3 案へ分かれ、9 案になります。

@@ -88,6 +88,16 @@ module Generation
       items.flat_map { |item| Array(rule[item]) }
     end
 
+    # そのスタイル系統で、必ず出す項目の名前です。
+    #
+    # **バリエーションの展開（issue #50）が、外す素材を役割の名前で引くために
+    # 使います。** 素材の文字列を照合して見分けると、言い回しが変わったときに
+    # 黙って外れます。
+    # @return [Array<String>]
+    def required_items_for(style_family)
+      rule_for(style_family).fetch(REQUIRED_KEY).dup
+    end
+
     # 定義されているスタイル系統です。
     def style_families
       @rules.keys
@@ -97,25 +107,6 @@ module Generation
     attr_reader :version
 
     private
-
-    # 避ける構図も、そのままプロンプトへ入れられる英文でなければなりません。
-    def ensure_compositions!(style_family, compositions)
-      ensure_person_safety_present!(style_family, compositions)
-      return if compositions.all? { |item| item.is_a?(String) && !item.strip.empty? }
-
-      raise InvalidDictionaryError,
-            "避ける構図が文字列ではありません: #{style_family} (#{@version})" # 開発者向け
-    end
-
-    # **実写系で避ける構図が消えていたら、その場で失敗させます。**
-    # 空の一覧を黙って返すと、顔と手指の破綻を避ける指示が出なくなります。
-    def ensure_person_safety_present!(style_family, compositions)
-      return unless PERSON_SAFETY_REQUIRED_STYLES.include?(style_family)
-      return if compositions.any?
-
-      raise InvalidDictionaryError,
-            "避ける構図がありません: #{style_family}.#{PERSON_SAFETY_KEY} (#{@version})" # 開発者向け
-    end
 
     def rule_for(style_family)
       @rules.fetch(style_family) do
@@ -178,25 +169,11 @@ module Generation
     end
 
     def ensure_rules!
-      unless @rules.is_a?(Hash) && @rules.any?
-        raise InvalidDictionaryError,
-              "規則辞書のスタイル仕様化規則がありません: #{@version}" # 開発者向け
-      end
-
-      @rules.each { |style_family, rule| ensure_rule!(style_family, rule) }
+      StyleRulesTable.ensure_rules!(@rules, @version)
     end
 
-    def ensure_rule!(style_family, rule)
-      unless rule.is_a?(Hash)
-        raise InvalidDictionaryError,
-              "スタイル系統の規則が連想配列ではありません: #{style_family} (#{@version})" # 開発者向け
-      end
-
-      required = rule[REQUIRED_KEY]
-      return if required.is_a?(Array) && required.any?
-
-      raise InvalidDictionaryError,
-            "必ず出す項目の一覧がありません: #{style_family} (#{@version})" # 開発者向け
+    def ensure_compositions!(style_family, compositions)
+      StyleRulesTable.ensure_compositions!(style_family, compositions, @version)
     end
   end
 end

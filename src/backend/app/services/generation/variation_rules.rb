@@ -16,8 +16,9 @@ module Generation
 
     ORDER_KEY = 'order'
     COMPOSITIONS_KEY = 'compositions'
+    COPY_SPACE_CONFLICTS_KEY = 'copy_space_conflicts'
     FOCUS_KEY = 'focus'
-    KEEPS_PEOPLE_KEY = 'keeps_people'
+    DROPS_KEY = 'drops'
 
     # **仕様が求める案の数です。**
     REQUIRED_COUNT = 3
@@ -45,9 +46,19 @@ module Generation
       def build(path)
         loaded = read(path)
         ensure_order!(loaded, path)
+        ensure_conflicts!(loaded, path)
         ensure_compositions!(loaded, path)
 
         deep_freeze(loaded)
+      end
+
+      # **余白と衝突する言い回しの一覧を検めます。**
+      def ensure_conflicts!(loaded, path)
+        conflicts = loaded[COPY_SPACE_CONFLICTS_KEY]
+        return if conflicts.is_a?(Array) && conflicts.any? && conflicts.all?(String)
+
+        raise InvalidDefinitionError,
+              "余白と衝突する言い回しの一覧がありません: #{path}" # 開発者向け
       end
 
       def read(path)
@@ -78,17 +89,39 @@ module Generation
         end
 
         loaded[ORDER_KEY].each do |name|
-          ensure_composition!(compositions[name], name, path)
+          ensure_composition!(compositions[name], name, path, loaded[COPY_SPACE_CONFLICTS_KEY])
         end
       end
 
-      def ensure_composition!(composition, name, path)
+      def ensure_composition!(composition, name, path, conflicts)
         unless composition.is_a?(Hash)
           raise InvalidDefinitionError, "構図の定義がありません: #{name} (#{path})" # 開発者向け
         end
 
         ensure_text!(composition[FOCUS_KEY], "#{name}.#{FOCUS_KEY}", path)
-        ensure_flag!(composition[KEEPS_PEOPLE_KEY], "#{name}.#{KEEPS_PEOPLE_KEY}", path)
+        ensure_no_copy_space_conflict!(composition[FOCUS_KEY], "#{name}.#{FOCUS_KEY}", path, conflicts)
+        ensure_drops!(composition[DROPS_KEY], "#{name}.#{DROPS_KEY}", path)
+      end
+
+      # **コピースペースの確保を打ち消す指示を止めます。**
+      #
+      # 余白の確保は最上位の指定です（requirements.md 4.1 の 5）。
+      # 展開の段は余白の段より後に走りますので、`filling the frame` と書くと、
+      # あとから来るこの指示が最上位の指定を上書きする読み方ができます。
+      def ensure_no_copy_space_conflict!(value, where, path, conflicts)
+        matched = conflicts.find { |conflict| value.include?(conflict) }
+        return if matched.nil?
+
+        raise InvalidDefinitionError,
+              "余白の確保を打ち消す言い回しがあります: #{where} / #{matched} (#{path})" # 開発者向け
+      end
+
+      # **外す素材の役割は、名前の一覧で書きます。**
+      def ensure_drops!(drops, where, path)
+        return if drops.is_a?(Array) && drops.all?(String) && drops.uniq.size == drops.size
+
+        raise InvalidDefinitionError,
+              "外す素材の役割の一覧が読めません: #{where} (#{path})" # 開発者向け
       end
 
       def ensure_text!(value, where, path)
@@ -102,13 +135,6 @@ module Generation
 
         raise InvalidDefinitionError,
               "構図の指示に打ち消しの言い回しがあります: #{where} (#{path})" # 開発者向け
-      end
-
-      def ensure_flag!(value, where, path)
-        return if [true, false].include?(value)
-
-        raise InvalidDefinitionError,
-              "真偽で書かれていません: #{where} (#{path})" # 開発者向け
       end
 
       # **入れ子の中まで凍らせます。** 器だけでは、中の連想配列を書き換えられます。
