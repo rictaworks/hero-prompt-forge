@@ -1,0 +1,47 @@
+# コピースペースの構図規定です（requirements.md 4.1 の 4、4.2）。
+#
+# ヒーローイメージには、見出しと CTA ボタンを重ねる余白が要ります。
+# **コピースペースを持たない案を出しません。** 位置が決まらないまま進むと、
+# 被写体が画面いっぱいに入った、文字を置けない絵ができます。
+#
+# **値は、そのままプロンプトへ入れられる英文で書きます。** 実装は、
+# 文字列でない値をその場で失敗させます。
+#
+# **素材は 1 件 1 指示です。** 1 件へ複数の指示を詰め込むと、
+# アンチAIルック規則が 1 語に当たったときに、関係のない指示まで道連れに
+# なります（PR #135 のレビューより）。
+#
+# 各位置は次の 4 つの指示を持ちます。**それぞれ役割が違います。**
+#
+#   reserved   : 余白そのものの指定です
+#   subject    : 被写体を置く場所です。余白と重ならない側へ寄せます
+#   gaze       : 視線誘導です。**余白へ入り込まない形で余白側へ導きます**
+#   restraint  : 余白側を静かに保つ指定です。文字の可読性を守ります
+#
+# **1 件へ 2 つの性質を書きません。** アンチAIルック規則が片方の語に
+# 当たると、その指示が丸ごと落ちます（PR #135 のレビューより）。
+positions:
+  left:
+    reserved: clear copy space across the left third of the frame
+    subject: the main subject positioned on the right third intersection of a rule of thirds grid
+    gaze: the subject oriented toward the left side without extending into it
+    restraint: the left third kept free of competing detail
+  right:
+    reserved: clear copy space across the right third of the frame
+    subject: the main subject positioned on the left third intersection of a rule of thirds grid
+    gaze: the subject oriented toward the right side without extending into it
+    restraint: the right third kept free of competing detail
+  bottom_center:
+    reserved: clear copy space across the lower third of the frame
+    subject: the main subject positioned on the upper third line of a rule of thirds grid
+    gaze: the subject oriented toward the lower centre without extending into it
+    restraint: the lower third kept free of competing detail
+
+# アスペクト比ごとの構図の言い方です。
+#
+# 横に長いほど、被写体を寄せる余地が広がります。同じ余白の指定でも、
+# 比率によって画づくりが変わるため、比率を明示します。
+aspect_ratios:
+  "16:9": composed for a 16:9 wide crop
+  "21:9": composed for a 21:9 ultra wide crop
+  "3:2": composed for a 3:2 crop

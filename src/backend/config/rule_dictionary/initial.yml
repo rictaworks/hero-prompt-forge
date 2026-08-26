@@ -12,10 +12,12 @@
 # 渡ります。実装は、文字列でない値をその場で失敗させます。
 #
 # **公開済みの版は書き換えません。内容を変えるときは、必ず版を上げます。**
-# 版を据え置くと、すでに v2026.08.1 を投入した環境へ直した内容が届きません。
-# 旧版は `lens_mm` に数値（24 など）を持つため、その環境では実写系の生成が
-# 必ず InvalidDictionaryError で失敗します。
-version: v2026.08.2
+# 版を据え置くと、すでに古い版を投入した環境へ直した内容が届きません。
+# v2026.08.1 は `lens_mm` に数値（24 など）を持つため、その環境では実写系の
+# 生成が必ず InvalidDictionaryError で失敗します。
+# v2026.08.2 は業種ごとの人物の見込み（`people`）を持たないため、その環境では
+# 人物の構図を当てるかどうかを決められず、生成が失敗します。
+version: v2026.08.3
 
 # AI が作った画像にありがちな表現を抑える規則です（requirements.md 4.2）。
 anti_ai_rules:
@@ -106,34 +108,54 @@ style_spec_rules:
 # 業種ごとの既定値です（requirements.md 4.1 の 1）。
 #
 # トーンの指定が無い場合に、業種の標準を使います。
+# `people` は、その業種のヒーローイメージに人物が写る見込みです（issue #139）。
+#
+#   expected : 写る見込みです。顔と手指の破綻を避ける構図を当てます
+#   unlikely : 写らない見込みです。人物の構図を当てません
+#
+# **`unlikely` の業種へ人物の構図を当てると、人物のいないヒーローに人物を
+# 呼び込みます。** 料理・製品・物件の外観がこれに当たります。
+#
+# 業種の中の個別事情（製造でも製品だけを写したい等）は、この既定値を
+# 編集して調整します。
 industry_defaults:
   saas:
     tone: trust
     style_family: photoreal
+    people: expected
   restaurant:
     tone: warmth
     style_family: photoreal
+    people: unlikely
   medical:
     tone: trust
     style_family: photoreal
+    people: expected
   education:
     tone: friendly
     style_family: illustration
+    people: expected
   real_estate:
     tone: trust
     style_family: photoreal
+    people: unlikely
   manufacturing:
     tone: advanced
     style_family: photoreal
+    people: expected
   professional_services:
     tone: trust
     style_family: photoreal
+    people: expected
   ecommerce:
     tone: friendly
     style_family: photoreal
+    people: unlikely
   beauty:
     tone: premium
     style_family: photoreal
+    people: expected
   other:
     tone: minimal
     style_family: photoreal
+    people: unlikely

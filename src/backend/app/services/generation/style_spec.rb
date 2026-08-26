@@ -14,6 +14,16 @@ module Generation
   # やすいため、後ろ姿・手元のクロップ・遠景といった構図で回避します。利用者が
   # 明示した場合のみ許します（requirements.md 4.2）。
   #
+  # **当てるのは、人物が写る見込みの業種だけです**（issue #139）。
+  # 4.1 の 3 は「人物を含む場合は」と条件付きで定めています。料理・製品・
+  # 物件の外観へ「後ろ姿の被写体」を当てると、人物のいないヒーローに人物を
+  # 呼び込みます。見込みの判定は PeopleExpectation が持ちます。
+  #
+  # **当てる構図は 1 つだけです。** 後ろ姿・手元だけ・遠景を同時に指示すると、
+  # 生成モデルはどれを採るか決められません（4.1 の 5 が矛盾の解決を求めます）。
+  # 一覧の先頭を既定として使います。レンズ焦点距離と同じ扱いです。
+  # 案ごとに別の構図を選び直すのは、バリエーションの展開（issue #50）です。
+  #
   # 素材は **1 件 1 指示** で足します。1 件へ複数の指示を詰め込むと、
   # アンチAIルック規則（issue #40）が 1 つの語に当たったときに、
   # 関係のない指示まで道連れになります。
@@ -40,13 +50,22 @@ module Generation
     # 別の版の規則を、同じ下書きへ重ねて当てようとした場合に投げます。
     class VersionMismatchError < StandardError; end
 
+    # 規則辞書の業種の既定値が壊れている場合に投げます。
+    InvalidPeopleError = PeopleExpectation::InvalidDictionaryError
+
+    # 下書きに業種が入っていない場合に投げます。
+    class MissingIndustryError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
+    # 人物が写らない見込みのため、構図を当てなかったことを残す印です。
+    PERSON_SAFETY_SKIPPED_NOTE_KIND = :person_safety_skipped
 
     def initialize(dictionary:)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
       @rules = StyleRules.new(dictionary)
+      @people = PeopleExpectation.new(dictionary: dictionary)
     end
 
     # スタイル系統の指示を足した下書きを返します。
@@ -57,12 +76,12 @@ module Generation
 
       traced(draft, style_family,
              rules.specifications_for(style_family),
-             rules.person_safety_for(style_family))
+             chosen_safety(draft, style_family))
     end
 
     private
 
-    attr_reader :rules
+    attr_reader :rules, :people
 
     delegate :version, to: :rules
 
@@ -75,6 +94,25 @@ module Generation
 
       raise VersionMismatchError,
             "別の版の規則は重ねられません: #{applied_version} -> #{version}" # 開発者向け
+    end
+
+    # 人物が写る見込みのときだけ、避ける構図を 1 つ選びます。
+    #
+    # **見込みが無ければ空を返します。** 人物のいないヒーローに人物を
+    # 呼び込まないためです。
+    def chosen_safety(draft, style_family)
+      return [] unless people.expected?(industry_of(draft))
+
+      rules.person_safety_for(style_family).first(1)
+    end
+
+    # **業種は必須の入力です。** 欠けたまま進むと、人物の見込みを引けません。
+    def industry_of(draft)
+      industry = draft.input.is_a?(Hash) ? draft.input[:industry] : nil
+      return industry if industry.is_a?(String) && !industry.strip.empty?
+
+      raise MissingIndustryError,
+            "下書きに業種がありません: #{industry.inspect}" # 開発者向け
     end
 
     # 何を、どの版で、いくつ足したかを記録へ残します。
@@ -93,9 +131,18 @@ module Generation
     def applied(draft, specifications, safety)
       draft.add(
         main_terms: specifications + safety,
-        notes: safety.empty? ? [] : [{ kind: PERSON_SAFETY_NOTE_KIND, compositions: safety }],
+        notes: [safety_note(draft, safety)],
         dictionary_version: version
       )
+    end
+
+    # **当てた場合も、当てなかった場合も、ノートへ残します。**
+    # 当てなかった事実が残らないと、「なぜ人物の構図が入っていないのか」を
+    # あとから説明できません。
+    def safety_note(draft, safety)
+      return { kind: PERSON_SAFETY_NOTE_KIND, compositions: safety } if safety.any?
+
+      { kind: PERSON_SAFETY_SKIPPED_NOTE_KIND, industry: industry_of(draft) }
     end
 
     # **スタイル系統は必須の入力です。** 欠けたまま進むと、どの仕様を当てるか
