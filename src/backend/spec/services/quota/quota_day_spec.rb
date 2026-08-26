@@ -86,6 +86,33 @@ RSpec.describe Quota::QuotaDay do
     end
   end
 
+  describe '受け取る値の取り違え' do
+    it '.of に日付を渡すと失敗します' do
+      expect { described_class.of(Date.new(2026, 8, 25)) }
+        .to raise_error(ArgumentError)
+    end
+
+    it '.start_at に時刻を渡すと失敗します' do
+      expect { described_class.start_at(jst('2026-08-25 01:00:00')) }
+        .to raise_error(ArgumentError)
+    end
+
+    it '.reset_at に時刻を渡すと失敗します' do
+      expect { described_class.reset_at(jst('2026-08-25 01:00:00')) }
+        .to raise_error(ArgumentError)
+    end
+
+    it '.seconds_until_reset に日付を渡すと失敗します' do
+      expect { described_class.seconds_until_reset(Date.new(2026, 8, 25)) }
+        .to raise_error(ArgumentError)
+    end
+
+    it '文字列を渡すと失敗します' do
+      expect { described_class.of('2026-08-25 03:00:00') }
+        .to raise_error(ArgumentError)
+    end
+  end
+
   describe '一日の長さ' do
     it 'クォータ日の始まりと終わりは24時間離れています' do
       day = Date.new(2026, 8, 25)
