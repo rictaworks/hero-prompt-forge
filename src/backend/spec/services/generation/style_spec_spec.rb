@@ -37,14 +37,24 @@ RSpec.describe Generation::StyleSpec do
     }
   end
 
+  # 人物の見込みは業種の既定値から引きます（issue #139）。
+  let(:industry_defaults) do
+    {
+      'saas' => { 'tone' => 'trust', 'style_family' => 'photoreal', 'people' => 'expected' },
+      'ecommerce' => { 'tone' => 'friendly', 'style_family' => 'photoreal',
+                       'people' => 'unlikely' }
+    }
+  end
+
   let(:dictionary) do
-    RuleDictionary.create!(version: 'vspec.style', style_spec_rules: style_spec_rules)
+    RuleDictionary.create!(version: 'vspec.style', style_spec_rules: style_spec_rules,
+                           industry_defaults: industry_defaults)
   end
 
   let(:spec) { described_class.new(dictionary: dictionary) }
 
-  def draft_for(style_family)
-    Generation::Draft.new(input: { industry: 'saas', style_family: style_family })
+  def draft_for(style_family, industry: 'saas')
+    Generation::Draft.new(input: { industry: industry, style_family: style_family })
   end
 
   def applied(style_family)
@@ -131,7 +141,8 @@ RSpec.describe Generation::StyleSpec do
       broken[style_family][item] = value
       described_class.new(
         dictionary: RuleDictionary.create!(version: "vspec.bad-#{item}-#{value.hash.abs}",
-                                           style_spec_rules: broken)
+                                           style_spec_rules: broken,
+                                           industry_defaults: industry_defaults)
       )
     end
 
@@ -205,20 +216,116 @@ RSpec.describe Generation::StyleSpec do
   end
 
   describe '人物の破綻を構図で避けること' do
-    it '実写系では避ける構図を足します' do
-      expect(applied('photoreal').main_terms)
-        .to include('back view of the subject', 'cropped hands only')
+    it '人物が写る見込みの業種では、避ける構図を足します' do
+      expect(applied('photoreal').main_terms).to include('back view of the subject')
+    end
+
+    # **同時に複数を指示しません。** 後ろ姿・手元だけ・遠景を並べると、
+    # 生成モデルはどれを採るか決められません（requirements.md 4.1 の 5）。
+    it '当てる構図は 1 つだけです' do
+      expect(applied('photoreal').main_terms).not_to include('cropped hands only')
+    end
+
+    it '一覧の先頭を既定として使います' do
+      note = applied('photoreal').notes.first
+
+      expect(note[:compositions]).to eq(['back view of the subject'])
     end
 
     it '避けた事実をノートへ残します' do
       note = applied('photoreal').notes.first
 
       expect(note[:kind]).to eq(described_class::PERSON_SAFETY_NOTE_KIND)
-      expect(note[:compositions]).to eq(['back view of the subject', 'cropped hands only'])
     end
 
-    it '避ける構図の定義が無いスタイルでは、ノートを増やしません' do
-      expect(applied('illustration').notes).to be_empty
+    # **人物が写らない見込みの業種へ、人物を呼び込みません**（issue #139）。
+    describe '人物が写らない見込みの業種' do
+      def without_people(style_family)
+        spec.apply(draft_for(style_family, industry: 'ecommerce'))
+      end
+
+      it '避ける構図を足しません' do
+        expect(without_people('photoreal').main_terms)
+          .not_to include('back view of the subject', 'cropped hands only')
+      end
+
+      it '撮影の指示は、これまでどおり足します' do
+        expect(without_people('photoreal').main_terms).to include('35mm lens')
+      end
+
+      it '当てなかった事実をノートへ残します' do
+        note = without_people('photoreal').notes.first
+
+        expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
+        expect(note[:industry]).to eq('ecommerce')
+      end
+
+      it '理由が「業種の見込み」であることが分かります' do
+        note = without_people('photoreal').notes.first
+
+        expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_PEOPLE_UNLIKELY)
+      end
+    end
+
+    # **理由を分けます**（PR #145 のレビューより）。
+    # 業種が「写る見込み」でも、スタイル系統に定義が無ければ当てません。
+    # そのとき業種を理由にしたノートを残すと、読み手を誤らせます。
+    describe '避ける構図の定義が無いスタイル系統' do
+      it '構図を足しません' do
+        expect(applied('illustration').main_terms)
+          .not_to include('back view of the subject')
+      end
+
+      it '理由が「スタイル系統に定義が無い」ことが分かります' do
+        note = applied('illustration').notes.first
+
+        expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
+        expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_STYLE_HAS_NONE)
+      end
+
+      it '業種を理由にしません' do
+        note = applied('illustration').notes.first
+
+        expect(note).not_to have_key(:industry)
+      end
+
+      # **業種の見込みを引きません。** 規則辞書に見込みが無い場合でも、
+      # 定義の無い系統では止まりません。影響の範囲を実写系に抑えます。
+      it '規則辞書に見込みが無くても、定義の無い系統では止まりません' do
+        broken = RuleDictionary.create!(
+          version: 'vspec.people-none', style_spec_rules: style_spec_rules,
+          industry_defaults: { 'saas' => { 'tone' => 'trust' } }
+        )
+
+        expect { described_class.new(dictionary: broken).apply(draft_for('illustration')) }
+          .not_to raise_error
+      end
+    end
+
+    it '業種の見込みが選べない値なら失敗します' do
+      broken = RuleDictionary.create!(
+        version: 'vspec.people-broken', style_spec_rules: style_spec_rules,
+        industry_defaults: { 'saas' => { 'people' => 'maybe' } }
+      )
+
+      expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
+        .to raise_error(described_class::InvalidPeopleError)
+    end
+
+    it '業種の見込みが無ければ失敗します' do
+      broken = RuleDictionary.create!(
+        version: 'vspec.people-missing', style_spec_rules: style_spec_rules,
+        industry_defaults: { 'saas' => { 'tone' => 'trust' } }
+      )
+
+      expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
+        .to raise_error(described_class::InvalidPeopleError)
+    end
+
+    it '下書きに業種が無ければ失敗します' do
+      bare = Generation::Draft.new(input: { style_family: 'photoreal' })
+
+      expect { spec.apply(bare) }.to raise_error(described_class::MissingIndustryError)
     end
 
     it '返した構図の一覧へ足しても、規則の中身は変わりません' do
@@ -234,7 +341,8 @@ RSpec.describe Generation::StyleSpec do
       without_safety = style_spec_rules.deep_dup
       without_safety['photoreal'].delete('person_safety')
       broken = RuleDictionary.create!(version: 'vspec.no-safety',
-                                      style_spec_rules: without_safety)
+                                      style_spec_rules: without_safety,
+                                      industry_defaults: industry_defaults)
 
       expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
         .to raise_error(described_class::InvalidDictionaryError)
@@ -244,7 +352,8 @@ RSpec.describe Generation::StyleSpec do
       empty_safety = style_spec_rules.deep_dup
       empty_safety['photoreal']['person_safety'] = []
       broken = RuleDictionary.create!(version: 'vspec.empty-safety',
-                                      style_spec_rules: empty_safety)
+                                      style_spec_rules: empty_safety,
+                                      industry_defaults: industry_defaults)
 
       expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
         .to raise_error(described_class::InvalidDictionaryError)
@@ -367,7 +476,9 @@ RSpec.describe Generation::StyleSpec do
     let(:seed_spec) do
       described_class.new(
         dictionary: RuleDictionary.create!(
-          version: 'vspec.seed', style_spec_rules: InitialRuleDictionary.style_spec_rules
+          version: 'vspec.seed',
+          style_spec_rules: InitialRuleDictionary.style_spec_rules,
+          industry_defaults: InitialRuleDictionary.industry_defaults
         )
       )
     end

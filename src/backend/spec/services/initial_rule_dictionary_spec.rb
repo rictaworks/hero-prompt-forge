@@ -128,6 +128,26 @@ RSpec.describe InitialRuleDictionary do
 
       expect(tones).to all(be_in(Generation::InputChoices::BRAND_TONES))
     end
+
+    # **人物の見込みが欠けると、人物の構図を当てるかどうかを決められません**
+    # （issue #139）。欠けたまま投入された環境では、生成が失敗します。
+    it 'すべての業種が人物の見込みを持ちます' do
+      values = described_class.industry_defaults.values.pluck('people')
+
+      expect(values).to all(be_in(Generation::PeopleExpectation::CHOICES))
+    end
+
+    it '人物が写らない見込みの業種があります' do
+      values = described_class.industry_defaults.values.pluck('people')
+
+      expect(values).to include(Generation::PeopleExpectation::UNLIKELY)
+    end
+
+    it '人物が写る見込みの業種があります' do
+      values = described_class.industry_defaults.values.pluck('people')
+
+      expect(values).to include(Generation::PeopleExpectation::EXPECTED)
+    end
   end
 
   describe '定義の読み込み' do
