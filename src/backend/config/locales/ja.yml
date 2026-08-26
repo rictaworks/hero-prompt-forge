@@ -3,6 +3,16 @@
 # 文言をモデルやコントローラへ直書きしません。ここへ追加します。
 # 日本語版のみを提供するため、他の言語のファイルを置きません。
 ja:
+  # 検証で弾いたときの文言です。日本語版のみを提供するため、標準の訳を持ちません。
+  # 使っている検証の分だけを定義します。
+  activerecord:
+    errors:
+      messages:
+        blank: "を入力してください。"
+        # 保存に失敗したことを開発者へ知らせる文言です（RecordInvalid）。
+        record_invalid: "%{errors}のため保存できませんでした。"
+        inclusion: "に選べない値が指定されています。"
+        taken: "はすでに使われています。"
   errors:
     common:
       next_action_unknown: "解決しない場合は info@rictaworks.jp までご連絡ください。"
