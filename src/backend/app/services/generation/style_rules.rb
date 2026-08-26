@@ -56,11 +56,13 @@ module Generation
     end
 
     # そのスタイル系統で、必ず出す指示の一覧を返します。
+    #
+    # @param variation [Integer] 何案目かです。**一覧で書かれた項目の選び直しに使います**
     # @return [Array<String>]
-    def specifications_for(style_family)
+    def specifications_for(style_family, variation: 0)
       rule = rule_for(style_family)
 
-      rule.fetch(REQUIRED_KEY).map { |item| specification(rule, style_family, item) }
+      rule.fetch(REQUIRED_KEY).map { |item| specification(rule, style_family, item, variation) }
     end
 
     # 人物を含む場合に、顔や手指の破綻を避ける構図です。
@@ -126,11 +128,18 @@ module Generation
     #
     # 一覧で書かれている場合は先頭を使います。入れ子（照明のように複数の指示を
     # まとめたもの）の場合は、その中から取り出します。
-    def specification(rule, style_family, item)
+    def specification(rule, style_family, item, variation)
       value = rule[item] || nested_value(rule, item)
       ensure_specification!(style_family, item, value)
 
-      value.is_a?(Array) ? value.first : value
+      chosen(value, variation)
+    end
+
+    # **一覧を一巡したら先頭へ戻ります。** 案の数と選べる値の数は一致しません。
+    def chosen(value, variation)
+      return value unless value.is_a?(Array)
+
+      value[variation % value.size]
     end
 
     def nested_value(rule, item)

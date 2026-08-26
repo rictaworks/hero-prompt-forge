@@ -57,6 +57,14 @@ RSpec.describe Generation::StyleSpec do
     Generation::Draft.new(input: { industry: industry, style_family: style_family })
   end
 
+  # **ノートの並びに頼りません。** 印で探します。
+  def safety_note(draft)
+    draft.notes.find do |note|
+      [described_class::PERSON_SAFETY_NOTE_KIND,
+       described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND].include?(note[:kind])
+    end
+  end
+
   def applied(style_family)
     spec.apply(draft_for(style_family))
   end
@@ -227,13 +235,13 @@ RSpec.describe Generation::StyleSpec do
     end
 
     it '一覧の先頭を既定として使います' do
-      note = applied('photoreal').notes.first
+      note = safety_note(applied('photoreal'))
 
       expect(note[:compositions]).to eq(['back view of the subject'])
     end
 
     it '避けた事実をノートへ残します' do
-      note = applied('photoreal').notes.first
+      note = safety_note(applied('photoreal'))
 
       expect(note[:kind]).to eq(described_class::PERSON_SAFETY_NOTE_KIND)
     end
@@ -254,14 +262,14 @@ RSpec.describe Generation::StyleSpec do
       end
 
       it '当てなかった事実をノートへ残します' do
-        note = without_people('photoreal').notes.first
+        note = safety_note(without_people('photoreal'))
 
         expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
         expect(note[:industry]).to eq('ecommerce')
       end
 
       it '理由が「業種の見込み」であることが分かります' do
-        note = without_people('photoreal').notes.first
+        note = safety_note(without_people('photoreal'))
 
         expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_PEOPLE_UNLIKELY)
       end
@@ -277,7 +285,7 @@ RSpec.describe Generation::StyleSpec do
       end
 
       it '理由が「スタイル系統に定義が無い」ことが分かります' do
-        note = applied('illustration').notes.first
+        note = safety_note(applied('illustration'))
 
         expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
         expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_STYLE_HAS_NONE)

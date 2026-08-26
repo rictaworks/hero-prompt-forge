@@ -60,6 +60,11 @@ module Generation
     class MissingIndustryError < StandardError; end
 
     # ノートに残す印です。文言ではなく記号で持ちます。
+    #
+    # **当てた仕様そのものを残します。** バリエーションの展開（issue #50）が、
+    # 案ごとに別の値へ選び直すために使います。素材の並びだけでは、どれが
+    # この段の足したものか分かりません。
+    SPECIFICATIONS_NOTE_KIND = :style_spec_applied
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
     # 構図を当てなかったことを残す印です。**理由を添えます。**
     PERSON_SAFETY_SKIPPED_NOTE_KIND = :person_safety_skipped
@@ -167,9 +172,15 @@ module Generation
     def applied(draft, specifications, decision)
       draft.add(
         main_terms: specifications + decision[:compositions],
-        notes: [safety_note(decision)],
+        notes: [specifications_note(draft, specifications), safety_note(decision)],
         dictionary_version: version
       )
+    end
+
+    # **当てた仕様そのものを残します。** issue #50 が選び直すために使います。
+    def specifications_note(draft, specifications)
+      { kind: SPECIFICATIONS_NOTE_KIND, style_family: style_family_of(draft),
+        specifications: specifications }
     end
 
     # **当てた場合も、当てなかった場合も、ノートへ残します。**

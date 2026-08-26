@@ -1,0 +1,38 @@
+# バリエーション3案の展開の規則です（requirements.md 4.1 の 8）。
+#
+# **構図の異なる 3 案を出します。** 同じ絵の色違いではありません。
+# **何を主役にするか**を変えます。
+#
+#   subject_led         : 被写体主導。人や物を主役にします
+#   environment_led     : 環境主導。場所と空気を主役にし、被写体を小さく置きます
+#   abstract_background : 抽象背景。具体物を置かず、面と光で見せます
+#
+# **値は、そのままプロンプトへ入れられる英文です。**
+# **素材は 1 件 1 指示です。** 1 件へ複数の指示を詰め込むと、アンチAIルック規則が
+# 1 語に当たったときに、関係のない指示まで道連れになります。
+#
+# **打ち消しの言い回しを書きません。** 生成モデルは打ち消しの解釈が弱く、
+# かえってその要素を呼び込みます。
+#
+# **コピースペースの指定を打ち消す指示を書きません。** 余白の確保は最上位の
+# 指定です（requirements.md 4.1 の 5）。
+
+# 案の順です。**1 案目が既定の案です。**
+order:
+  - subject_led
+  - environment_led
+  - abstract_background
+
+compositions:
+  subject_led:
+    # 主役の置き方です。
+    focus: the main subject rendered large and sharp in the foreground
+    # 人物を避ける構図を保つかどうかです。
+    keeps_people: true
+  environment_led:
+    focus: the surrounding space filling the frame with the subject small within it
+    keeps_people: true
+  abstract_background:
+    # **具体物を置きません。** 人物を避ける構図は、置く人物がありませんので外します。
+    focus: an abstract composition of planes, gradients and light
+    keeps_people: false
