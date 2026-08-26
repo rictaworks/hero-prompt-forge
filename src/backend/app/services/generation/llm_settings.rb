@@ -15,7 +15,8 @@ module Generation
 
     # 必ずある鍵です。
     TEXT_KEYS = %w[model endpoint instruction].freeze
-    NUMBER_KEYS = %w[open_timeout_seconds read_timeout_seconds max_output_tokens].freeze
+    NUMBER_KEYS = %w[open_timeout_seconds read_timeout_seconds write_timeout_seconds
+                     max_output_tokens].freeze
 
     # 呼び出し先として認める形です。**暗号化された通信だけを認めます。**
     ENDPOINT_FORMAT = %r{\Ahttps://[^\s]+\z}

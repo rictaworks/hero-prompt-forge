@@ -3,8 +3,11 @@
 # **最安のモデルを選びます**（CLAUDE.md）。2026-08-27 時点の公表価格では、
 # Gemini の文章モデルのうち `gemini-2.5-flash-lite` が最も安く、
 # 100 万トークンあたり 入力 0.10 ドル・出力 0.40 ドルです。
-# 次に安いのは `gemini-2.5-flash`（入力 0.30 ドル・出力 2.50 ドル）で、
-# **出力の単価が 6 倍以上**になります。
+# 次に安いのは `gemini-3.1-flash-lite`（入力 0.25 ドル・出力 1.50 ドル）で、
+# **入力が 2.5 倍、出力が 3.75 倍**になります。
+#
+# **無償枠は使いません。** 無償枠では入力が学習に使われる場合があります。
+# **有償の枠でご利用ください。**
 #
 # **価格は変わります。** 変わったときにこのファイルだけを直せるよう、
 # 実装の中へ書きません（requirements.md 8）。
@@ -18,6 +21,7 @@ endpoint: "https://generativelanguage.googleapis.com/v1beta/models/%<model>s:gen
 # 待つ秒数です。**待ち続けません。** 越えたら失敗させ、縮退へ回します（issue #53）。
 open_timeout_seconds: 5
 read_timeout_seconds: 20
+write_timeout_seconds: 10
 
 # 返す文の量の上限です。**素材を磨くだけですので、長い出力は要りません。**
 max_output_tokens: 1024
@@ -36,4 +40,4 @@ instruction: |
   You are an art director refining prompt fragments for a website hero image.
   Rewrite each fragment so that it reads as precise, concrete art direction.
   Keep the meaning of every fragment. Keep the same number of fragments and the same order.
-  Keep every fragment in English. Return one fragment per line, with no numbering and no commentary.
+  Return one fragment per line, with no numbering and no commentary.

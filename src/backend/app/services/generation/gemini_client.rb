@@ -26,6 +26,14 @@ module Generation
     # キーを載せる見出しです。**URL へ載せません。** 記録へ残ります。
     API_KEY_HEADER = 'x-goog-api-key'
 
+    # 呼び出しの失敗として扱う出来事です。
+    #
+    # **通信の失敗をすべて受け止めます。** 受け止め漏れがあると、
+    # 縮退（issue #53）へ回らず、生成そのものが落ちます
+    # （PR #162 のレビューより）。
+    FAILURES = [Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout,
+                OpenSSL::SSL::SSLError, SocketError, SystemCallError, IOError].freeze
+
     def initialize(settings: LlmSettings.load)
       @settings = settings
     end
@@ -79,7 +87,7 @@ module Generation
 
       raise RequestFailedError,
             "LLM の呼び出しが失敗しました: #{response.code}" # 開発者向け
-    rescue Net::OpenTimeout, Net::ReadTimeout, SocketError, IOError => e
+    rescue *FAILURES => e
       raise RequestFailedError, "LLM の呼び出しが失敗しました: #{e.class}" # 開発者向け
     end
 
@@ -88,6 +96,7 @@ module Generation
       client.use_ssl = true
       client.open_timeout = settings.fetch('open_timeout_seconds')
       client.read_timeout = settings.fetch('read_timeout_seconds')
+      client.write_timeout = settings.fetch('write_timeout_seconds')
       client
     end
 
