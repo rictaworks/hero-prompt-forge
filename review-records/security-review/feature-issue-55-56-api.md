@@ -18,7 +18,7 @@
 | 経路 | `src/backend/config/routes.rb` |
 | 文言・時刻の書き方 | `src/backend/config/locales/ja.yml` |
 | 文言の決まりの検査 | `src/backend/spec/config/locales_spec.rb` |
-| テスト | `src/backend/spec/requests/api/v1/prompt_requests_spec.rb`（48 例） |
+| テスト | `src/backend/spec/requests/api/v1/prompt_requests_spec.rb`（66 例） |
 | 契約 | `SPEC/api/README.md` |
 
 **画面を作るファイル（`.tsx`）を 1 件も含みません。**
@@ -36,6 +36,8 @@
 **3 回目で、`BaseController` へ `rescue_from ActionController::ParameterMissing` を実際に足しました。** `invalid_input`（400）として、`code` ・ `message` ・ `next_action` を備えた形で返します。**添えるのは項目名だけです。** 送られた値を返しません。
 
 **テストも足しました。** 識別子が欠けている場合・配列の場合・連想配列の場合の 3 通りについて、**状態コードだけでなく、契約の 4 項目がそろうこと・項目名が添うこと・記録も枠も作らないこと**を固定しました（18 例）。
+
+**`rescue_from` を外すと、そのうち 9 例が赤くなります**（契約の形を押さえた例です）。**残る 9 例は緑のままです。** 状態コードと副作用の無さを押さえており、Rails の既定でも満たされるためです。**役割が違いますので、赤くならないのが正しい姿です。**
 
 **記録の書き方を改めます。** 「テスト」と書くのは、**そのテストを実際に走らせて緑になったときだけ**にします。
 
@@ -86,7 +88,7 @@
 | 差し戻し理由の露出 | テスト | 記録の中身を返しません |
 | 秘匿値の混入 | 目視 | ありません |
 | 書き方の検査 | RuboCop | 175 ファイル、指摘 0 件 |
-| テスト | RSpec | 1611 例、失敗 0 件（うち API は 69 例） |
+| テスト | RSpec | 1611 例、失敗 0 件（うち API は 66 例） |
 | ハードコードの検査 | 検査 | 検出 0 件 |
 
 ## 判断したこと
