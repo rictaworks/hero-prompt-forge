@@ -30,6 +30,8 @@ module Generation
 
     # 読みが添えられている書き方です。「櫻花堂（おうかどう）」の形です。
     READING_IN_PARENTHESES = /[（(]([ぁ-ゖァ-ヴー]{1,20})[）)]/
+    # かぎ括弧の閉じです。読みは閉じ括弧の後ろに続きます。
+    CLOSING_QUOTE = /[」』]/
 
     # 読みが分からないまま残した名前に添える説明です。
     KEPT_AS_WRITTEN = 'kept as written in Japanese'
@@ -158,9 +160,14 @@ module Generation
     end
 
     # **その名前が見つかった位置の、すぐ後ろだけを見ます。**
+    #
+    # かぎ括弧でくくられている場合は、閉じ括弧を挟んで読みが続きます
+    # （「櫻花堂」（おうかどう））。閉じ括弧 1 文字だけを飛ばします。
     def reading_after(matched, text)
       following = text[matched.end(1)..]
-      found = following&.match(/\A#{READING_IN_PARENTHESES.source}/)
+      return nil if following.nil?
+
+      found = following.match(/\A#{CLOSING_QUOTE.source}?#{READING_IN_PARENTHESES.source}/)
       found && found[1]
     end
 
