@@ -42,8 +42,12 @@ test.describe("ランディング", () => {
 
   // 手順 5：4 つの手順が並ぶこと
   test("4 つの手順が並びます", async ({ page }) => {
+    // **完全一致で探します。** 「From Input to Package」が「Input」を
+    // 含むため、部分一致では 2 件に当たります。
     for (const title of ["Input", "Rules", "Refine", "Package"]) {
-      await expect(page.getByRole("heading", { name: title })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: title, exact: true }),
+      ).toBeVisible();
     }
   });
 

@@ -116,6 +116,10 @@
   color: var(--grey-777);
   line-height: 1.7;
 }
+.heroNoteAccount {
+  color: var(--gold);
+}
+
 .heroScrollCue {
   position: absolute;
   left: 50%;

@@ -7,7 +7,15 @@
 export const strings = {
   app: {
     title: "hero-prompt-forge",
-    wordmark: "Veyra Dragon",
+    // 画面に出す名前です。
+    //
+    // **モックの既定値（Veyra Dragon）を、そのまま公開しません**
+    // （PR #170 のレビューより）。デザインシステムの既定値であり、
+    // 他社の名称と衝突しうるためです。**モックは書き換えません。
+    // 正しい値は実装側で入れます**（CLAUDE.md）。
+    //
+    // ブランドが確定したら、ここを直します。
+    wordmark: "hero-prompt-forge",
     description:
       "ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。",
   },
@@ -89,6 +97,9 @@ export const strings = {
     // `labels` の下へ置きます。** 句点で終わらないためです。
     meta: {
       title: "hero-prompt-forge — Forge Heroes Beyond the Cliché.",
+      // 共有されたときに出る説明です。
+      shareDescription:
+        "ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。",
     },
     labels: {
       navFeatures: "Features",
@@ -102,7 +113,8 @@ export const strings = {
       heroAction: "Xでログインして始める",
       heroNoteBefore: "利用条件：",
       heroNoteAccount: "@rictaworks",
-      heroNoteAfter: " のフォロワーであること",
+      heroNoteAfter: " の",
+      heroNoteTail: "フォロワーであること",
       heroImageAlt: "",
       featuresEyebrow: "WHAT WE DO",
       featuresTitle: "Three Guards",

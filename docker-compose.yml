@@ -55,6 +55,8 @@ services:
       FOLLOWER_GATE_CREDENTIAL: ${FOLLOWER_GATE_CREDENTIAL:-}
       # ログインの後に戻す先です。
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      # 画面の公開先です。**ブラウザへ配ってよい値です。**
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-}
       # 画面からバックエンドへの中継先です。**ブラウザへ配りません。**
       BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-}
       # 開発・テストでのみ効く自動ログインです。**本番では効きません。**

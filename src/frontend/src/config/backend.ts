@@ -19,6 +19,14 @@ export const BACKEND_URL_VARIABLE = "BACKEND_INTERNAL_URL";
 /** 画面から見える、バックエンドへの入口です。 */
 export const BACKEND_PROXY_PREFIXES = ["/api", "/auth"] as const;
 
+/**
+ * X ログインの入口です。**画面と同じ場所です。** 中継はサーバー側が行います。
+ *
+ * **画面の外へ出る入口です。** 画面の中の移動の仕組みを使いません
+ * （先読みで、押していないのに呼ばれます）。
+ */
+export const LOGIN_PATH = "/auth/start";
+
 export function backendInternalUrl(): string {
   const value = process.env[BACKEND_URL_VARIABLE];
   if (!value) {
