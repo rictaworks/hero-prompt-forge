@@ -10,6 +10,27 @@ import {
   StrengthCard,
 } from "@/components/ui";
 
+/**
+ * 画面の中の移動の仕組みを、印の付いた入口へ差し替えます。
+ *
+ * **素の入口と見分けるためです。** どちらも同じ `href` の付いた入口として
+ * 描かれますので、`href` だけでは見分けられません（PR #170 のレビューで
+ * 実測されました）。**印が付いていれば、移動先を先に読み込む仕組みです。**
+ */
+jest.mock("next/link", () => {
+  const react = jest.requireActual("react");
+
+  return {
+    __esModule: true,
+    default: (props: { children: unknown; href: string }) =>
+      react.createElement(
+        "a",
+        { href: props.href, "data-prefetching": "true" },
+        props.children,
+      ),
+  };
+});
+
 describe("Logo", () => {
   it("ワードマークと移動先を表示します", () => {
     render(<Logo wordmark="Veyra Dragon" href="/" />);
@@ -38,6 +59,32 @@ describe("Button", () => {
     expect(screen.getByRole("link", { name: "Xでログイン" })).toHaveAttribute(
       "href",
       "/projects",
+    );
+  });
+
+  // **外への出口は、素の入口で描きます**（PR #170 の指摘 F1）。
+  // 画面の中の移動の仕組みは移動先を先に読み込みますので、押していないのに
+  // ログインの手続きが始まります。
+  it("外への出口は、先読みの仕組みで描きません", () => {
+    render(
+      <Button href="/auth/start" external>
+        Xでログイン
+      </Button>,
+    );
+
+    const link = screen.getByRole("link", { name: "Xでログイン" });
+
+    expect(link).toHaveAttribute("href", "/auth/start");
+    expect(link).not.toHaveAttribute("data-prefetching");
+  });
+
+  // **画面の中の移動は、先読みの仕組みで描きます。**
+  it("画面の中の移動は、先読みの仕組みで描きます", () => {
+    render(<Button href="/projects">プロジェクト</Button>);
+
+    expect(screen.getByRole("link", { name: "プロジェクト" })).toHaveAttribute(
+      "data-prefetching",
+      "true",
     );
   });
 

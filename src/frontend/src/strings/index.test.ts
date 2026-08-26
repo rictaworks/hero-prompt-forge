@@ -123,4 +123,46 @@ describe("strings", () => {
       ]);
     }
   });
+  // **モックの既定値を、そのまま公開しません**（PR #170 の指摘 R6）。
+  //
+  // モックのブランド（デザインシステムの既定値）とアカウント名は、
+  // **他社の名称と衝突しうる値**です。**モックは書き換えません。正しい値は
+  // 実装側で入れます**（CLAUDE.md）。ここは、その値が戻っていないことを
+  // 検める最後の守りです。
+  //
+  // **語そのものを書き写しています。** 設定から引くと、設定ごと戻された
+  // ときに検査も一緒に戻り、何も守れません（PR #170 のレビューより）。
+  it("モックの既定値を公開の文言に含みません", () => {
+    const FORBIDDEN = ["Veyra Dragon", "veyra_dragon", "Veyra", "veyra"];
+
+    const collect = (value: unknown, path: string): [string, string][] =>
+      typeof value === "string"
+        ? [[path, value]]
+        : typeof value === "object" && value !== null
+          ? Object.entries(value).flatMap(([key, child]) =>
+              collect(child, path ? `${path}.${key}` : key),
+            )
+          : [];
+
+    const all = collect(strings, "");
+
+    expect(all.length).toBeGreaterThan(0);
+    for (const [path, value] of all) {
+      const found = FORBIDDEN.filter((word) => value.includes(word));
+
+      expect([path, found]).toEqual([path, []]);
+    }
+  });
+
+  // **利用条件のアカウント名は、フォロワー判定の対象と一致します。**
+  // 違っていると、利用者はフォローすべき相手を誤ります（CLAUDE.md）。
+  it("利用条件のアカウント名は @rictaworks です", () => {
+    expect(text("landing.labels.heroNoteAccount")).toBe("@rictaworks");
+  });
+
+  // **画面に出す名前は、リポジトリの名前です。**
+  it("画面に出す名前は hero-prompt-forge です", () => {
+    expect(text("app.wordmark")).toBe("hero-prompt-forge");
+  });
+
 });
