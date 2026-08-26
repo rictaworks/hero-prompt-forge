@@ -1,0 +1,39 @@
+# LLM による精緻化の設定です（requirements.md 4.1 の 10、8）。
+#
+# **最安のモデルを選びます**（CLAUDE.md）。2026-08-27 時点の公表価格では、
+# Gemini の文章モデルのうち `gemini-2.5-flash-lite` が最も安く、
+# 100 万トークンあたり 入力 0.10 ドル・出力 0.40 ドルです。
+# 次に安いのは `gemini-2.5-flash`（入力 0.30 ドル・出力 2.50 ドル）で、
+# **出力の単価が 6 倍以上**になります。
+#
+# **価格は変わります。** 変わったときにこのファイルだけを直せるよう、
+# 実装の中へ書きません（requirements.md 8）。
+#
+# **API キーはここへ書きません。** 環境変数 `GEMINI_API_KEY` から読みます。
+model: gemini-2.5-flash-lite
+
+# 呼び出し先です。`%<model>s` にモデル名が入ります。
+endpoint: "https://generativelanguage.googleapis.com/v1beta/models/%<model>s:generateContent"
+
+# 待つ秒数です。**待ち続けません。** 越えたら失敗させ、縮退へ回します（issue #53）。
+open_timeout_seconds: 5
+read_timeout_seconds: 20
+
+# 返す文の量の上限です。**素材を磨くだけですので、長い出力は要りません。**
+max_output_tokens: 1024
+
+# ばらつきの大きさです。**小さくします。** 指示を磨くのであって、作り直しません。
+temperature: 0.2
+
+# 指示文です。**そのままモデルへ渡す英文です。**
+#
+# **打ち消しを書きません。** 生成モデルは打ち消しの解釈が弱く、かえって
+# その要素を呼び込みます。
+#
+# **素材の数と並びを変えさせません。** 変わると、どの素材がどの段の
+# ものかを追えなくなります。
+instruction: |
+  You are an art director refining prompt fragments for a website hero image.
+  Rewrite each fragment so that it reads as precise, concrete art direction.
+  Keep the meaning of every fragment. Keep the same number of fragments and the same order.
+  Keep every fragment in English. Return one fragment per line, with no numbering and no commentary.
