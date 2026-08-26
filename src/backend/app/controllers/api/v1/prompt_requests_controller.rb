@@ -13,11 +13,23 @@ module Api
       rescue_from PromptRequests::Acceptance::ForbiddenInputError, with: :render_forbidden_input
       rescue_from Quota::Reservation::ExhaustedError, with: :render_quota_exhausted
 
+      # 生成履歴です（issue #59）。
+      #
+      # **上限に達していても閲覧できます。** 閲覧は生成ではありません。
+      # 枠の判定をこの経路に置きません。
+      #
+      # **他人のリクエストは載りません。** 必ず利用者で絞り込みます。
+      def index
+        found = owned.recent_first.includes(:prompt_outputs)
+        found = found.where(project_id: project_ids) if params[:project_id].present?
+
+        render json: { prompt_requests: found.map { |item| summary(item) } }, status: :ok
+      end
+
       # 状態と、完了していれば 3 案を返します。
       def show
-        found = PromptRequest.for_user(current_user).find(params.expect(:id))
-
-        render json: PromptRequests::Representation.new(found).to_h, status: :ok
+        render json: PromptRequests::Representation.new(owned.find(params.expect(:id))).to_h,
+               status: :ok
       end
 
       # 受け付けて、投入します。
@@ -34,6 +46,21 @@ module Api
       end
 
       private
+
+      # **必ず利用者で絞り込みます。** 絞り込みを飛ばす経路を作りません。
+      def owned
+        PromptRequest.for_user(current_user)
+      end
+
+      # **他人のプロジェクトの識別子で絞られても、何も返しません。**
+      # 絞り込みは `owned` の内側で行いますので、範囲が広がりません。
+      def project_ids
+        Array(params[:project_id])
+      end
+
+      def summary(prompt_request)
+        PromptRequests::Representation.new(prompt_request).to_summary
+      end
 
       # **時刻の書き方は Rails の置き場から引きます。**
       # 文言の置き場（`labels`）へ書式を混ぜません（PR #166 のレビューより）。

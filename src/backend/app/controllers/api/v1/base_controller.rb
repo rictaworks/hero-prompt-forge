@@ -36,6 +36,14 @@ module Api
                      details: { fields: [{ field: error.param, reason: 'missing' }] })
       end
 
+      # 検証で弾かれた場合です。**項目と理由だけを添えます。** 値を返しません。
+      def render_invalid_record(error)
+        fields = error.record.errors.map { |item| { field: item.attribute, reason: item.type } }
+
+        render_error(code: 'invalid_input', scope: 'invalid_input',
+                     status: :bad_request, details: { fields: fields })
+      end
+
       # 見つからない場合です。**他人の資源も同じ返し方にします。**
       def render_not_found
         render_error(code: 'not_found', scope: 'not_found', status: :not_found)

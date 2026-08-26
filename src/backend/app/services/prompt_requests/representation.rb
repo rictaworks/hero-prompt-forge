@@ -25,6 +25,17 @@ module PromptRequests
       @prompt_request = prompt_request
     end
 
+    # 履歴の一覧に載せる形です（issue #59）。
+    #
+    # **案そのものを載せません。** 一覧で 3 案ぶんの本文を返すと、
+    # 件数が増えるほど応答が重くなります。**取り出しは 1 件ずつ行います。**
+    #
+    # **縮退の印は載せます。** 履歴からも、どの案が縮退で作られたかが分かります。
+    # @return [Hash]
+    def to_summary
+      base.merge(outputs_count: prompt_request.prompt_outputs.size)
+    end
+
     # @return [Hash]
     def to_h
       body = base
