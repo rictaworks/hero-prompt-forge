@@ -9,9 +9,24 @@ module Api
     #
     # **他人のリクエストは引けません。** 見つからない場合と同じ返し方にします。
     class PromptRequestsController < BaseController
+      include VerifiesHumans
+
       rescue_from Generation::InputNormalizer::InvalidInputError, with: :render_invalid_input
       rescue_from PromptRequests::Acceptance::ForbiddenInputError, with: :render_forbidden_input
       rescue_from Quota::Reservation::ExhaustedError, with: :render_quota_exhausted
+      rescue_from BotProtection::RecaptchaVerifier::VerificationFailedError,
+                  with: :render_verification_failed
+      rescue_from BotProtection::RecaptchaVerifier::UnavailableError,
+                  with: :render_verification_unavailable
+
+      # **投入する経路だけを守ります。** 閲覧は守りません。
+      #
+      #   1. **守る対象は「投入」です。** 閲覧は状態を変えず、枠も使いません
+      #   2. **閲覧はすでに認証とプラン値で守られています**
+      #   3. 画面を移るたびに問い合わせると、待ち時間と第三者への送信が増えます
+      #
+      # 判断の正は `SPEC/api/README.md` です。
+      before_action :verify_human!, only: :create
 
       # 生成履歴です（issue #59）。
       #
@@ -85,6 +100,21 @@ module Api
                      status: :unprocessable_content,
                      details: { prompt_request_id: error.prompt_request.id,
                                 reasons: error.reasons.map(&:to_h) })
+      end
+
+      # 人の操作だと確かめられませんでした。
+      #
+      # **通らなかった理由を返しません。** Google が返す理由の符号は、
+      # Bot 対策の内側の情報です。**返すと、通り抜け方を探る手がかりになります。**
+      def render_verification_failed(_error)
+        render_error(code: 'human_verification_failed', scope: 'human_verification_failed',
+                     status: :forbidden)
+      end
+
+      # 照合そのものができませんでした。**利用者の落ち度ではありません。**
+      def render_verification_unavailable(_error)
+        render_error(code: 'service_unavailable', scope: 'service_unavailable',
+                     status: :service_unavailable)
       end
 
       # 本日の枠を使い切っています。**次回のリセット時刻を必ず添えます。**
