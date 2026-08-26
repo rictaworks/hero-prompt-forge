@@ -11,8 +11,21 @@ module Generation
   #
   #   - 表記のゆれを取り除きます。大文字と小文字・連続する空白・ハイフンは
   #     「同じ語の別の書き方」です
-  #   - **英字の語は、語の切れ目で見ます。** `teal` を登録したときに `stealth` を
-  #     巻き込まないためです。日本語には語の切れ目がないため、そのまま含みを見ます
+  #   - **英字の語は、語の切れ目で見ます。部分一致に戻さないでください。**
+  #
+  # 語の切れ目で見る理由です。排除する語は運用で足されていきます。短い語を
+  # 足した瞬間に、部分一致は関係のない指示まで巻き込みます。
+  #
+  #   teal を足すと     : stealth startup founders    が消えます
+  #   art を足すと      : artisan coffee roastery     が消えます
+  #                     : a heartfelt customer scene  が消えます
+  #                     : a factory line with parts   が消えます
+  #
+  # **とくに、利用者が指定したブランドカラー（teal accent など）が、規則辞書の
+  # 1 語で無言のうちに消える経路になります。** requirements.md 4.1 の 5 は、
+  # ブランドカラーを「捨てる」のではなく「弱める」対象と定めています。
+  #
+  # 日本語には語の切れ目がないため、そのまま含みを見ます。
   class AntiAiRules
     # 規則辞書の内容が足りない、または壊れている場合に投げます。
     class InvalidDictionaryError < StandardError; end

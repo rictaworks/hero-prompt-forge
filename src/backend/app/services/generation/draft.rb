@@ -74,6 +74,12 @@ module Generation
       other.is_a?(self.class) && to_h == other.to_h
     end
 
+    # `==` を定めたら `eql?` と `hash` も揃えます。揃えないと、中身が同じでも
+    # 集合や連想配列の鍵として別物に扱われます。
+    alias eql? ==
+
+    delegate :hash, to: :to_h
+
     def to_h
       {
         input: @input,

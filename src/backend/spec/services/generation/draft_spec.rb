@@ -65,6 +65,55 @@ RSpec.describe Generation::Draft do
     end
   end
 
+  # **自分のものでない入れ物を凍らせません。**
+  # 下書きを1つ作っただけで、渡した側の入れ物が使えなくなると困ります。
+  describe '渡した側への影響' do
+    it '渡した素材の配列は、そのまま使い続けられます' do
+      terms = ['a calm office']
+      described_class.new(input: {}, main_terms: terms)
+
+      expect { terms << 'soft window light' }.not_to raise_error
+    end
+
+    it '渡した入力の連想配列は、そのまま使い続けられます' do
+      normalized = { industry: 'saas', brand_colors: ['#112233'] }
+      described_class.new(input: normalized)
+
+      expect { normalized[:industry] = 'beauty' }.not_to raise_error
+    end
+
+    it '渡した入力の入れ子も凍りません' do
+      normalized = { brand_colors: ['#112233'] }
+      described_class.new(input: normalized)
+
+      expect { normalized[:brand_colors] << '#445566' }.not_to raise_error
+    end
+
+    it '渡した側を書き換えても、下書きは変わりません' do
+      normalized = { industry: 'saas' }
+      built = described_class.new(input: normalized)
+      normalized[:industry] = 'beauty'
+
+      expect(built.input[:industry]).to eq('saas')
+    end
+  end
+
+  describe '#hash と #eql?' do
+    it '中身が同じなら、連想配列の鍵として同じものに扱われます' do
+      one = draft(main_terms: ['a'])
+      other = draft(main_terms: ['a'])
+
+      expect({ one => 1 }[other]).to eq(1)
+    end
+
+    it '中身が違えば別の鍵になります' do
+      one = draft(main_terms: ['a'])
+      other = draft(main_terms: ['b'])
+
+      expect({ one => 1 }[other]).to be_nil
+    end
+  end
+
   describe '#add' do
     it '新しい下書きを返します' do
       original = draft

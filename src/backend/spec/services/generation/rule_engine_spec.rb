@@ -189,6 +189,16 @@ RSpec.describe Generation::RuleEngine do
         .to raise_error(described_class::InvalidDictionaryError)
     end
 
+    it '全角空白だけの語が混ざっていれば失敗します' do
+      expect { engine_with(['purple to teal gradient', '　']) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '空の語が混ざっていれば失敗します（nil）' do
+      expect { engine_with(['purple to teal gradient', nil]) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
     it '注入する語に空の語が混ざっていれば失敗します' do
       dictionary = RuleDictionary.create!(
         version: 'vspec.empty-negative',
@@ -246,6 +256,37 @@ RSpec.describe Generation::RuleEngine do
 
         expect(draft.notes.first[:matched]).to eq(matched)
       end
+    end
+  end
+
+  # **1つの下書きへ当てる規則辞書は1つだけです。**
+  # 生成リクエストが持てる版は1つですので、別の版を重ねると、
+  # 前の版で適用した事実が記録から消えます。
+  describe '別の版を重ねた場合' do
+    let(:other_dictionary) do
+      RuleDictionary.create!(
+        version: 'vspec.other',
+        anti_ai_rules: { 'forbidden_terms' => ['a'], 'negative_prompt_terms' => ['x'] }
+      )
+    end
+
+    it '重ねて当てようとすると失敗します' do
+      applied = engine.apply(engine.start(input))
+      other = described_class.new(dictionary: other_dictionary)
+
+      expect { other.apply(applied) }.to raise_error(described_class::VersionMismatchError)
+    end
+
+    it '同じ版なら重ねて当てられます' do
+      applied = engine.apply(engine.start(input))
+
+      expect { engine.apply(applied) }.not_to raise_error
+    end
+
+    it '版がまだ無い下書きには当てられます' do
+      bare = Generation::Draft.new(input: input)
+
+      expect(engine.apply(bare).dictionary_version).to eq('vspec.rules')
     end
   end
 

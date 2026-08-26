@@ -27,6 +27,9 @@ module Generation
     # 渡された素材が文字列でない場合に投げます。
     class InvalidDraftError < StandardError; end
 
+    # 別の版の規則を、同じ下書きへ重ねて当てようとした場合に投げます。
+    class VersionMismatchError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     REMOVED_NOTE_KIND = :anti_ai_removed
 
@@ -46,6 +49,7 @@ module Generation
     # 規則を適用した下書きを返します。
     # @return [Draft]
     def apply(draft)
+      ensure_same_version!(draft)
       kept, removed = partition(draft.main_terms)
 
       Trace.step('generation.anti_ai_rules_applied',
@@ -60,6 +64,17 @@ module Generation
     private
 
     attr_reader :version, :rules
+
+    # **1つの下書きへ当てる規則辞書は1つだけです。**
+    # 生成リクエストが持てる版は1つですので、別の版を重ねると、
+    # 前の版で適用した事実が記録から消えます。
+    def ensure_same_version!(draft)
+      applied_version = draft.dictionary_version
+      return if applied_version.nil? || applied_version == version
+
+      raise VersionMismatchError,
+            "別の版の規則は重ねられません: #{applied_version} -> #{version}" # 開発者向け
+    end
 
     def applied(draft, kept, removed)
       draft.replace(
