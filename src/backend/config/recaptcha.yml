@@ -1,0 +1,23 @@
+# reCAPTCHA の設定です（requirements.md 5.1、issue #61）。
+#
+# **Bot 対策を自作しません**（CLAUDE.md）。Google の reCAPTCHA へ委ねます。
+#
+# **秘密鍵はここへ書きません。** 環境変数 `RECAPTCHA_SECRET_KEY` から読みます。
+# サイト鍵は画面側が持ちます（ブラウザから見える値です）。
+#
+# **v3 を使います。** 利用者に絵を選ばせません。得点で判定します。
+verification_endpoint: "https://www.google.com/recaptcha/api/siteverify"
+
+# 通す得点の下限です。**0.5 は Google が示す目安です。**
+# 厳しくすると本当の利用者を弾き、緩めると Bot を通します。
+# **変えたくなったときに、このファイルだけを直せるようにします。**
+minimum_score: 0.5
+
+# 求める行動の名前です。画面側が同じ名前で得点を取ります。
+# **行動が違えば、他の画面で取った得点を使い回せません。**
+expected_action: generate_prompt
+
+# 待つ秒数です。**待ち続けません。**
+open_timeout_seconds: 3
+read_timeout_seconds: 5
+write_timeout_seconds: 3
