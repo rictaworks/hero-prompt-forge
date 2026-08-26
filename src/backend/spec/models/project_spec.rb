@@ -97,4 +97,34 @@ RSpec.describe Project do
       expect(project.reload.brand_settings['colors']).to eq(%w[#c0392b #c9a84c])
     end
   end
+
+  # **業種の中の個別事情を、プロジェクトの側で持ちます**（issue #147）。
+  #
+  # 規則辞書は全利用者で共有される単一のマスタです。**1 社のために編集すると、
+  # 全社の出力が変わります。**
+  describe '人物が写る見込みの上書き' do
+    it '指定が無ければ空です' do
+      expect(build_project.tap(&:save!).people_expectation).to be_nil
+    end
+
+    Generation::PeopleExpectation::CHOICES.each do |value|
+      it "「#{value}」を保持できます" do
+        project = build_project(brand_settings: { 'people' => value })
+        project.save!
+
+        expect(project.reload.people_expectation).to eq(value)
+      end
+    end
+
+    # **選択肢の外の値を保存させません。**
+    # 書き間違えた上書きが黙って無視されると、利用者は
+    # 「指定したのに反映されない」状態になります。
+    ['maybe', '', 'Expected', 1].each do |value|
+      it "「#{value.inspect}」なら保存できません" do
+        project = build_project(brand_settings: { 'people' => value })
+
+        expect(project).not_to be_valid
+      end
+    end
+  end
 end

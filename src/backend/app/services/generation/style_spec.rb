@@ -138,12 +138,22 @@ module Generation
       compositions = rules.person_safety_for(style_family)
       return { compositions: [], reason: SKIPPED_BECAUSE_STYLE_HAS_NONE } if compositions.empty?
 
-      unless people.expected?(industry_of(draft))
+      decided = people.decide(industry_of(draft), people_override(draft))
+      unless decided[:expected]
         return { compositions: [], reason: SKIPPED_BECAUSE_PEOPLE_UNLIKELY,
-                 industry: industry_of(draft) }
+                 industry: industry_of(draft), people_source: decided[:source] }
       end
 
-      { compositions: compositions.first(1), reason: nil }
+      { compositions: compositions.first(1), reason: nil, people_source: decided[:source] }
+    end
+
+    # プロジェクト単位の上書きです（issue #147）。
+    #
+    # **規則辞書は全利用者で共有される単一のマスタです。** 1 社のために編集すると、
+    # 全社の出力が変わります。**業種の中の個別事情は、プロジェクトの側で持ちます。**
+    # 上書きが無ければ、これまでどおり業種の既定値を使います。
+    def people_override(draft)
+      draft.input.is_a?(Hash) ? draft.input[:people] : nil
     end
 
     # **業種は必須の入力です。** 欠けたまま進むと、人物の見込みを引けません。
@@ -162,7 +172,8 @@ module Generation
                  style_family: style_family,
                  specifications: specifications.size,
                  person_safety: decision[:compositions].size,
-                 person_safety_skipped: decision[:reason]) do
+                 person_safety_skipped: decision[:reason],
+                 people_source: decision[:people_source]) do
         applied(draft, specifications, decision)
       end
     end
@@ -190,11 +201,21 @@ module Generation
       return applied_note(decision) if decision[:compositions].any?
 
       note = { kind: PERSON_SAFETY_SKIPPED_NOTE_KIND, reason: decision[:reason] }
-      decision[:industry] ? note.merge(industry: decision[:industry]) : note
+      note = note.merge(industry: decision[:industry]) if decision[:industry]
+      with_source(note, decision)
     end
 
     def applied_note(decision)
-      { kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] }
+      with_source({ kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] },
+                  decision)
+    end
+
+    # **どこから引いた見込みかを残します**（issue #147）。
+    # プロジェクトで上書きしたのか、業種の既定値なのかが分かります。
+    def with_source(note, decision)
+      return note if decision[:people_source].nil?
+
+      note.merge(people_source: decision[:people_source])
     end
 
     # **スタイル系統は必須の入力です。** 欠けたまま進むと、どの仕様を当てるか

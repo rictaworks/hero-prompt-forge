@@ -515,4 +515,62 @@ RSpec.describe Generation::StyleSpec do
       end
     end
   end
+
+  # **プロジェクト単位で、人物の見込みを上書きできます**（issue #147）。
+  #
+  # 規則辞書は全利用者で共有される単一のマスタです。**1 社のために編集すると、
+  # 全社の出力が変わります。**
+  describe '人物の見込みの上書き' do
+    # **ノートの並びに頼りません。** 印で探します。
+    def safety_note(draft)
+      draft.notes.find do |note|
+        [described_class::PERSON_SAFETY_NOTE_KIND,
+         described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND].include?(note[:kind])
+      end
+    end
+
+    def overridden(style_family, industry:, people:)
+      spec.apply(Generation::Draft.new(input: { style_family: style_family,
+                                                industry: industry, people: people }))
+    end
+
+    # EC でも、アパレル・コスメはモデル着用のヒーローが主流です。
+    it '写らない見込みの業種でも、写る側へ寄せられます' do
+      draft = overridden('photoreal', industry: 'ecommerce', people: 'expected')
+
+      expect(draft.main_terms).to include('back view of the subject')
+    end
+
+    # 製造でも、製品だけを写したい場合があります。
+    it '写る見込みの業種でも、写らない側へ寄せられます' do
+      draft = overridden('photoreal', industry: 'saas', people: 'unlikely')
+
+      expect(draft.main_terms).not_to include('back view of the subject')
+    end
+
+    it '上書きが無ければ、業種の既定値を使います' do
+      expect(applied('photoreal').main_terms).to include('back view of the subject')
+    end
+
+    # **どこから引いたかを控えへ残します。**
+    it '上書きしたことが控えから分かります' do
+      draft = overridden('photoreal', industry: 'ecommerce', people: 'expected')
+
+      expect(safety_note(draft)[:people_source])
+        .to eq(Generation::PeopleExpectation::FROM_PROJECT)
+    end
+
+    it '業種の既定値を使ったことも控えから分かります' do
+      expect(safety_note(applied('photoreal'))[:people_source])
+        .to eq(Generation::PeopleExpectation::FROM_INDUSTRY)
+    end
+
+    # **選択肢の外の値は、その場で失敗させます。**
+    ['maybe', '', 'Expected', 1].each do |value|
+      it "上書きが「#{value.inspect}」なら失敗します" do
+        expect { overridden('photoreal', industry: 'saas', people: value) }
+          .to raise_error(Generation::PeopleExpectation::InvalidOverrideError)
+      end
+    end
+  end
 end
