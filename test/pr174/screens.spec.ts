@@ -176,12 +176,23 @@ test.describe("評価メモ（06）", () => {
   });
 
   // 手順 18：記録が残ること
+  //
+  // **この例だけで完結させます。** 前の例が保存した内容を読むと、
+  // 並べて動かしたときに順番が入れ替わって落ちます
+  // （PR #174 の整備で実測されました）。
   test("記録が残ります", async ({ page }) => {
+    const written = `余白が読みやすいです。${Date.now()}`;
+
+    await open(page, "/requests/1/notes");
+    await page.getByLabel("所感").first().fill(written);
+    await page.getByRole("button", { name: "この案のメモを保存" }).first().click();
+    await expect(
+      page.getByRole("button", { name: "保存済み" }).first(),
+    ).toBeVisible();
+
     await open(page, "/requests/1/notes");
 
-    await expect(page.getByLabel("所感").first()).toHaveValue(
-      "余白が読みやすいです。",
-    );
+    await expect(page.getByLabel("所感").first()).toHaveValue(written);
   });
 });
 
