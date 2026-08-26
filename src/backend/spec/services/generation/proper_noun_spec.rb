@@ -205,16 +205,30 @@ RSpec.describe Generation::ProperNoun do
         '株式会社さくらの家が運営します。' => 'さくらの家',
         '合同会社あおぞらの丘は分譲住宅を扱います。' => 'あおぞらの丘',
         '有限会社きらめきの工房をご紹介します。' => 'きらめきの工房',
-        'さくらの家株式会社が運営します。' => 'さくらの家'
+        'さくらの家株式会社が運営します。' => 'さくらの家',
+        # **「の」が語中にある名前を切り詰めません**（PR #157 のレビューより）。
+        '株式会社みのりが運営します。' => 'みのり',
+        '株式会社きのこは製菓会社です。' => 'きのこ',
+        '株式会社たけのこをご紹介します。' => 'たけのこ',
+        '株式会社あけぼのが運営します。' => 'あけぼの',
+        '株式会社ものづくり研究所です。' => 'ものづくり研究所',
+        '株式会社いのちの木が運営します。' => 'いのちの木',
+        'このはな株式会社が運営します。' => 'このはな',
+        'きのこ株式会社です。' => 'きのこ'
       }.each do |summary, name|
         it "「#{summary}」から「#{name}」を切り詰めません" do
           expect(found_in(summary).map(&:original)).to include(name)
         end
       end
 
-      # **一覧に無い語が続く場合は、「の」の手前で切ります。**
-      # 取りすぎるより、短く切るほうが害が小さいためです。
-      it '名前に使われない語が続けば、手前で切ります' do
+      # **重ねて落とします。**
+      it '「の◯◯」が重なっても落とします' do
+        expect(found_in('株式会社みらいの事業の強みをご覧ください。').map(&:original))
+          .to eq(['みらい'])
+      end
+
+      # **一覧に挙げた語だけを落とします。** 既定はそのまま残します。
+      it '会社そのものを指さない語が続けば、そこを落とします' do
         expect(found_in('株式会社みらいの強みは提案力です。').map(&:original))
           .not_to include('みらいの強み')
       end
@@ -298,19 +312,29 @@ RSpec.describe Generation::ProperNoun do
 
     it '意味説明が英文でなければ失敗します' do
       allow(YAML).to receive(:safe_load_file)
-        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => '名前', 'patterns' => ['(a)'] }],
-                      'name_forming_words' => ['家'] })
+        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => '名前', 'patterns' => ['(a)'] }] })
 
       expect { described_class.load_rules }
         .to raise_error(described_class::InvalidDefinitionError)
     end
 
-    it '名前に使われる語の一覧が無ければ失敗します' do
+    it '会社名のうしろに付く語の一覧が無ければ失敗します' do
       allow(YAML).to receive(:safe_load_file)
         .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => 'a name', 'patterns' => ['(a)'] }] })
 
-      expect { described_class.load_rules }
+      expect { described_class.load_attribute_words }
         .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **語そのものの形も検めます**（PR #157 のレビューより）。
+    [[''], ['強み|特長'], ['強 み'], [1]].each do |words|
+      it "うしろに付く語が「#{words.inspect}」なら失敗します" do
+        allow(YAML).to receive(:safe_load_file)
+          .and_return({ 'company_attribute_words' => words })
+
+        expect { described_class.load_attribute_words }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
     end
 
     it '屋号の語尾の読みが読めなければ失敗します' do

@@ -60,9 +60,11 @@ module Generation
     end
 
     def initialize(rules: self.class.load_rules,
-                   suffix_readings: self.class.load_suffix_readings)
+                   suffix_readings: self.class.load_suffix_readings,
+                   attribute_words: self.class.load_attribute_words)
       @rules = rules
       @suffix_readings = suffix_readings
+      @company_name = CompanyName.new(attribute_words)
     end
 
     class << self
@@ -74,6 +76,11 @@ module Generation
       # 屋号の語尾の読みを読み込みます。
       def load_suffix_readings(path: DEFINITION_PATH)
         ProperNounRules.load_suffix_readings(path)
+      end
+
+      # 会社名のうしろに付きやすい語を読み込みます。
+      def load_attribute_words(path: DEFINITION_PATH)
+        ProperNounRules.load_attribute_words(path)
       end
     end
 
@@ -103,7 +110,7 @@ module Generation
 
     private
 
-    attr_reader :rules, :suffix_readings
+    attr_reader :rules, :suffix_readings, :company_name
 
     def found_in(text)
       rules.flat_map { |rule| matches_for(rule, text) }
@@ -124,7 +131,7 @@ module Generation
 
     # **同じ名前を 2 度足しません。**
     def build_found(rule, matched, text)
-      name = matched[1]
+      name = company_name.trimmed(matched[1])
       return nil if name.nil? || name.strip.empty?
 
       Found.new(original: name, romaji: romaji_for(name, matched, text),

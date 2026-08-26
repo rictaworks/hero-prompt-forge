@@ -10,45 +10,56 @@ module Generation
 
     RULES_KEY = 'rules'
     SUFFIX_READINGS_KEY = 'shop_suffix_readings'
-    NAME_WORDS_KEY = 'name_forming_words'
 
-    # 手がかりの中で、名前に使われる語の一覧へ差し替える場所です。
-    #
-    # **同じ一覧を手がかりごとに書き写しません。** 会社の種別は 4 通りあり、
-    # 書き写すと、一覧を直すときに 4 か所すべてを直すことになります。
-    NAME_WORDS_PLACEHOLDER = '%<name_words>s'
+    # 会社名のうしろに付く語として認める形です。
+    # **記号や空白を含む語を認めません。** 落とす判定が静かに壊れます。
+    ATTRIBUTE_WORD_FORMAT = /\A[ぁ-ゖァ-ヴー一-龥]{1,10}\z/
+    ATTRIBUTE_WORDS_KEY = 'company_attribute_words'
+    ATTRIBUTE_PARTICLE_KEY = 'company_attribute_particle'
 
     class << self
       # @return [Array<Hash>]
       def load_rules(path)
-        loaded = read(path)
-        rules = loaded[RULES_KEY]
+        rules = read(path)[RULES_KEY]
         unless rules.is_a?(Array) && rules.any?
           raise InvalidDefinitionError, "手がかりがありません: #{path}" # 開発者向け
         end
 
-        name_words = name_words_of(loaded, path)
-
-        rules.map { |rule| build_rule(rule, name_words) }
+        rules.map { |rule| build_rule(rule) }
       end
 
-      # 名前に使われる語の一覧です。
+      # 会社名のうしろに付きやすい、会社そのものを指さない語です（issue #153）。
       #
-      # **「の」が名前の一部か、文をつなぐ助詞かは、文字だけでは決まりません。**
-      # 「株式会社みらいの強み」の「の」は助詞ですが、「株式会社さくらの家」の
-      # 「の」は名前の一部です。**名前に使われる語を並べ、それが続く場合だけ
-      # 「の」をまたぎます**（issue #153）。
+      # **拾った名前の末尾が「の＋この一覧の語」で終わる場合だけ、そこを落とします。**
+      # 一覧に無ければ、拾った名前をそのまま使います。
       #
-      # **一般名詞をすべて並べるのではありません。** 並べるのは、名前の後半に
-      # 使われる語だけです。数は限られており、増やしても壊れません。
-      def name_words_of(loaded, path)
-        words = loaded[NAME_WORDS_KEY]
-        unless words.is_a?(Array) && words.any? && words.all?(String)
-          raise InvalidDefinitionError,
-                "名前に使われる語の一覧がありません: #{path}" # 開発者向け
-        end
+      # **語そのものの形も検めます。** 空の語や記号を含む語が混ざると、
+      # 落とす判定が静かに壊れます（PR #157 のレビューより）。
+      # @return [Array<String>]
+      def load_attribute_words(path)
+        loaded = read(path)
+        words = loaded[ATTRIBUTE_WORDS_KEY]
+        ensure_attribute_words!(words, path)
+        particle = loaded[ATTRIBUTE_PARTICLE_KEY]
+        ensure_particle!(particle, path)
 
-        words.join('|')
+        { ATTRIBUTE_PARTICLE_KEY => particle, ATTRIBUTE_WORDS_KEY => words }.freeze
+      end
+
+      # **名前と語をつなぐ助詞です。** 1 文字のかなだけを認めます。
+      def ensure_particle!(particle, path)
+        return if particle.is_a?(String) && particle.match?(/\A[ぁ-ゖ]\z/)
+
+        raise InvalidDefinitionError,
+              "名前と語をつなぐ助詞が読めません: #{path}" # 開発者向け
+      end
+
+      def ensure_attribute_words!(words, path)
+        return if words.is_a?(Array) && words.any? &&
+                  words.all? { |word| word.is_a?(String) && word.match?(ATTRIBUTE_WORD_FORMAT) }
+
+        raise InvalidDefinitionError,
+              "会社名のうしろに付く語の一覧が読めません: #{path}" # 開発者向け
       end
 
       # @return [Hash]
@@ -70,20 +81,15 @@ module Generation
         raise InvalidDefinitionError, "定義を読み込めません: #{path} (#{e.class})" # 開発者向け
       end
 
-      def build_rule(rule, name_words)
+      def build_rule(rule)
         patterns = fetch_required(rule, 'patterns')
         raise InvalidDefinitionError, "見つける語が空です: #{rule.inspect}" if patterns.empty? # 開発者向け
 
         {
           kind: fetch_required(rule, 'kind').to_sym,
           gloss: ensure_gloss(fetch_required(rule, 'gloss')),
-          matchers: patterns.map { |pattern| matcher_for(pattern, name_words) }
+          matchers: patterns.map { |pattern| Regexp.new(pattern) }
         }
-      end
-
-      # **名前に使われる語の一覧を、手がかりへ差し込みます。**
-      def matcher_for(pattern, name_words)
-        Regexp.new(pattern.gsub(NAME_WORDS_PLACEHOLDER, name_words))
       end
 
       # **意味説明は、そのままプロンプトへ入る英文です。**

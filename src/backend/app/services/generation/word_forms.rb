@@ -77,7 +77,7 @@ module Generation
         definition[PLURAL_FORMS_KEY]
       end
 
-      # テストから読み直せるようにします。**本番の経路では使いません。**
+      # 覚えた対応表を忘れます。**テストが読み直すために使います。**
       def reset!
         @definition = nil
       end
