@@ -30,9 +30,12 @@ module Generation
     SCOPE = 'art_direction_note'
 
     # 添える内容です。
-    Note = Struct.new(:checkpoints, :adjustments, keyword_init: true) do
+    #
+    # **節の見出しも一緒に返します。** 画面（issue #73、#74）が文言を
+    # 組み立て直さずに済みます。
+    Note = Struct.new(:checkpoints, :adjustments, :headings, keyword_init: true) do
       def to_h
-        { checkpoints: checkpoints, adjustments: adjustments }
+        { checkpoints: checkpoints, adjustments: adjustments, headings: headings }
       end
     end
 
@@ -48,10 +51,12 @@ module Generation
     def for(draft)
       ensure_draft!(draft)
 
+      built = Note.new(checkpoints: checkpoints_for(draft), adjustments: adjustments_for(draft),
+                       headings: section_headings)
+
       Trace.step('generation.art_direction_note_built',
-                 checkpoints: 0, notes: draft.notes.size) do
-        Note.new(checkpoints: checkpoints_for(draft), adjustments: adjustments_for(draft))
-      end
+                 checkpoints: built.checkpoints.size,
+                 adjustments: built.adjustments.size) { built }
     end
 
     private
@@ -62,78 +67,23 @@ module Generation
       raise InvalidDraftError, "下書きを渡してください: #{draft.class}" # 開発者向け
     end
 
-    # **仕様が定める 3 点を必ず含みます。** 人物の写り方は、当てた場合だけ足します。
+    # **確かめることは NoteCheckpoints が組み立てます。**
     def checkpoints_for(draft)
-      [copy_space_checkpoint(draft),
-       brand_color_checkpoint(draft),
-       cliche_checkpoint,
-       person_safety_checkpoint(draft)].compact
-    end
-
-    def checkpoint(key, text)
-      Checkpoint.new(key: key, heading: heading(key), text: text)
+      NoteCheckpoints.new(draft).build
     end
 
     def heading(key)
       I18n.t("#{SCOPE}.headings.#{key}")
     end
 
-    def text(key, **)
-      I18n.t("#{SCOPE}.#{key}", **)
-    end
-
-    # **語を並べるときの区切りも、実装の中へ書きません。**
-    def joined(values)
-      values.join(I18n.t("#{SCOPE}.headings.separator"))
-    end
-
-    # **余白の指定が無い案は、使わないようにお伝えします。**
-    # 4.2 は「コピースペースを持たない案を出力しない」と定めています。
-    # ここへ届くのは組み立ての誤りですが、**利用者が気づける形で残します。**
-    def copy_space_checkpoint(draft)
-      note = find_note(draft, CopySpace::NOTE_KIND)
-      return checkpoint(:copy_space, text('checkpoints.copy_space_missing')) if note.nil?
-
-      checkpoint(:copy_space,
-                 text('checkpoints.copy_space', position: position_label(note[:position])))
-    end
-
-    def position_label(position)
-      I18n.t("input_choices.headings.copy_space_positions.#{position}")
-    end
-
-    def brand_color_checkpoint(draft)
-      colors = color_notes(draft)
-      return checkpoint(:brand_color, text('checkpoints.brand_color_absent')) if colors.empty?
-
-      checkpoint(:brand_color,
-                 text('checkpoints.brand_color', colors: joined(colors.pluck(:name))))
-    end
-
-    def cliche_checkpoint
-      checkpoint(:cliche, text('checkpoints.cliche'))
-    end
-
-    def person_safety_checkpoint(draft)
-      applied = find_note(draft, StyleSpec::PERSON_SAFETY_NOTE_KIND)
-      return checkpoint(:person_safety, text('checkpoints.person_safety_skipped')) if applied.nil?
-
-      checkpoint(:person_safety,
-                 text('checkpoints.person_safety',
-                      compositions: joined(Array(applied[:compositions]))))
+    # 節の見出しです。
+    def section_headings
+      { checkpoints: heading(:checkpoints), adjustments: heading(:adjustments) }
     end
 
     # **控えから組み立てます。推し量りません。**
     def adjustments_for(draft)
       AdjustmentList.new(draft).build
-    end
-
-    def color_notes(draft)
-      draft.notes.select { |note| note[:kind] == ConflictResolver::BRAND_COLOR_NOTE_KIND }
-    end
-
-    def find_note(draft, kind)
-      draft.notes.find { |note| note[:kind] == kind }
     end
   end
 end

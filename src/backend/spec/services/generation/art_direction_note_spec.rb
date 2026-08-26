@@ -19,13 +19,20 @@ RSpec.describe Generation::ArtDirectionNote do
   end
 
   # **実際の経路から下書きを作ります**（requirements.md 4.1）。
-  def resolved(**overrides)
+  def specified(**overrides)
     engine = Generation::RuleEngine.new(dictionary: dictionary)
     spec = Generation::StyleSpec.new(dictionary: dictionary)
                                 .apply(engine.apply(engine.start(input(**overrides))))
 
+    Generation::CopySpace.new.apply(spec)
+  end
+
+  def resolver
     Generation::ConflictResolver.new(dictionary: dictionary)
-                                .resolve(Generation::CopySpace.new.apply(spec))
+  end
+
+  def resolved(**overrides)
+    resolver.resolve(specified(**overrides))
   end
 
   def built(**overrides)
@@ -34,6 +41,13 @@ RSpec.describe Generation::ArtDirectionNote do
 
   def checkpoint(built_note, key)
     built_note.checkpoints.find { |item| item.key == key }
+  end
+
+  # AI っぽさを避ける規則に当たる色を指定した場合です。
+  def weakened_built
+    dictionary.update!(anti_ai_rules: { 'forbidden_terms' => ['teal'],
+                                        'negative_prompt_terms' => ['deformed hands'] })
+    built(brand_colors: ['#0E7C7B'])
   end
 
   # **仕様が定める 3 点を必ず含みます**（requirements.md 4.1 の 9）。
@@ -69,9 +83,25 @@ RSpec.describe Generation::ArtDirectionNote do
       expect(checkpoint(built, :person_safety).text).to include('顔や指')
     end
 
-    it '人物の指示が入っていなければ、その旨を伝えます' do
+    # **控えを読みます。「無いこと」から推し量りません**（PR #159 のレビューより）。
+    it '業種の見込みで入れていなければ、その理由を伝えます' do
       expect(checkpoint(built(industry: 'ecommerce'), :person_safety).text)
-        .to include('人物の指示を入れていません')
+        .to include('この業種では人物が写らない見込み')
+    end
+
+    it 'スタイルに定めが無ければ、その理由を伝えます' do
+      expect(checkpoint(built(style_family: 'illustration'), :person_safety).text)
+        .to include('定めがありません')
+    end
+
+    # **弱めた色と、そのまま入れた色を分けて確かめていただきます。**
+    it '弱めた色には、弱めた前提で確かめていただきます' do
+      expect(checkpoint(weakened_built, :brand_color).text).to include('ほのかに感じる程度')
+    end
+
+    it '弱めた色に「アクセントとして現れていますか」と尋ねません' do
+      expect(checkpoint(weakened_built, :brand_color).text)
+        .not_to include('アクセントとして現れていますか')
     end
   end
 
@@ -126,12 +156,72 @@ RSpec.describe Generation::ArtDirectionNote do
   end
 
   describe '受け渡しの形' do
-    it '確かめることと調整したことを持ちます' do
-      expect(built.to_h.keys).to contain_exactly(:checkpoints, :adjustments)
+    it '確かめること・調整したこと・節の見出しを持ちます' do
+      expect(built.to_h.keys).to contain_exactly(:checkpoints, :adjustments, :headings)
+    end
+
+    it '節の見出しを添えます' do
+      expect(built.headings.values).to all(be_present)
     end
 
     it '確かめることは、印と見出しと本文を持ちます' do
       expect(checkpoint(built, :cliche).to_h.keys).to contain_exactly(:key, :heading, :text)
+    end
+  end
+
+  # **バリエーションの展開（issue #50）を通した案でも、正しく出ます。**
+  describe '3 案へ展開した案' do
+    def variations(**overrides)
+      Generation::VariationExpander.new(dictionary: dictionary)
+                                   .expand(specified(**overrides))
+                                   .map { |draft| resolver.resolve(draft) }
+    end
+
+    def notes(**overrides)
+      variations(**overrides).map { |draft| note.for(draft) }
+    end
+
+    it '3 案すべてにノートが付きます' do
+      expect(notes.size).to eq(3)
+    end
+
+    it '3 案すべてが、確かめることを持ちます' do
+      expect(notes).to all(satisfy { |item| item.checkpoints.any? })
+    end
+
+    # **抽象背景の案は、人物を置かない案です。**
+    it '抽象背景の案には、外した理由を伝えます' do
+      expect(checkpoint(notes.third, :person_safety).text).to include('具体物を置かない')
+    end
+
+    it '外した役割を、日本語の呼び名で伝えます' do
+      expect(notes.third.adjustments).to include(a_string_including('被写界深度'))
+    end
+
+    it '開発者向けの名前を出しません' do
+      expect(notes.third.adjustments).to all(satisfy { |line| line.exclude?('depth_of_field') })
+    end
+
+    # **AI っぽさを避ける規則で落とした素材も伝えます。**
+    #
+    # **いまの工程では、規則の適用の時点で素材がまだありません**（issue #161）。
+    # そのため、控えを直接持たせて確かめます。
+    it '落とした素材を伝えます' do
+      draft = variations.first.add(notes: [{ kind: Generation::RuleEngine::REMOVED_NOTE_KIND,
+                                             term: 'purple to teal gradient',
+                                             matched: 'purple to teal gradient' }])
+
+      expect(note.for(draft).adjustments).to include(a_string_including('外しました'))
+    end
+  end
+
+  # **役割の呼び名が無ければ、その場で失敗させます。**
+  describe '役割の呼び名' do
+    it '呼び名の無い役割は失敗します' do
+      draft = resolved.add(notes: [{ kind: Generation::VariationExpander::DROPPED_NOTE_KIND,
+                                     role: 'lens_mm', term: 'a 35mm lens' }])
+
+      expect { note.for(draft) }.to raise_error(I18n::MissingTranslationData)
     end
   end
 end

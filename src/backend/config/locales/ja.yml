@@ -34,16 +34,19 @@ ja:
   # 句点で終わりません。
   art_direction_note:
     headings:
-      # 語を並べるときの区切りです。文の中へ差し込みます。
-      separator: "・"
       checkpoints: "出来上がった絵で確かめること"
       adjustments: "この案で調整したこと"
       copy_space: "文字を置く余白の読みやすさ"
       brand_color: "ブランドカラーの再現度"
       cliche: "AI っぽさの混入"
       person_safety: "人物の写り方"
-      composition: "構図"
-      # 役割の呼び名です。文の中へ差し込みます。
+    # 見出しではない、文の中へ差し込む呼び名と区切りです。
+    labels:
+      # 語を並べるときの区切りです。
+      separator: "・"
+      # 文と文をつなぐときの区切りです。
+      sentence_separator: " "
+      # 役割の呼び名です。
       roles:
         person_safety: "人物の写り方"
         depth_of_field: "被写界深度"
@@ -55,10 +58,13 @@ ja:
       copy_space: "%{position}に、見出しと CTA ボタンを置ける余白がありますか。文字を重ねたときに読めるだけの明るさの差がありますか。"
       copy_space_missing: "文字を置く余白の指定が入っていません。この案は使わないでください。"
       brand_color: "指定いただいた %{colors} が、絵の中にアクセントとして現れていますか。画面全体を塗る色になっていませんか。"
+      brand_color_weakened: "%{colors} は、AI っぽさを避ける規則に当たったため弱めています。ほのかに感じる程度に留まっていますか。強く出ている場合はお知らせください。"
       brand_color_absent: "ブランドカラーのご指定がありませんでした。色の再現度は確認の対象外です。"
       cliche: "青紫のグラデーション・意味のない浮遊物・過剰な光の粒など、生成 AI にありがちな表現が入っていませんか。指示では避けていますが、出力に現れることがあります。"
       person_safety: "顔や指の形が崩れていませんか。%{compositions}という指示で崩れを避けていますが、出力に現れることがあります。"
-      person_safety_skipped: "この案には人物の指示を入れていません。人物が写っている場合は、この案を使わないでください。"
+      person_safety_unlikely: "この業種では人物が写らない見込みのため、人物の指示を入れていません。人物が写っている場合は、この案を使わないでください。"
+      person_safety_no_rule: "この絵のスタイルには、人物の崩れを避ける指示の定めがありません。人物が写っている場合は、顔や指の形をよくご確認ください。"
+      person_safety_dropped: "この案は具体物を置かないため、人物の指示を外しています。人物が写っている場合は、この案を使わないでください。"
     adjustments:
       brand_color_weakened: "%{name}（%{color}）は、AI っぽさを避ける規則に当たったため、ほのかに感じる程度まで弱めて残しました。"
       brand_color_accent: "%{name}（%{color}）は、主役に添えるアクセントとして入れました。"
@@ -67,11 +73,9 @@ ja:
       tone_restrained: "全体の雰囲気の指定は、文字を置く余白を飾らないように控えめにしました。"
       anti_ai_removed: "「%{term}」は、生成 AI にありがちな表現に当たるため外しました。"
       variation_dropped: "この案は具体物を置かないため、%{role}の指示を外しました。"
-      person_safety_from_project: "人物の写り方は、サイトの設定でご指定いただいた見込みに従いました。"
-      size_substituted: "選ばれた生成 AI が受け付ける画像の大きさに、%{aspect_ratio}とぴったり同じものがありません。最も近い %{size} を選びました。"
   # 入力の選択肢の呼び名です。**見出しではなく、文の中へ差し込みます。**
   input_choices:
-    headings:
+    labels:
       copy_space_positions:
         left: "画面の左三分の一"
         right: "画面の右三分の一"

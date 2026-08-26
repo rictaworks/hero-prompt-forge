@@ -20,31 +20,35 @@ RSpec.describe '文言の定義' do
       .to raise_error(I18n::MissingTranslationData)
   end
 
-  # **見出しと項目名は、文ではありません。**
-  # `headings` の下だけを、句点で終わらない文言の置き場とします。
+  # **見出しと呼び名は、文ではありません。**
+  # `headings`（見出し）と `labels`（呼び名・区切り）の下だけを、
+  # 句点で終わらない文言の置き場とします。
   # 説明・案内・失敗の知らせは、いずれも文ですので句点で終わります。
-  def headings_key
-    :headings
+  #
+  # **`headings` を句点回避の置き場にしません**（PR #159 のレビューより）。
+  # 見出しでないもの（役割の呼び名・語の区切り）は `labels` へ置きます。
+  def non_sentence_keys
+    %i[headings labels]
   end
 
-  def collect_sentences(node, inside_headings: false, into: [])
+  def collect_sentences(node, inside_labels: false, into: [])
     case node
-    when String then into << node unless inside_headings
+    when String then into << node unless inside_labels
     when Hash
       node.each do |key, value|
-        collect_sentences(value, inside_headings: inside_headings || key == headings_key,
+        collect_sentences(value, inside_labels: inside_labels || non_sentence_keys.include?(key),
                                  into: into)
       end
     end
     into
   end
 
-  def collect_headings(node, inside_headings: false, into: [])
+  def collect_headings(node, inside_labels: false, into: [])
     case node
-    when String then into << node if inside_headings
+    when String then into << node if inside_labels
     when Hash
       node.each do |key, value|
-        collect_headings(value, inside_headings: inside_headings || key == headings_key,
+        collect_headings(value, inside_labels: inside_labels || non_sentence_keys.include?(key),
                                 into: into)
       end
     end

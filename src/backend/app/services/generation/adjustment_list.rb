@@ -14,7 +14,7 @@ module Generation
   # 先に用意してあります**（`adjustments.person_safety_from_project`）。
   class AdjustmentList
     SCOPE = "#{ArtDirectionNote::SCOPE}.adjustments".freeze
-    ROLES_SCOPE = "#{ArtDirectionNote::SCOPE}.headings.roles".freeze
+    ROLES_SCOPE = "#{ArtDirectionNote::SCOPE}.labels.roles".freeze
 
     def initialize(draft)
       @draft = draft
@@ -61,8 +61,10 @@ module Generation
       text('variation_dropped', role: role_label(note[:role]))
     end
 
+    # **既定へ寄せません。** 役割の呼び名が無いまま通すと、
+    # `lens_mm` のような開発者向けの名前が利用者へ出ます（PR #159 のレビューより）。
     def role_label(role)
-      I18n.t("#{ROLES_SCOPE}.#{role}", default: role)
+      I18n.t("#{ROLES_SCOPE}.#{role}")
     end
 
     def text(key, **)
