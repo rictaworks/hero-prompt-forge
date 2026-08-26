@@ -50,6 +50,9 @@ module Generation
     # 別の版の規則を、同じ下書きへ重ねて当てようとした場合に投げます。
     class VersionMismatchError < StandardError; end
 
+    # 統合済みの下書きへ仕様化を当てようとした場合に投げます。
+    class AlreadyIntegratedError < StandardError; end
+
     # 規則辞書の業種の既定値が壊れている場合に投げます。
     InvalidPeopleError = PeopleExpectation::InvalidDictionaryError
 
@@ -83,6 +86,7 @@ module Generation
     # @return [Draft]
     def apply(draft)
       ensure_same_version!(draft)
+      ensure_not_integrated!(draft)
       style_family = style_family_of(draft)
 
       traced(draft, style_family,
@@ -99,6 +103,16 @@ module Generation
     # **1つの下書きへ当てる規則辞書は1つだけです。**
     # 生成リクエストが持てる版は1つですので、別の版を重ねると、
     # 前の版で適用した事実が記録から消えます。RuleEngine と同じ扱いにします。
+    # **矛盾解決のあとに当てません。** 統合はこの段より後に走ります。
+    # あとから仕様化を当てると、**弱めるはずの配色指定がそのまま残ります**
+    # （PR #151 の 2 回目のレビューで実測されました）。
+    def ensure_not_integrated!(draft)
+      return unless ConflictResolver.integrated?(draft)
+
+      raise AlreadyIntegratedError,
+            'すでに矛盾解決を適用した下書きへは、仕様化を当てられません。' # 開発者向け
+    end
+
     def ensure_same_version!(draft)
       applied_version = draft.dictionary_version
       return if applied_version.nil? || applied_version == version

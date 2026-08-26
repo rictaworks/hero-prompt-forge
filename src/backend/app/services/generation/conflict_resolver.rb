@@ -32,6 +32,12 @@ module Generation
     # 下書きにトーンが入っていない場合に投げます。
     class MissingToneError < StandardError; end
 
+    # 下書きにスタイル系統が入っていない場合に投げます。
+    MissingStyleFamilyError = StyleSpec::MissingStyleFamilyError
+
+    # コピースペースを確保していない下書きを渡された場合に投げます。
+    class MissingCopySpaceError < StandardError; end
+
     # すでに統合済みの下書きへ、もう一度当てようとした場合に投げます。
     class AlreadyIntegratedError < StandardError; end
 
@@ -40,15 +46,16 @@ module Generation
     TONE_NOTE_KIND = :tone_integrated
     STYLE_PALETTE_NOTE_KIND = StylePalette::NOTE_KIND
 
-    # ブランドカラーの統合の強さです。
-    ACCENT = :accent
-    SECONDARY_ACCENT = :secondary_accent
-    WEAKENED = :weakened
+    # ブランドカラーの統合の強さです。**扱いは BrandColorIntegration が持ちます。**
+    ACCENT = BrandColorIntegration::ACCENT
+    SECONDARY_ACCENT = BrandColorIntegration::SECONDARY_ACCENT
+    WEAKENED = BrandColorIntegration::WEAKENED
 
     def initialize(dictionary:)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
       @rules = AntiAiRules.new(dictionary)
+      @style_rules = StyleRules.new(dictionary)
       @definition = IntegrationRules.load
     end
 
@@ -56,6 +63,7 @@ module Generation
     # @return [Draft]
     def resolve(draft)
       ensure_not_integrated!(draft)
+      ensure_reserved!(draft)
       colors = brand_color_integrations(draft)
       styles = style_palette_weakenings(draft, colors)
       tone = tone_integration(draft)
@@ -79,7 +87,23 @@ module Generation
 
     private
 
-    attr_reader :rules, :definition
+    attr_reader :rules, :style_rules, :definition
+
+    # **コピースペースを確保していない下書きは統合しません。**
+    #
+    # requirements.md 4.2 は「コピースペースを持たない案を出しません」と定め、
+    # 4.1 は矛盾解決を余白の確保より後に置いています。**正しい順序なら、
+    # 確保されていない下書きはここへ届きません。** 届いたのは組み立ての誤りです。
+    #
+    # **黙って余白を守る指定を省きません。** 省くと、余白の帯が飾られた案が
+    # そのまま出ます。本プロジェクトはフォールバックを禁じています
+    # （PR #151 の 2 回目のレビューより）。
+    def ensure_reserved!(draft)
+      return if CopySpace.reserved?(draft)
+
+      raise MissingCopySpaceError,
+            'コピースペースを確保していない下書きは統合できません。' # 開発者向け
+    end
 
     # **2 回当てません。** ノートだけが二重に残り、
     # アートディレクションノートが同じ説明を繰り返します。
@@ -102,7 +126,7 @@ module Generation
 
     def integrated(draft, colors, styles, tone)
       draft.replace(main_terms: styles[:main_terms]).add(
-        main_terms: colors.pluck(:term) + color_restraint(draft, colors) + tone[:terms],
+        main_terms: colors.pluck(:term) + color_restraint(colors) + tone[:terms],
         notes: colors.map { |item| color_note(item) } + styles[:notes] + [tone_note(tone)]
       )
     end
@@ -111,8 +135,10 @@ module Generation
     #
     # 優先順位の ① は余白の確保、② がブランドカラーです。アクセントを置く
     # オブジェクトが余白側へ来ると、二番目の指定が最上位の指定を侵します。
-    def color_restraint(draft, colors)
-      return [] if colors.empty? || !CopySpace.reserved?(draft)
+    #
+    # **余白の確保は入口で求めています。** ここでは色の指定の有無だけを見ます。
+    def color_restraint(colors)
+      return [] if colors.empty?
 
       [definition.fetch('brand_color_restraint')]
     end
@@ -123,31 +149,26 @@ module Generation
     def style_palette_weakenings(draft, colors)
       return { main_terms: draft.main_terms, notes: [] } if colors.empty?
 
-      StylePalette.new(definition.fetch('style_palette_conflicts')).weaken(draft.main_terms)
+      StylePalette.for(definition: definition, style_rules: style_rules,
+                       style_family: style_family_of(draft))
+                  .weaken(draft.main_terms)
     end
 
-    # ブランドカラーを、強さの順に統合します。
-    #
-    # **1 色目をアクセント、2 色目をそれを支える細部として扱います。**
-    # 2 色を同じ強さで指定すると、どちらが主なのか決まりません。
+    # **スタイル系統は必須の入力です。** 欠けたまま進むと、どの配色指定と
+    # ぶつかっているのか決められません。
+    def style_family_of(draft)
+      value = draft.input.is_a?(Hash) ? draft.input[:style_family] : nil
+      return value if value.is_a?(String) && !value.strip.empty?
+
+      raise MissingStyleFamilyError,
+            "下書きにスタイル系統がありません: #{value.class}" # 開発者向け
+    end
+
+    # ブランドカラーを、強さの順に統合します。**扱いは BrandColorIntegration です。**
     def brand_color_integrations(draft)
       colors = Array(draft.input.is_a?(Hash) ? draft.input[:brand_colors] : nil)
 
-      colors.each_with_index.map do |color, index|
-        strength = index.zero? ? ACCENT : SECONDARY_ACCENT
-        build_integration(color, strength)
-      end
-    end
-
-    # **アンチAIルック規則に当たる場合は、落とさずに弱めます。**
-    def build_integration(color, strength)
-      name = ColorName.of(color)
-      term = format(definition.dig('brand_color', strength.to_s), color: name)
-      matched = rules.forbidden_match(term)
-      return { color: color, name: name, strength: strength, term: term, matched: nil } if matched.nil?
-
-      { color: color, name: name, strength: WEAKENED, matched: matched,
-        term: format(definition.dig('brand_color', WEAKENED.to_s), color: name) }
+      BrandColorIntegration.new(rules: rules, definition: definition).integrations_for(colors)
     end
 
     def color_note(item)
@@ -158,15 +179,15 @@ module Generation
     # トーン装飾を統合します。**いちばん弱い指定です。**
     #
     # **余白の帯まで飾りません。** 飾ると文字が読めなくなります。
-    # コピースペースを確保している下書きにだけ、余白を守る指定を足します。
+    # **余白の確保は入口で求めていますので、必ず足します。**
     def tone_integration(draft)
       tone = tone_of(draft)
       terms = [definition.fetch('tones').fetch(tone) do
         raise InvalidDefinitionError, "トーンの装飾がありません: #{tone}" # 開発者向け
       end]
-      terms << definition.fetch('tone_restraint') if CopySpace.reserved?(draft)
+      terms << definition.fetch('tone_restraint')
 
-      { tone: tone, terms: terms, restrained: CopySpace.reserved?(draft) }
+      { tone: tone, terms: terms, restrained: true }
     end
 
     def tone_note(tone)
@@ -181,7 +202,7 @@ module Generation
       return value if value.is_a?(String) && !value.strip.empty?
 
       raise MissingToneError,
-            "下書きにトーンがありません: #{value.inspect}" # 開発者向け
+            "下書きにトーンがありません: #{value.class}" # 開発者向け
     end
   end
 end

@@ -39,12 +39,16 @@ brand_color_restraint: "the brand accent placed away from the reserved copy area
 # 配色指定は事実上の支配色の指定であり、「アクセントとして統合する」という
 # ② の扱いと食い違います。**捨てずに弱めます**（requirements.md 4.1 の 5）。
 #
-# `match` は素材に含まれる語です。当たった素材を `weakened` へ置き換えます。
-style_palette_conflicts:
-  - match: "brand colors"
-    weakened: "a restrained palette led by the brand accent"
-  - match: "palette of"
-    weakened: "a restrained palette led by the brand accent"
+# **当てるのは、スタイル仕様化規則が持つ配色指定そのものです。**
+# 語の一部が含まれるかどうかで当てると、利用者由来の素材まで丸ごと置き換えます
+# （PR #151 の 2 回目のレビューで実測されました）。
+#
+# `items` は、規則辞書のスタイル仕様化規則の項目名です。
+# その項目の値と一致した素材だけを `weakened` へ置き換えます。
+style_palette_conflict:
+  items:
+    - palette
+  weakened: "a restrained palette led by the brand accent"
 
 # トーン装飾です。**いちばん弱い指定です。**
 #

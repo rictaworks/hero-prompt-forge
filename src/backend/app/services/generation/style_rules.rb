@@ -72,6 +72,20 @@ module Generation
       compositions.dup
     end
 
+    # 指定した項目が取り得る値をすべて返します。
+    #
+    # **矛盾解決（issue #43）が、配色指定そのものを見分けるために使います。**
+    # 語の一部が含まれるかどうかで当てると、利用者由来の素材まで置き換えます。
+    #
+    # **定義されていない項目は、値を持たないものとして扱います。**
+    # スタイル系統によって持つ項目が違うためです。
+    # @return [Array<String>]
+    def values_for(style_family, items)
+      rule = rule_for(style_family)
+
+      items.flat_map { |item| Array(rule[item]) }
+    end
+
     # 定義されているスタイル系統です。
     def style_families
       @rules.keys

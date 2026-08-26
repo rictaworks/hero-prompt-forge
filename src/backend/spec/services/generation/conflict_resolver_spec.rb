@@ -9,7 +9,9 @@ RSpec.describe Generation::ConflictResolver do
   end
 
   let(:dictionary) do
-    RuleDictionary.create!(version: 'vspec.conflict', anti_ai_rules: anti_ai_rules)
+    RuleDictionary.create!(version: 'vspec.conflict', anti_ai_rules: anti_ai_rules,
+                           style_spec_rules: InitialRuleDictionary.style_spec_rules,
+                           industry_defaults: InitialRuleDictionary.industry_defaults)
   end
 
   let(:resolver) { described_class.new(dictionary: dictionary) }
@@ -24,7 +26,13 @@ RSpec.describe Generation::ConflictResolver do
       copy_space_position: 'left', aspect_ratio: '16:9' }.merge(overrides)
   end
 
+  # **コピースペースを確保した下書きを渡します。**
+  # 矛盾解決は、余白の確保より後の段です（requirements.md 4.1）。
   def draft_for(**overrides)
+    Generation::CopySpace.new.apply(Generation::Draft.new(input: input(**overrides)))
+  end
+
+  def bare_draft(**overrides)
     Generation::Draft.new(input: input(**overrides))
   end
 
@@ -151,30 +159,27 @@ RSpec.describe Generation::ConflictResolver do
   # **トーン装飾が余白と競合しないようにします。**
   # 余白の帯まで飾ると、文字が読めません。
   describe '余白との競合' do
-    let(:reserved_draft) { Generation::CopySpace.new.apply(draft_for) }
-
-    it '余白を確保していれば、余白を守る指定を足します' do
-      expect(resolver.resolve(reserved_draft).main_terms)
-        .to include(a_string_including('reserved copy area'))
+    it '余白を守る指定を足します' do
+      expect(resolved.main_terms).to include(a_string_including('reserved copy area'))
     end
 
     it '守った事実をノートへ残します' do
-      expect(tone_note(resolver.resolve(reserved_draft))[:restrained]).to be(true)
-    end
-
-    it '余白を確保していなければ、余白の指定を足しません' do
-      expect(resolved.main_terms)
-        .to all(satisfy { |term| term.exclude?('reserved copy area') })
+      expect(tone_note(resolved)[:restrained]).to be(true)
     end
 
     # **コピースペースの指定を落としません。**
     it 'すでにある余白の指定を残します' do
-      expect(resolver.resolve(reserved_draft).main_terms)
-        .to include(a_string_including('copy space'))
+      expect(resolved.main_terms).to include(a_string_including('copy space'))
     end
 
     it '余白の確保は保たれます' do
-      expect(Generation::CopySpace.reserved?(resolver.resolve(reserved_draft))).to be(true)
+      expect(Generation::CopySpace.reserved?(resolved)).to be(true)
+    end
+
+    # **黙って省きません。** 省くと、余白の帯が飾られた案がそのまま出ます。
+    it '余白を確保していない下書きは統合できません' do
+      expect { resolver.resolve(bare_draft) }
+        .to raise_error(described_class::MissingCopySpaceError)
     end
   end
 
@@ -187,9 +192,10 @@ RSpec.describe Generation::ConflictResolver do
 
     it 'もとの下書きを変えません' do
       draft = draft_for
+      before = draft.main_terms
       resolver.resolve(draft)
 
-      expect(draft.main_terms).to be_empty
+      expect(draft.main_terms).to eq(before)
     end
   end
 
@@ -214,9 +220,10 @@ RSpec.describe Generation::ConflictResolver do
     end
 
     it 'トーンが無ければ失敗します' do
-      bare = Generation::Draft.new(input: { industry: 'saas' })
+      without = Generation::CopySpace.new
+                                     .apply(Generation::Draft.new(input: input.except(:brand_tone)))
 
-      expect { resolver.resolve(bare) }.to raise_error(described_class::MissingToneError)
+      expect { resolver.resolve(without) }.to raise_error(described_class::MissingToneError)
     end
 
     it '色コードの形が違えば失敗します' do
@@ -228,6 +235,7 @@ RSpec.describe Generation::ConflictResolver do
   # **統合の規則は人が編集するデータです。中身を信用しません。**
   describe '統合の規則の検め' do
     def with_definition(loaded)
+      dictionary # 規則辞書を先に用意します。YAML の差し替えより後だと読めません
       allow(YAML).to receive(:safe_load_file).and_return(loaded)
       Generation::IntegrationRules.reset!
     end
@@ -238,8 +246,8 @@ RSpec.describe Generation::ConflictResolver do
                            'secondary_accent' => '%<color>s as a small detail',
                            'weakened' => '%<color>s as a hint' },
         'brand_color_restraint' => 'the brand accent placed away from the copy area',
-        'style_palette_conflicts' => [{ 'match' => 'brand colors',
-                                        'weakened' => 'a restrained palette' }],
+        'style_palette_conflict' => { 'items' => ['palette'],
+                                      'weakened' => 'a restrained palette' },
         'tones' => Generation::InputChoices::BRAND_TONES.index_with { 'an impression' },
         'tone_restraint' => 'the reserved copy area kept plain'
       }
@@ -299,7 +307,7 @@ RSpec.describe Generation::ConflictResolver do
 
     it 'スタイル系統との衝突の規則が無ければ失敗します' do
       broken = sound_definition
-      broken.delete('style_palette_conflicts')
+      broken.delete('style_palette_conflict')
       with_definition(broken)
 
       expect { described_class.new(dictionary: dictionary) }
@@ -320,6 +328,16 @@ RSpec.describe Generation::ConflictResolver do
     it '打ち消しの言い回しは失敗します' do
       broken = sound_definition
       broken['brand_color']['accent'] = 'no %<color>s anywhere'
+      with_definition(broken)
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **有無だけを見ると、生成のたびに落ちます**（PR #151 の 2 回目のレビューより）。
+    it '色を差し込めない書き方は失敗します' do
+      broken = sound_definition
+      broken['brand_color']['accent'] = '%<color>s with 100% coverage'
       with_definition(broken)
 
       expect { described_class.new(dictionary: dictionary) }
@@ -346,20 +364,13 @@ RSpec.describe Generation::ConflictResolver do
 
   # **優先順位の ① 余白 ＞ ② ブランドカラーを、出力に現します。**
   describe '余白とブランドカラーの優先順位' do
-    let(:reserved_draft) { Generation::CopySpace.new.apply(draft_for(brand_colors: ['#F5A623'])) }
-
     it 'アクセントを余白から離します' do
-      expect(resolver.resolve(reserved_draft).main_terms)
+      expect(resolved(brand_colors: ['#F5A623']).main_terms)
         .to include(a_string_including('brand accent placed away'))
     end
 
-    it '余白を確保していなければ足しません' do
-      expect(resolved(brand_colors: ['#F5A623']).main_terms)
-        .to all(satisfy { |term| term.exclude?('brand accent placed away') })
-    end
-
     it 'ブランドカラーの指定が無ければ足しません' do
-      expect(resolver.resolve(Generation::CopySpace.new.apply(draft_for)).main_terms)
+      expect(resolved.main_terms)
         .to all(satisfy { |term| term.exclude?('brand accent placed away') })
     end
   end
@@ -373,7 +384,11 @@ RSpec.describe Generation::ConflictResolver do
       draft.notes.select { |note| note[:kind] == described_class::STYLE_PALETTE_NOTE_KIND }
     end
 
-    let(:styled) { draft_for(brand_colors: ['#F5A623']).add(main_terms: ['two brand colors plus one neutral']) }
+    let(:palette_term) { 'two brand colors plus one neutral' }
+
+    let(:styled) do
+      draft_for(brand_colors: ['#F5A623'], style_family: 'abstract').add(main_terms: [palette_term])
+    end
 
     it '配色の指定を弱めます' do
       expect(resolver.resolve(styled).main_terms)
@@ -388,21 +403,52 @@ RSpec.describe Generation::ConflictResolver do
     it '弱めた事実をノートへ残します' do
       note = palette_notes(resolver.resolve(styled)).first
 
-      expect(note[:term]).to eq('two brand colors plus one neutral')
-      expect(note[:matched]).to eq('brand colors')
+      expect(note[:term]).to eq(palette_term)
+      expect(note[:weakened]).to eq('a restrained palette led by the brand accent')
     end
 
     # **ブランドカラーの指定が無ければ、衝突しません。**
     it 'ブランドカラーの指定が無ければ、そのままにします' do
-      bare = draft_for.add(main_terms: ['two brand colors plus one neutral'])
+      bare = draft_for(style_family: 'abstract').add(main_terms: [palette_term])
 
-      expect(resolver.resolve(bare).main_terms).to include('two brand colors plus one neutral')
+      expect(resolver.resolve(bare).main_terms).to include(palette_term)
     end
 
     it '衝突しない素材はそのままにします' do
       draft = draft_for(brand_colors: ['#F5A623']).add(main_terms: ['35mm lens'])
 
       expect(resolver.resolve(draft).main_terms).to include('35mm lens')
+    end
+
+    # **語の一部が含まれるかどうかで当てません**（PR #151 の 2 回目のレビューより）。
+    # 利用者由来の素材まで丸ごと置き換えると、この issue の目的に反します。
+    ['a signboard showing the brand colors of the shop',
+     'muted palette of natural wood tones',
+     'wide palette of props on the counter'].each do |term|
+      it "「#{term}」を置き換えません" do
+        draft = draft_for(brand_colors: ['#F5A623'], style_family: 'abstract')
+                .add(main_terms: [term])
+
+        expect(resolver.resolve(draft).main_terms).to include(term)
+      end
+    end
+
+    # **もともと重なっていた素材を、黙って 1 件へまとめません。**
+    it '弱めない素材の数を変えません' do
+      terms = ['35mm lens', 'a calm office', 'a calm office']
+      draft = draft_for(brand_colors: ['#F5A623'], style_family: 'abstract')
+              .add(main_terms: terms)
+      kept = resolver.resolve(draft).main_terms.count { |term| terms.include?(term) }
+
+      expect(kept).to eq(draft.main_terms.count { |term| terms.include?(term) })
+    end
+
+    # **配色指定を持たないスタイル系統では、何も弱めません。**
+    it '配色指定を持たないスタイル系統では弱めません' do
+      draft = draft_for(brand_colors: ['#F5A623'], style_family: 'photoreal')
+              .add(main_terms: [palette_term])
+
+      expect(palette_notes(resolver.resolve(draft))).to be_empty
     end
   end
 
@@ -428,6 +474,21 @@ RSpec.describe Generation::ConflictResolver do
 
       expect { Generation::RuleEngine.new(dictionary: dictionary).apply(integrated) }
         .to raise_error(Generation::RuleEngine::AlreadyIntegratedError)
+    end
+
+    # **関所は 1 か所では足りません**（PR #151 の 2 回目のレビューより）。
+    it '統合済みの下書きへ仕様化を当てられません' do
+      integrated = resolved(brand_colors: ['#0E7C7B'])
+
+      expect { Generation::StyleSpec.new(dictionary: dictionary).apply(integrated) }
+        .to raise_error(Generation::StyleSpec::AlreadyIntegratedError)
+    end
+
+    it '統合済みの下書きへコピースペースを規定できません' do
+      integrated = resolved(brand_colors: ['#0E7C7B'])
+
+      expect { Generation::CopySpace.new.apply(integrated) }
+        .to raise_error(Generation::CopySpace::AlreadyIntegratedError)
     end
 
     it '二度統合できません' do
@@ -456,7 +517,8 @@ RSpec.describe Generation::ConflictResolver do
     it '規則の適用から統合までを通せます' do
       engine = Generation::RuleEngine.new(dictionary: dictionary)
       applied = engine.apply(engine.start(input(brand_colors: ['#0E7C7B'])))
-      reserved = Generation::CopySpace.new.apply(applied)
+      spec = Generation::StyleSpec.new(dictionary: dictionary).apply(applied)
+      reserved = Generation::CopySpace.new.apply(spec)
 
       expect(resolver.resolve(reserved).main_terms).to include(a_string_including('deep teal'))
     end

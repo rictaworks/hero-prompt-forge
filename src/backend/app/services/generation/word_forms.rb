@@ -122,9 +122,9 @@ module Generation
         ensure_variants!(plurals, PLURAL_FORMS_KEY)
         ensure_singulars!(singulars)
 
-        { SPELLING_VARIANTS_KEY => variants.freeze,
-          SINGULAR_WORDS_KEY => singulars.freeze,
-          PLURAL_FORMS_KEY => plurals.freeze }.freeze
+        DeepFreeze.call({ SPELLING_VARIANTS_KEY => variants,
+                          SINGULAR_WORDS_KEY => singulars,
+                          PLURAL_FORMS_KEY => plurals })
       end
 
       def read_definition

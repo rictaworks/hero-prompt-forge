@@ -39,7 +39,9 @@ RSpec.describe Generation::ColorName do
         '#0B3D2E' => 'deep green',
         '#00704A' => 'deep green',
         '#001F5B' => 'deep blue',
-        '#5F7F7A' => 'muted teal'
+        '#5F7F7A' => 'muted teal',
+        '#556B2F' => 'deep green',
+        '#FFC0CB' => 'pale pink'
       }.each do |color, name|
         it "「#{color}」を「#{name}」にします" do
           expect(described_class.of(color)).to eq(name)
@@ -250,6 +252,22 @@ RSpec.describe Generation::ColorName do
       names = (0...360).map { |hue| described_class.of(hex_from_hsl(hue, 0.8, 0.5)) }
 
       expect(names.count('teal').fdiv(names.size)).to be < 0.10
+    end
+
+    # **1 つの名前へ寄せすぎません**（PR #151 の 2 回目のレビューより）。
+    # 範囲が広いと、離れた色が同じ名前になり、ブランドカラーの再現度が落ちます。
+    it 'どの色名も色相の全周の 3 割を超えません' do
+      names = (0...360).map { |hue| described_class.of(hex_from_hsl(hue, 0.8, 0.5)) }
+      widest = names.tally.max_by { |_, count| count }
+
+      expect(widest.last.fdiv(names.size)).to be <= 0.30
+    end
+
+    # **しきい値の隙間に、実際の色から遠い名前が残らないことを確かめます。**
+    it '暗く濁った色に修飾語が付きます' do
+      names = [0.20, 0.30, 0.34].map { |lightness| described_class.of(hex_from_hsl(100, 0.4, lightness)) }
+
+      expect(names).to all(start_with('deep '))
     end
   end
 end

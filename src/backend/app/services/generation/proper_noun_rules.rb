@@ -27,7 +27,7 @@ module Generation
         readings = read(path)[SUFFIX_READINGS_KEY]
         ensure_readings!(readings, path)
 
-        readings.freeze
+        DeepFreeze.call(readings)
       end
 
       private

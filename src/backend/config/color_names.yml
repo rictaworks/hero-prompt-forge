@@ -30,15 +30,19 @@ achromatic_name: gray
 # **色相の名前の前に 1 つだけ付けます。** 2 つ以上重ねると（`muted deep green`）、
 # モデルによって解釈が割れます。**明るさを先に見ます。** 明暗の違いのほうが、
 # 鮮やかさの違いより見た目に効くためです。
+#
+# **しきい値の隙間を狭く取ります。** オリーブ `#556B2F` のように、暗くも濁っても
+# 中途半端な色は、修飾語が付かないと鮮やかな緑として渡ります
+# （PR #151 の 2 回目のレビューより）。
 modifiers:
   # 明度がこの値以下なら「深い」と表します（0.0 から 1.0）。
-  deep_lightness: 0.30
+  deep_lightness: 0.35
   deep_name: deep
   # 明度がこの値以上なら「淡い」と表します（0.0 から 1.0）。
   pale_lightness: 0.72
   pale_name: pale
   # 彩度がこの値以下なら「くすんだ」と表します（0.0 から 1.0）。
-  muted_saturation: 0.30
+  muted_saturation: 0.40
   muted_name: muted
 
 # 色相の範囲と名前です（0 度から 360 度）。
@@ -68,8 +72,8 @@ hues:
     to: 315
     name: purple
   - from: 315
-    to: 345
+    to: 350
     name: pink
-  - from: 345
+  - from: 350
     to: 360
     name: red
