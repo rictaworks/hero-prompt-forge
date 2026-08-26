@@ -31,11 +31,19 @@ module Adapters
     # 対象の呼び出しの版の鍵です。
     API_VERSION_KEY = 'api_version'
 
+    # 記法が必ず持つ鍵です。**版の記載も求めます。**
+    REQUIRED_KEYS = (NarrativeAdapter::REQUIRED_KEYS + [API_VERSION_KEY]).freeze
+
+    # 画像の大きさの形です。**画素で書きます。**
+    SIZE_FORMAT = /\A\d+x\d+\z/
+
     # 大きさをすり替えたことを残す印です。
     SIZE_SUBSTITUTED_NOTE_KIND = :size_substituted
 
     class << self
       def model_key = MODEL_KEY
+
+      def required_keys = REQUIRED_KEYS
     end
 
     # **打ち消しの欄を持ちません。**
@@ -85,12 +93,26 @@ module Adapters
     # **知らないアスペクト比は、その場で失敗させます。**
     # 既定の大きさへ寄せると、利用者が選んだのと違う形の絵が出ます。
     def size_for(aspect_ratio)
-      sizes = rules[SIZES_KEY]
-      size = sizes.is_a?(Hash) ? sizes[aspect_ratio] : nil
-      return size if size.is_a?(String) && !size.strip.empty?
+      size = sizes[aspect_ratio]
+      return size if size
 
       raise InvalidDefinitionError,
             "画像の大きさの対応がありません: #{aspect_ratio}" # 開発者向け
+    end
+
+    # 大きさの対応表です。**中身を信用しません。**
+    # 比のまま書かれていると、この呼び出しに弾かれます。
+    def sizes
+      table = rules[SIZES_KEY]
+      return table if valid_sizes?(table)
+
+      raise InvalidDefinitionError,
+            "画像の大きさの対応表が読めません: #{self.class.model_key}.#{SIZES_KEY}" # 開発者向け
+    end
+
+    def valid_sizes?(table)
+      table.is_a?(Hash) && table.any? &&
+        table.all? { |ratio, size| ratio.is_a?(String) && size.is_a?(String) && size.match?(SIZE_FORMAT) }
     end
   end
 end

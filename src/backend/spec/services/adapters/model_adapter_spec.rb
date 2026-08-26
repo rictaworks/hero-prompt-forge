@@ -135,6 +135,18 @@ RSpec.describe Adapters::ModelAdapter do
             .to raise_error(described_class::UnsafeTermError)
         end
 
+        # **打ち消しの素材も検めます**（PR #154 の 3 回目のレビューより）。
+        # Midjourney 系は打ち消しを本文の末尾へ連結します。
+        it 'この記法で意味を持つ文字は、打ち消しの素材でも弾きます' do
+          pattern = adapter.class.reserved_characters
+          next if pattern.nil?
+
+          unsafe = draft_for(negative_terms: ['weird (soft light) --ar 1:1'])
+
+          expect { adapter.format(unsafe) }
+            .to raise_error(described_class::UnsafeTermError)
+        end
+
         it '下書きでなければ失敗します' do
           expect { adapter.format('下書きではありません') }
             .to raise_error(described_class::InvalidDraftError)
@@ -219,6 +231,14 @@ RSpec.describe Adapters::ModelAdapter do
 
     it '打ち消しを二重に出しません' do
       expect(formatted.to_prompt.scan('deformed hands').size).to eq(1)
+    end
+
+    # **打ち消しに混ざったパラメータは、画面の比を上書きします。**
+    it '打ち消しにパラメータの印が混ざれば弾きます' do
+      unsafe = draft_for(negative_terms: ['weird --ar 1:1'])
+
+      expect { described_class.for('midjourney').format(unsafe) }
+        .to raise_error(described_class::UnsafeTermError)
     end
 
     # **本文の途中にパラメータを置けません**（PR #154 の 2 回目のレビューより）。
@@ -357,6 +377,25 @@ RSpec.describe Adapters::ModelAdapter do
       note = described_class.for('dalle').format(draft_for(aspect_ratio: '3:2')).notes.first
 
       expect(note[:api_version]).to eq('dall-e-3')
+    end
+
+    # **対応表の中身も検めます**（PR #154 の 3 回目のレビューより）。
+    it '大きさが画素で書かれていなければ失敗します' do
+      broken = { 'dalle' => Adapters::AdapterRules.send(:all)['dalle'].merge('sizes' => { '16:9' => '16:9' }) }
+      allow(YAML).to receive(:safe_load_file).and_return(broken)
+      Adapters::AdapterRules.reset!
+
+      expect { described_class.for('dalle').format(draft_for) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it '呼び出しの版が書かれていなければ失敗します' do
+      without = Adapters::AdapterRules.send(:all)['dalle'].except('api_version')
+      allow(YAML).to receive(:safe_load_file).and_return({ 'dalle' => without })
+      Adapters::AdapterRules.reset!
+
+      expect { described_class.for('dalle').format(draft_for) }
+        .to raise_error(Adapters::AdapterRules::InvalidDefinitionError)
     end
   end
 

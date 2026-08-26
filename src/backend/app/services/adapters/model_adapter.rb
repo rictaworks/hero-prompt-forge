@@ -127,8 +127,15 @@ module Adapters
     end
 
     # **本文へ入るすべての素材を検めます。** 検め方は TermGuard が持ちます。
+    #
+    # **打ち消しの素材も検めます。** Midjourney 系は打ち消しを本文の末尾へ
+    # 連結しますので、打ち消しに `--ar 1:1` が混ざると、**先に付けた画面の比を
+    # 上書きします**（PR #154 の 3 回目のレビューで実測されました）。
+    # 打ち消しの素材も、規則辞書＝管理画面の編集対象です。
     def ensure_terms_safe!(draft)
-      TermGuard.new(self.class.reserved_characters).ensure_safe!(draft.main_terms)
+      guard = TermGuard.new(self.class.reserved_characters)
+      guard.ensure_safe!(draft.main_terms)
+      guard.ensure_safe!(draft.negative_terms)
     end
 
     # 整形の過程で残す控えです。**既定では残しません。**
