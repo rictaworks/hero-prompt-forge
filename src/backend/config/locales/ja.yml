@@ -24,6 +24,16 @@ ja:
         invalid: "の形式が正しくありません。"
         # 長さの上限を超えた場合の文言です（length の maximum）。
         too_long: "は%{count}文字以内で入力してください。"
+  # 開発者用の管理画面の文言です。一般の利用者には見えません。
+  #
+  # **見出しと項目名は `headings` の下へ置きます。** 見出しは文ではありませんので、
+  # 句点で終わりません。文（説明・案内）は句点で終わります。
+  admin:
+    headings:
+      title: "hero-prompt-forge 管理"
+      dashboard: "管理画面"
+    dashboard:
+      description: "規則辞書の編集・利用者の管理・クォータのリセット・利用状況の集計は、順次ここへ足します。"
   errors:
     common:
       next_action_unknown: "解決しない場合は info@rictaworks.jp までご連絡ください。"
