@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -83,6 +83,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_100000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["prompt_request_id"], name: "index_quota_consumptions_on_prompt_request_id"
+    t.index ["prompt_request_id"], name: "index_quota_consumptions_on_reserved_prompt_request", unique: true, where: "(((status)::text = 'reserved'::text) AND (prompt_request_id IS NOT NULL))"
     t.index ["quota_day", "status"], name: "index_quota_consumptions_on_quota_day_and_status"
     t.index ["user_id", "quota_day"], name: "index_quota_consumptions_on_user_id_and_quota_day", unique: true
     t.index ["user_id"], name: "index_quota_consumptions_on_user_id"
