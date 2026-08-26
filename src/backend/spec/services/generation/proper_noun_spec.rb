@@ -64,11 +64,33 @@ RSpec.describe Generation::ProperNoun do
       '囲炉裏（いろり）のある宿です。',
       '定休日（ていきゅうび）は水曜です。',
       'やまだ（やまだ）さんが担当します。',
-      '櫻花堂と月見堂（つきみどう）を紹介します。'
+      '櫻花堂と月見堂（つきみどう）を紹介します。',
+      '名前のとおり「明るい」雰囲気です。',
+      '店名のような「親しみ」を大切にします。'
     ].each do |summary|
       it "「#{summary}」を名前として拾いません" do
         expect(found_in(summary)).to be_empty
       end
+    end
+  end
+
+  # **手がかりが左側にある書き方も拾います**（PR #149 のレビューより）。
+  describe '名前であることを先に述べる書き方' do
+    {
+      '屋号は「はな花」です。' => 'はな花',
+      '店名は「さくら堂」です。' => 'さくら堂',
+      'ブランド名は「ミライ」です。' => 'ミライ',
+      '店名：「みどり」です。' => 'みどり',
+      '社名が「あおぞら」に決まりました。' => 'あおぞら'
+    }.each do |summary, name|
+      it "「#{summary}」から「#{name}」を拾います" do
+        expect(found_in(summary).map(&:original)).to include(name)
+      end
+    end
+
+    # **助詞をすぐ後ろに求めます。**
+    it '間に語が挟まる書き方は拾いません' do
+      expect(found_in('名前のとおり「明るい」雰囲気です。')).to be_empty
     end
   end
 
