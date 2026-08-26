@@ -11,6 +11,13 @@ class RuleDictionary < ApplicationRecord
   # 公開済みの版が 1 つも無い場合に投げます。
   class MissingCurrentError < StandardError; end
 
+  # 業種の既定値が欠けている場合に投げます。
+  #
+  # **`KeyError` を使いません。** `KeyError` は Ruby のどこの `fetch` でも
+  # 上がる広い種別です。**書き間違いによる取り違えまで、辞書の不備として
+  # 静かに片付きます**（PR #165 の 2 回目のレビューより）。
+  class MissingDefaultsError < KeyError; end
+
   validates :version, presence: true, uniqueness: true
 
   scope :published, -> { where.not(published_at: nil) }
@@ -47,7 +54,7 @@ class RuleDictionary < ApplicationRecord
   # 業種ごとの既定値を返します。定義が無ければ例外にします。
   def defaults_for(industry)
     industry_defaults.fetch(industry.to_s) do
-      raise KeyError, "業種の既定値がありません: #{industry.inspect}" # 開発者向け
+      raise MissingDefaultsError, "業種の既定値がありません: #{industry.inspect}" # 開発者向け
     end
   end
 

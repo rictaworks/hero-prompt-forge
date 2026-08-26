@@ -50,7 +50,7 @@ module PromptRequests
     end
 
     def status_for(packages)
-      degraded?(packages) ? 'degraded_completed' : 'completed'
+      degraded?(packages) ? PromptRequest::DEGRADED_COMPLETED : PromptRequest::COMPLETED
     end
 
     def version_of(packages)

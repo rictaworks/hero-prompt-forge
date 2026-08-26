@@ -48,8 +48,19 @@ class GeneratePromptJob < ApplicationJob
     Generation::InputNormalizer::InvalidInputError,
     Generation::InputNormalizer::InvalidDictionaryError,
     RuleDictionary::MissingCurrentError,
-    KeyError
+    RuleDictionary::MissingDefaultsError
   ].freeze
+
+  # **働き手が落ちたと見なすまでの時間です。**
+  #
+  # 働き手が異常終了すると、仕事は待ち行列へ戻りますが、**戻ってくるのは
+  # 投入時の `executions` です。** 投入し直しとして見分けられませんので、
+  # `generating` のまま永久に取り残されます（PR #165 の 2 回目のレビューで
+  # 実測されました）。**時間で見分けます。**
+  #
+  # **短くしすぎません。** 組み立ての途中で別の働き手が横入りします。
+  # 組み立ては、磨きの待ち時間（1 案あたり最大 20 秒）を含めても分の単位です。
+  STALE_AFTER = 15.minutes
 
   # **繰り返せば通ることがある誤りです。** 上限まで試します。
   #
@@ -86,9 +97,11 @@ class GeneratePromptJob < ApplicationJob
   # 試したうえでの、想定された行き止まりです。**状態・理由・クォータの返還・
   # 記録がすべて残りますので、握りつぶしにはあたりません。**
   # 想定していない誤り（下の `rescue_from`）とは、扱いを分けます。
-  retry_on(*TRANSIENT_FAILURES, attempts: MAX_ATTEMPTS, wait: :polynomially_longer) do |job, error|
-    job.record_failure(error)
-  end
+  # **塊を渡すのは、投げ直させないためだけです。**
+  # 記録は `after_discard` が引き受けます。`retry_on` は塊を呼んだ直後に
+  # `after_discard` を呼びますので、**ここで記録すると 2 度走ります**
+  # （PR #165 の 2 回目のレビューで実測されました）。
+  retry_on(*TRANSIENT_FAILURES, attempts: MAX_ATTEMPTS, wait: :polynomially_longer) { nil }
 
   # **繰り返しません。** 記録は `after_discard` が一度だけ行います。
   discard_on(*PERMANENT_FAILURES)
@@ -117,8 +130,8 @@ class GeneratePromptJob < ApplicationJob
 
     Trace.step('jobs.generate_prompt_failed',
                prompt_request: request.id, error: error.class.name) do
-      request.transition_to!('generating') if request.status == 'queued'
-      request.transition_to!('failed', rejection_reason: reason_for(error))
+      request.transition_to!(PromptRequest::GENERATING) if request.status == PromptRequest::QUEUED
+      request.transition_to!(PromptRequest::FAILED, rejection_reason: reason_for(error))
       Quota::Reservation.settle!(request)
     end
   end
@@ -136,7 +149,7 @@ class GeneratePromptJob < ApplicationJob
     request.with_lock do
       next skipped(request) unless resumable?(request)
 
-      request.transition_to!('generating') if request.status == 'queued'
+      request.transition_to!(PromptRequest::GENERATING) if request.status == PromptRequest::QUEUED
       true
     end
   end
@@ -148,13 +161,20 @@ class GeneratePromptJob < ApplicationJob
   # 1 回目が `generating` まで進めたあと落ちた回です。**別の投入は 1 回目
   # ですので、`generating` を見たら見送ります。**
   def resumable?(request)
-    return true if request.status == 'queued'
+    return true if request.status == PromptRequest::QUEUED
+    return false unless request.status == PromptRequest::GENERATING
 
-    request.status == 'generating' && retrying?
+    retrying? || stale?(request)
   end
 
   def retrying?
     executions.to_i > 1
+  end
+
+  # **働き手が落ちて置き去りになった行を、拾い直します。**
+  # 見分けるのは時間です。`executions` では見分けられません。
+  def stale?(request)
+    request.updated_at <= STALE_AFTER.ago
   end
 
   def skipped(request)
@@ -162,11 +182,20 @@ class GeneratePromptJob < ApplicationJob
                prompt_request: request.id, status: request.status) { false }
   end
 
-  # **決着だけが残っている場合です。** 成果物は提供済みで、枠が予約のまま
-  # 残っています。確定はひとまとまりの外で行いますので、そこで落ちるとこの形に
-  # なります。**放っておくと、日をまたいだときに予約そのものを止めます。**
+  # **決着だけが残っている場合です。**
+  #
+  # 生成そのものは終わっている（成果物を提供したか、失敗として記録した）のに、
+  # 枠が予約のまま残っています。**確定も返還も、ひとまとまりの外で行います**
+  # ので、そこで落ちるとこの形になります。
+  #
+  # **提供できた場合と、失敗した場合の両方を拾います。** 片方だけに立て直しを
+  # 用意すると、鏡像の側が取り残されます（PR #165 の 2 回目のレビューより）。
+  #
+  # **放っておくと、日をまたいだときに予約そのものを止めます。**
   def awaiting_settlement?(request)
-    request.delivered? && reserved?(request)
+    return false unless request.delivered? || request.status == PromptRequest::FAILED
+
+    reserved?(request)
   end
 
   def reserved?(request)
@@ -174,7 +203,8 @@ class GeneratePromptJob < ApplicationJob
   end
 
   def settle(request)
-    Trace.step('jobs.generate_prompt_settled', prompt_request: request.id) do
+    Trace.step('jobs.generate_prompt_settled',
+               prompt_request: request.id, status: request.status) do
       Quota::Reservation.settle!(request)
     end
   end
@@ -195,9 +225,12 @@ class GeneratePromptJob < ApplicationJob
   # **クォータの確定は、そのひとまとまりの外です。** 外れた場合は、
   # 投入し直しの `awaiting_settlement?` が拾い直します。
   def deliver(request, packages)
-    PromptRequests::Delivery.new(request).call(packages)
+    stored = Trace.step('jobs.generate_prompt_stored',
+                        prompt_request: request.id, packages: packages.size) do
+      PromptRequests::Delivery.new(request).call(packages)
+    end
 
-    Quota::Reservation.settle!(request)
+    settle(stored)
   end
 
   # **理由は種別だけを残します。** 利用者の入力そのものを残しません。

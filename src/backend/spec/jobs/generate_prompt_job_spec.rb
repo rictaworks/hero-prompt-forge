@@ -209,6 +209,17 @@ RSpec.describe GeneratePromptJob do
         expect(request.reload.prompt_outputs).to be_empty
       end
 
+      # **記録は一度だけです**（PR #165 の 2 回目のレビューより）。
+      # `retry_on` の塊と `after_discard` が重なると、2 度走ります。
+      it '失敗の記録は一度だけ走ります' do
+        allow(Trace).to receive(:step).and_call_original
+
+        run_to_the_end
+
+        expect(Trace).to have_received(:step)
+          .with('jobs.generate_prompt_failed', hash_including(:prompt_request)).once
+      end
+
       # **2 回目で通れば、成果物を提供します。**
       it '途中で通れば、やり直しが実を結びます' do
         attempts = 0
@@ -324,6 +335,48 @@ RSpec.describe GeneratePromptJob do
     end
   end
 
+  # **働き手が落ちて置き去りになった行を、拾い直します**
+  # （PR #165 の 2 回目のレビューより）。
+  describe '働き手が落ちた場合' do
+    # 投入し直しではない、新しい投入です。**`executions` は 1 です。**
+    def fresh_run(target)
+      described_class.perform_now(target.id)
+      request.reload
+    end
+
+    def abandoned(elapsed)
+      target = queued
+      target.transition_to!('generating')
+      target.update_column(:updated_at, elapsed.ago) # rubocop:disable Rails/SkipsModelValidations
+      target
+    end
+
+    it '置き去りの行を拾い直します' do
+      fresh_run(abandoned(described_class::STALE_AFTER + 1.minute))
+
+      expect(request.reload.prompt_outputs.count).to eq(3)
+    end
+
+    it 'クォータを決着させます' do
+      fresh_run(abandoned(described_class::STALE_AFTER + 1.minute))
+
+      expect(QuotaConsumption.find_by(prompt_request: request).status).to eq('confirmed')
+    end
+
+    # **まだ走っているかもしれない行へ、横入りしません。**
+    it '走り出したばかりの行へは横入りしません' do
+      fresh_run(abandoned(1.minute))
+
+      expect(request.reload.prompt_outputs).to be_empty
+    end
+
+    it '走り出したばかりの行の状態を変えません' do
+      fresh_run(abandoned(1.minute))
+
+      expect(request.reload.status).to eq('generating')
+    end
+  end
+
   # **確定だけが残った場合も、投入し直しで拾い直します。**
   describe 'クォータの確定が外れた場合' do
     def deliver_without_settlement
@@ -365,6 +418,51 @@ RSpec.describe GeneratePromptJob do
       described_class.perform_now(request.id)
 
       expect(request.reload.prompt_outputs.count).to eq(3)
+    end
+  end
+
+  # **返還だけが残った場合も、投入し直しで拾い直します**
+  # （PR #165 の 2 回目のレビューより）。**確定の場合と対称にします。**
+  describe 'クォータの返還が外れた場合' do
+    def failed_without_settlement
+      target = queued
+      allow(Quota::Reservation).to receive(:settle!)
+        .and_raise(ActiveRecord::ConnectionNotEstablished)
+      begin
+        described_class.new(target.id).record_failure(StandardError.new)
+      rescue ActiveRecord::ConnectionNotEstablished
+        nil
+      end
+      RSpec::Mocks.space.proxy_for(Quota::Reservation).reset
+      request.reload
+    end
+
+    it '失敗として記録されたままです' do
+      failed_without_settlement
+
+      expect(request.status).to eq('failed')
+    end
+
+    it '枠は予約のまま残ります' do
+      failed_without_settlement
+
+      expect(QuotaConsumption.find_by(prompt_request: request).status).to eq('reserved')
+    end
+
+    it '投入し直しで返還します' do
+      failed_without_settlement
+
+      described_class.perform_now(request.id)
+
+      expect(QuotaConsumption.find_by(prompt_request: request).status).to eq('refunded')
+    end
+
+    it '案を作りません' do
+      failed_without_settlement
+
+      described_class.perform_now(request.id)
+
+      expect(request.reload.prompt_outputs).to be_empty
     end
   end
 
