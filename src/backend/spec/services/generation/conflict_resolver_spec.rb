@@ -14,6 +14,11 @@ RSpec.describe Generation::ConflictResolver do
 
   let(:resolver) { described_class.new(dictionary: dictionary) }
 
+  # **統合の規則は 1 度だけ読みます。** 例ごとに読み直させます。
+  before { Generation::IntegrationRules.reset! }
+
+  after { Generation::IntegrationRules.reset! }
+
   def input(**overrides)
     { industry: 'saas', style_family: 'photoreal', brand_tone: 'trust',
       copy_space_position: 'left', aspect_ratio: '16:9' }.merge(overrides)
@@ -86,7 +91,7 @@ RSpec.describe Generation::ConflictResolver do
       note = color_note(resolved(brand_colors: ['#0E7C7B']))
 
       expect(note[:color]).to eq('#0E7C7B')
-      expect(note[:name]).to eq('teal')
+      expect(note[:name]).to eq('deep teal')
     end
 
     it '指定が無ければ足しません' do
@@ -224,15 +229,19 @@ RSpec.describe Generation::ConflictResolver do
   describe '統合の規則の検め' do
     def with_definition(loaded)
       allow(YAML).to receive(:safe_load_file).and_return(loaded)
+      Generation::IntegrationRules.reset!
     end
 
     def sound_definition
       {
-        'brand_color' => { 'accent' => 'a %<color>s accent',
-                           'secondary_accent' => 'a small %<color>s detail',
-                           'weakened' => 'a hint of %<color>s' },
+        'brand_color' => { 'accent' => '%<color>s used as the accent',
+                           'secondary_accent' => '%<color>s as a small detail',
+                           'weakened' => '%<color>s as a hint' },
+        'brand_color_restraint' => 'the brand accent placed away from the copy area',
+        'style_palette_conflicts' => [{ 'match' => 'brand colors',
+                                        'weakened' => 'a restrained palette' }],
         'tones' => Generation::InputChoices::BRAND_TONES.index_with { 'an impression' },
-        'tone_restraint' => 'the reserved copy area left plain'
+        'tone_restraint' => 'the reserved copy area kept plain'
       }
     end
 
@@ -278,6 +287,153 @@ RSpec.describe Generation::ConflictResolver do
       expect { described_class.new(dictionary: dictionary) }
         .to raise_error(described_class::InvalidDefinitionError)
     end
+
+    it 'ブランドカラーを余白から離す指定が無ければ失敗します' do
+      broken = sound_definition
+      broken.delete('brand_color_restraint')
+      with_definition(broken)
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it 'スタイル系統との衝突の規則が無ければ失敗します' do
+      broken = sound_definition
+      broken.delete('style_palette_conflicts')
+      with_definition(broken)
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **空白だけを弾いても足りません**（PR #151 のレビューより）。
+    # 日本語はそのまま生成モデルへ渡り、打ち消しはその要素を呼び込みます。
+    it '日本語の規則は失敗します' do
+      broken = sound_definition
+      broken['tones']['trust'] = '落ち着いた印象'
+      with_definition(broken)
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it '打ち消しの言い回しは失敗します' do
+      broken = sound_definition
+      broken['brand_color']['accent'] = 'no %<color>s anywhere'
+      with_definition(broken)
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+  end
+
+  # **英文として成立していることを確かめます**（PR #151 のレビューより）。
+  describe '組み上がった英文' do
+    # 色の名前は母音で始まるものと子音で始まるものが混ざります。
+    # `a %<color>s` と書くと `a orange` になります。
+    it '冠詞の誤りを作りません' do
+      terms = resolved(brand_colors: %w[#F5A623 #D9C7A8]).main_terms
+
+      expect(terms).to all(satisfy { |term| !term.match?(/\ba\s+[aeiou]/i) })
+    end
+
+    it '英語だけで組み立てます' do
+      terms = resolved(brand_colors: %w[#0E7C7B #F5A623]).main_terms
+
+      expect(terms).to all(match(/\A[\x20-\x7E]+\z/))
+    end
+  end
+
+  # **優先順位の ① 余白 ＞ ② ブランドカラーを、出力に現します。**
+  describe '余白とブランドカラーの優先順位' do
+    let(:reserved_draft) { Generation::CopySpace.new.apply(draft_for(brand_colors: ['#F5A623'])) }
+
+    it 'アクセントを余白から離します' do
+      expect(resolver.resolve(reserved_draft).main_terms)
+        .to include(a_string_including('brand accent placed away'))
+    end
+
+    it '余白を確保していなければ足しません' do
+      expect(resolved(brand_colors: ['#F5A623']).main_terms)
+        .to all(satisfy { |term| term.exclude?('brand accent placed away') })
+    end
+
+    it 'ブランドカラーの指定が無ければ足しません' do
+      expect(resolver.resolve(Generation::CopySpace.new.apply(draft_for)).main_terms)
+        .to all(satisfy { |term| term.exclude?('brand accent placed away') })
+    end
+  end
+
+  # **優先順位の ② ブランドカラー ＞ ③ スタイル系統を、出力に現します。**
+  #
+  # スタイル系統の配色指定は事実上の支配色の指定です。
+  # 「アクセントとして統合する」という ② の扱いと食い違います。
+  describe 'スタイル系統との優先順位' do
+    def palette_notes(draft)
+      draft.notes.select { |note| note[:kind] == described_class::STYLE_PALETTE_NOTE_KIND }
+    end
+
+    let(:styled) { draft_for(brand_colors: ['#F5A623']).add(main_terms: ['two brand colors plus one neutral']) }
+
+    it '配色の指定を弱めます' do
+      expect(resolver.resolve(styled).main_terms)
+        .to include('a restrained palette led by the brand accent')
+    end
+
+    it '弱める前の指定を残しません' do
+      expect(resolver.resolve(styled).main_terms)
+        .to all(satisfy { |term| term.exclude?('two brand colors') })
+    end
+
+    it '弱めた事実をノートへ残します' do
+      note = palette_notes(resolver.resolve(styled)).first
+
+      expect(note[:term]).to eq('two brand colors plus one neutral')
+      expect(note[:matched]).to eq('brand colors')
+    end
+
+    # **ブランドカラーの指定が無ければ、衝突しません。**
+    it 'ブランドカラーの指定が無ければ、そのままにします' do
+      bare = draft_for.add(main_terms: ['two brand colors plus one neutral'])
+
+      expect(resolver.resolve(bare).main_terms).to include('two brand colors plus one neutral')
+    end
+
+    it '衝突しない素材はそのままにします' do
+      draft = draft_for(brand_colors: ['#F5A623']).add(main_terms: ['35mm lens'])
+
+      expect(resolver.resolve(draft).main_terms).to include('35mm lens')
+    end
+  end
+
+  # **統合のあとにアンチAIルック規則を当てさせません**（PR #151 のレビューより）。
+  #
+  # 弱めて残したブランドカラーは、当たった語をそのまま含みます。
+  # そのあとに規則を当てると、弱めた素材ごと落ち、ノートの説明と食い違います。
+  describe '工程の順序' do
+    let(:anti_ai_rules) do
+      { 'forbidden_terms' => ['teal'], 'negative_prompt_terms' => ['deformed hands'] }
+    end
+
+    it '統合済みであることを見分けられます' do
+      expect(described_class.integrated?(resolved)).to be(true)
+    end
+
+    it '統合前は統合済みと見なしません' do
+      expect(described_class.integrated?(draft_for)).to be(false)
+    end
+
+    it '統合済みの下書きへ規則を当てられません' do
+      integrated = resolved(brand_colors: ['#0E7C7B'])
+
+      expect { Generation::RuleEngine.new(dictionary: dictionary).apply(integrated) }
+        .to raise_error(Generation::RuleEngine::AlreadyIntegratedError)
+    end
+
+    it '二度統合できません' do
+      expect { resolver.resolve(resolved) }
+        .to raise_error(described_class::AlreadyIntegratedError)
+    end
   end
 
   # **初期データでそのまま動くことを確かめます。**
@@ -294,6 +450,15 @@ RSpec.describe Generation::ConflictResolver do
       note = color_note(resolved(brand_colors: ['#0E7C7B']))
 
       expect(note[:strength]).to eq(described_class::ACCENT)
+    end
+
+    # **4.1 の 2 から 5 を、定められた順で通します。**
+    it '規則の適用から統合までを通せます' do
+      engine = Generation::RuleEngine.new(dictionary: dictionary)
+      applied = engine.apply(engine.start(input(brand_colors: ['#0E7C7B'])))
+      reserved = Generation::CopySpace.new.apply(applied)
+
+      expect(resolver.resolve(reserved).main_terms).to include(a_string_including('deep teal'))
     end
   end
 end

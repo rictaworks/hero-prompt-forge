@@ -10,8 +10,19 @@ module Generation
 
     DEFINITION_PATH = 'config/integration_rules.yml'
     BRAND_COLOR_KEY = 'brand_color'
+    BRAND_COLOR_RESTRAINT_KEY = 'brand_color_restraint'
+    STYLE_PALETTE_CONFLICTS_KEY = 'style_palette_conflicts'
     TONES_KEY = 'tones'
     TONE_RESTRAINT_KEY = 'tone_restraint'
+
+    # **そのままプロンプトへ入れられる英文の形です。**
+    # 印字できる ASCII だけを認めます。日本語が混ざると、そのまま生成モデルへ
+    # 渡ります（PR #151 のレビューで実測されました）。
+    ENGLISH_TEXT_FORMAT = /\A[\x20-\x7E]+\z/
+
+    # **打ち消しの言い回しです。** 「◯◯を出さないでください」と書くと、
+    # かえってその要素を呼び込みます。よく知られた性質です。
+    NEGATION_FORMAT = /\b(?:no|not|never|without|avoid|avoiding|free of|lacking)\b/i
 
     # ブランドカラーの統合の強さです。**3 つとも必ずあります。**
     BRAND_COLOR_STRENGTHS = %w[accent secondary_accent weakened].freeze
@@ -22,15 +33,55 @@ module Generation
     class << self
       # @return [Hash]
       def load(path: DEFINITION_PATH)
-        loaded = read(path)
-        ensure_brand_color!(loaded[BRAND_COLOR_KEY], path)
-        ensure_tones!(loaded[TONES_KEY], path)
-        ensure_text!(loaded[TONE_RESTRAINT_KEY], TONE_RESTRAINT_KEY, path)
+        @definition ||= {}
+        @definition[path] ||= build(path)
+      end
 
-        loaded.freeze
+      # テストから読み直せるようにします。**本番の経路では使いません。**
+      def reset!
+        @definition = nil
       end
 
       private
+
+      # **読み込みは 1 度だけです。** 生成のたびに YAML を読むと、
+      # 1 件の生成で何度も同じファイルを開きます。ColorName と同じ扱いにします
+      # （PR #151 のレビューより）。
+      def build(path)
+        loaded = read(path)
+        ensure_all!(loaded, path)
+
+        DeepFreeze.call(loaded)
+      end
+
+      def ensure_all!(loaded, path)
+        ensure_brand_color!(loaded[BRAND_COLOR_KEY], path)
+        ensure_text!(loaded[BRAND_COLOR_RESTRAINT_KEY], BRAND_COLOR_RESTRAINT_KEY, path)
+        ensure_style_palette_conflicts!(loaded[STYLE_PALETTE_CONFLICTS_KEY], path)
+        ensure_tones!(loaded[TONES_KEY], path)
+        ensure_text!(loaded[TONE_RESTRAINT_KEY], TONE_RESTRAINT_KEY, path)
+      end
+
+      # **スタイル系統との衝突の規則を検めます。**
+      def ensure_style_palette_conflicts!(conflicts, path)
+        unless conflicts.is_a?(Array) && conflicts.any?
+          raise InvalidDefinitionError,
+                "スタイル系統との衝突の規則がありません: #{path}" # 開発者向け
+        end
+
+        conflicts.each_with_index do |conflict, index|
+          ensure_conflict!(conflict, "#{STYLE_PALETTE_CONFLICTS_KEY}[#{index}]", path)
+        end
+      end
+
+      def ensure_conflict!(conflict, where, path)
+        unless conflict.is_a?(Hash)
+          raise InvalidDefinitionError, "衝突の規則の形が違います: #{where} (#{path})" # 開発者向け
+        end
+
+        ensure_text!(conflict[StylePalette::MATCH_KEY], "#{where}.match", path)
+        ensure_text!(conflict[StylePalette::WEAKENED_KEY], "#{where}.weakened", path)
+      end
 
       def read(path)
         loaded = YAML.safe_load_file(Rails.root.join(path))
@@ -74,11 +125,25 @@ module Generation
       end
 
       # **そのままプロンプトへ入れられる英文であることを求めます。**
+      #
+      # 空白だけを弾いても足りません。**日本語も打ち消しも通ります。**
+      # 前者はそのまま生成モデルへ渡り、後者はかえってその要素を呼び込みます
+      # （PR #151 のレビューで実測されました）。
       def ensure_text!(value, where, path)
-        return if value.is_a?(String) && value.strip.present?
+        unless value.is_a?(String) && value.strip.present? &&
+               value.match?(ENGLISH_TEXT_FORMAT)
+          raise InvalidDefinitionError,
+                "統合の規則が英文ではありません: #{where} (#{path})" # 開発者向け
+        end
+
+        ensure_no_negation!(value, where, path)
+      end
+
+      def ensure_no_negation!(value, where, path)
+        return unless value.match?(NEGATION_FORMAT)
 
         raise InvalidDefinitionError,
-              "統合の規則が英文ではありません: #{where} (#{path})" # 開発者向け
+              "統合の規則に打ち消しの言い回しがあります: #{where} (#{path})" # 開発者向け
       end
 
       # **色を差し込む場所があることを求めます。**

@@ -14,14 +14,37 @@
 #
 # **画面全体の支配色にしません。アクセントとして自然に統合します。**
 # 支配色にすると、業種の雰囲気も撮影の指示も、その色に塗りつぶされます。
+# **冠詞を含む言い回しを避けます。** 色の名前は `orange` ・ `deep green` の
+# ように、母音で始まるものと子音で始まるものが混ざります。`a %<color>s` と
+# 書くと `a orange` になります（PR #151 のレビューで実測されました）。
 brand_color:
   # 通常の統合です。
-  accent: "a %<color>s accent on a single object in the scene"
+  accent: "%<color>s used as the accent on one object in the scene"
   # 2 色目です。1 色目より弱く扱います。
-  secondary_accent: "a small %<color>s detail supporting the main accent"
+  secondary_accent: "%<color>s appearing as a small supporting detail"
   # **アンチAIルック規則に当たった場合です。**
   # 落とさずに、示唆の強さまで弱めます（PR #135 の申し送り）。
-  weakened: "a barely visible hint of %<color>s"
+  weakened: "%<color>s present only as a barely visible hint"
+
+# ブランドカラーが余白へ入り込まないための指定です。
+#
+# **優先順位の ① は余白の確保、② がブランドカラーです。** アクセントを置く
+# オブジェクトが余白側へ来ると、二番目の指定が最上位の指定を侵します。
+# コピースペースを確保している下書きにだけ足します。
+brand_color_restraint: "the brand accent placed away from the reserved copy area"
+
+# スタイル系統が持つ配色の指定と、ブランドカラーがぶつかったときの解決です。
+#
+# **優先順位の ② がブランドカラー、③ がスタイル系統です。** スタイル系統の
+# 配色指定は事実上の支配色の指定であり、「アクセントとして統合する」という
+# ② の扱いと食い違います。**捨てずに弱めます**（requirements.md 4.1 の 5）。
+#
+# `match` は素材に含まれる語です。当たった素材を `weakened` へ置き換えます。
+style_palette_conflicts:
+  - match: "brand colors"
+    weakened: "a restrained palette led by the brand accent"
+  - match: "palette of"
+    weakened: "a restrained palette led by the brand accent"
 
 # トーン装飾です。**いちばん弱い指定です。**
 #
@@ -38,4 +61,7 @@ tones:
 # トーン装飾が余白と競合しないための指定です。
 #
 # **トーン装飾は画面全体に掛かります。** 余白の帯まで飾ると、文字が読めません。
-tone_restraint: "the reserved copy area left plain"
+# **`left` と書きません。** 同じプロンプトに `clear copy space across the right
+# third of the frame` が入ると、`left` が位置の「左」と読まれます
+# （PR #151 のレビューより）。
+tone_restraint: "the reserved copy area kept plain"

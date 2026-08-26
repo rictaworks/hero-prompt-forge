@@ -8,6 +8,12 @@ module Generation
   #
   # 名前は色相・彩度・明度から機械的に決めます。**名前を一覧で持ちません。**
   # 色は無数にあり、並べ切れないためです。範囲は `config/color_names.yml` にあります。
+  #
+  # **色相だけで名づけません。** ベージュ `#D9C7A8` を `orange`、深緑 `#0B3D2E` を
+  # `green` と呼ぶと、生成モデルは鮮やかなオレンジ・鮮やかな緑を返します。
+  # **利用者のブランドカラーとかけ離れた指示になります。** 明るさと鮮やかさを
+  # 修飾語で添え、`pale orange` ・ `deep green` ・ `muted teal` の形で渡します
+  # （PR #151 のレビューより）。
   class ColorName
     # 定義が読めない、または内容が足りない場合に投げます。
     class InvalidDefinitionError < StandardError; end
@@ -27,7 +33,7 @@ module Generation
 
         return achromatic_name(lightness) if achromatic?(saturation, lightness)
 
-        hue_name(hue)
+        [modifier(saturation, lightness), hue_name(hue)].compact.join(' ')
       end
 
       # テストから読み直せるようにします。**本番の経路では使いません。**
@@ -84,6 +90,20 @@ module Generation
         return 'white' if lightness >= definition.fetch('white_lightness')
 
         definition.fetch('achromatic_name')
+      end
+
+      # 明るさと鮮やかさを表す修飾語です。**多くとも 1 つです。**
+      #
+      # **明るさを先に見ます。** 明暗の違いのほうが、鮮やかさの違いより
+      # 見た目に効きます。2 つ重ねた `muted deep green` は、モデルによって
+      # 解釈が割れます。
+      def modifier(saturation, lightness)
+        rules = definition.fetch('modifiers')
+        return rules.fetch('deep_name') if lightness <= rules.fetch('deep_lightness')
+        return rules.fetch('pale_name') if lightness >= rules.fetch('pale_lightness')
+        return rules.fetch('muted_name') if saturation <= rules.fetch('muted_saturation')
+
+        nil
       end
 
       def hue_name(hue)
