@@ -7,13 +7,17 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
   let(:user) { User.create!(x_user_id: '3131313131', display_name: 'あかね', plan: 'active') }
   let(:project) { Project.create!(user: user, industry: 'saas', style_family: 'photoreal') }
 
+  # **十分に前の時点で公開します。** 時計を戻す例（クォータ日の境界の確かめ）で、
+  # 公開より前の時点になると版が引けなくなります。
+  let(:published_at) { Time.zone.parse('2026-01-01 00:00:00 +09:00') }
+
   let!(:dictionary) do
     RuleDictionary.create!(
       version: 'vspec.api',
       anti_ai_rules: InitialRuleDictionary.anti_ai_rules,
       style_spec_rules: InitialRuleDictionary.style_spec_rules,
       industry_defaults: InitialRuleDictionary.industry_defaults
-    ).tap(&:publish!)
+    ).tap { |found| found.publish!(now: published_at) }
   end
 
   # **`raw` という名前を使いません。** 画面の文字を安全と印づける仕組みと同じ名前です。
@@ -186,8 +190,85 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
         expect(PromptRequest.last.rejection_reason).not_to include('大谷')
       end
 
+      # **原文そのものも残しません**（PR #166 のレビューより）。
+      # 理由から語を落としても、原文が別の列に残っていては意味がありません。
+      it '自由に書いた文章を記録へ残しません' do
+        post_forbidden
+
+        expect(PromptRequest.last.inputs).not_to have_key('service_summary')
+      end
+
+      it '記録の中身に見つかった語が残りません' do
+        post_forbidden
+
+        expect(PromptRequest.last.inputs.to_json).not_to include('大谷')
+      end
+
+      # **選択肢の値は残します。** 入力し直していただくときの手がかりです。
+      it '選んだ値は残します' do
+        post_forbidden
+
+        expect(PromptRequest.last.inputs).to include('industry' => 'saas')
+      end
+
       it 'ジョブを投入しません' do
         expect { post_forbidden }.not_to have_enqueued_job(GeneratePromptJob)
+      end
+    end
+
+    # **返還済みの枠がある日に禁止入力を送っても、枠を取り直しません**
+    # （PR #166 のレビューより）。取り直しは行の更新ですので、**件数では
+    # 捉えられません。状態で確かめます。**
+    describe '返還済みの枠がある日の禁止入力' do
+      before { login_as(user) }
+
+      def refunded_slot
+        consumption = Quota::Reservation.reserve!(user: user)
+        consumption.transition_to!('refunded')
+        consumption
+      end
+
+      it '枠は返還済みのままです' do
+        slot = refunded_slot
+
+        post_request(service_summary: '大谷翔平さんに登場していただくヒーローイメージです。')
+
+        expect(slot.reload.status).to eq('refunded')
+      end
+
+      it '422 を返します' do
+        refunded_slot
+
+        post_request(service_summary: '大谷翔平さんに登場していただくヒーローイメージです。')
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+    end
+
+    # **クォータ日の境界で、次回のリセット時刻がずれません**（requirements.md 4.4）。
+    #
+    # **日付まで固定します。** 時だけを見ると、「当日の 03:00（すでに過ぎた
+    # 時刻）」を返す退行を捉えられません（PR #166 のレビューより）。
+    describe 'クォータ日の境界' do
+      include ActiveSupport::Testing::TimeHelpers
+
+      before { login_as(user) }
+
+      # その時点で枠を使い切らせてから、もう一度送ります。
+      def reset_at_at(moment)
+        travel_to(Time.zone.parse(moment)) do
+          Quota::Reservation.reserve!(user: user)
+          post_request
+          error_body.dig('details', 'reset_at')
+        end
+      end
+
+      it '03:00 の前は、その日の 03:00 を返します' do
+        expect(reset_at_at('2026-08-27 02:59:59 +09:00')).to eq('2026-08-27T03:00:00+09:00')
+      end
+
+      it '03:00 からは、翌日の 03:00 を返します' do
+        expect(reset_at_at('2026-08-27 03:00:00 +09:00')).to eq('2026-08-28T03:00:00+09:00')
       end
     end
 
@@ -213,7 +294,8 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
       it '次回のリセットは JST 03:00 です' do
         post_request
 
-        expect(Time.zone.parse(error_body.dig('details', 'reset_at')).in_time_zone('Asia/Tokyo').hour)
+        expect(Time.zone.parse(error_body.dig('details', 'reset_at'))
+                   .in_time_zone('Asia/Tokyo').hour)
           .to eq(3)
       end
 

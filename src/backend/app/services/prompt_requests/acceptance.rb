@@ -11,6 +11,7 @@ module PromptRequests
   #   2. 入力を正規化します（誤りは項目ごとに返します）
   #   3. 記録を作ります（`draft`）
   #   4. 禁止入力を調べます（見つかれば `rejected`。**枠を使いません**）
+  #      **自由に書いていただいた文章は、記録から落とします**
   #   5. 枠を予約します（使い切っていれば、次回のリセット時刻を添えて断ります）
   #   6. `queued` へ進めて、ジョブを投入します
   #
@@ -25,6 +26,9 @@ module PromptRequests
   # **トランザクションで包みません。** 予約は上限到達の測定を伴います。
   # 外側のトランザクションで包むと、断った事実の記録まで巻き戻ります。
   class Acceptance
+    # 自由に書いていただく欄です。**差し戻した記録には残しません。**
+    FREE_TEXT_FIELD = 'service_summary'
+
     # 禁止入力が見つかった場合に投げます。**記録は `rejected` で残ります。**
     class ForbiddenInputError < StandardError
       attr_reader :prompt_request, :reasons
@@ -86,12 +90,27 @@ module PromptRequests
       end
       return unless detected.forbidden?
 
-      request.transition_to!('rejected', rejection_reason: reason_for(detected.reasons))
+      request.transition_to!('rejected',
+                             rejection_reason: reason_for(detected.reasons),
+                             inputs: kept(request))
       raise ForbiddenInputError.new(prompt_request: request, reasons: detected.reasons)
     end
 
-    # **残すのは種別と直し方の鍵だけです。** 見つかった語そのものを残しません。
+    # **差し戻した記録から、自由に書いていただく欄を落とします。**
+    #
+    # 見つかった語を `rejection_reason` へ残さない配慮は、**原文がそのまま
+    # 別の列に残っていては意味がありません**（PR #166 のレビューより）。
+    # 権利に触れると判定した文章ですので、**実在の方のお名前や商標を含みます。**
     # 差し戻しの記録は保管期間が長く、閲覧できる範囲も広くなります。
+    #
+    # **生成には使いません。** 差し戻した以上、この文章で作ることはありません。
+    # 業種・スタイル系統といった選択肢の値は、**入力し直していただくときの
+    # 手がかりになりますので残します。**
+    def kept(request)
+      request.inputs.except(FREE_TEXT_FIELD)
+    end
+
+    # **残すのは種別と直し方の鍵だけです。** 見つかった語そのものを残しません。
     def reason_for(reasons)
       reasons.map(&:kind).uniq.join(',')
     end

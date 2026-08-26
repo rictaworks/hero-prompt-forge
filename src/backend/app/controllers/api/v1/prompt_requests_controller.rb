@@ -21,8 +21,13 @@ module Api
       end
 
       # 受け付けて、投入します。
+      #
+      # **`params.expect` で受け取ります。** `params.require` は配列を
+      # そのまま通しますので、`project_id` に配列を送られると `find` が
+      # 配列を返し、**契約の形を外れた 500 になります**
+      # （PR #166 のレビューで実測されました）。
       def create
-        request = acceptance.call(project_id: params.require(:project_id),
+        request = acceptance.call(project_id: params.expect(:project_id),
                                   inputs: params.fetch(:inputs, {}))
 
         render json: PromptRequests::Representation.new(request).to_h, status: :created
@@ -30,9 +35,10 @@ module Api
 
       private
 
-      # **時刻の書き方も文言と同じ置き場から引きます。**
+      # **時刻の書き方は Rails の置き場から引きます。**
+      # 文言の置き場（`labels`）へ書式を混ぜません（PR #166 のレビューより）。
       def spelled(time)
-        time.strftime(I18n.t('prompt_requests.labels.reset_at_format'))
+        I18n.l(time, format: :reset_at)
       end
 
       def acceptance

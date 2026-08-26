@@ -124,16 +124,23 @@ ja:
     quota_exhausted:
       message: "本日の生成枠を使い切りました。"
       next_action: "次回のリセットは %{reset_at} です。それまでお待ちください。"
+  # 時刻の書き方です。**文ではありませんので、`formats` の下へ置きます。**
+  # Rails の標準の置き場です。`I18n.l(time, format: :reset_at)` で引きます。
+  time:
+    formats:
+      # 次回のリセット時刻の書き方です（requirements.md 4.4）。
+      reset_at: "%-m月%-d日 %H:%M"
   # 生成リクエストの応答に添える文言です（requirements.md 12.1）。
   #
   # **記録に残る差し戻しの理由は、開発者向けの種別です。**
   # 利用者へは、ここの文言と次に行う操作をお返しします。
   prompt_requests:
-    # 文ではない、時刻の書き方です。
-    labels:
-      reset_at_format: "%-m月%-d日 %H:%M"
     failure:
       rejected:
+        # **`errors.forbidden_input.message` と同じ事象です。**
+        # 受け付けたその場でお返しする文言（`errors`）と、あとから状態を
+        # 取り出したときの文言（ここ）で、**時制の受け取られ方が違います。**
+        # 片方を直したらもう片方も見てください。
         message: "権利に触れるおそれのある内容が含まれているため、生成を行いませんでした。"
         next_action: "入力を書き換えて、もう一度お試しください。この差し戻しでは生成枠を使っていません。"
       failed:

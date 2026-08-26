@@ -27,8 +27,12 @@ RSpec.describe '文言の定義' do
   #
   # **`headings` を句点回避の置き場にしません**（PR #159 のレビューより）。
   # 見出しでないもの（役割の呼び名・語の区切り）は `labels` へ置きます。
+  #
+  # **`formats`（時刻・日付の書き方）も文ではありません。** Rails の標準の
+  # 置き場ですので、そこへ置きます（PR #166 のレビューより）。**書式を
+  # `labels` へ混ぜません。** 呼び名でも区切りでもないためです。
   def non_sentence_keys
-    %i[headings labels]
+    %i[headings labels formats]
   end
 
   def collect_sentences(node, inside_labels: false, into: [])
