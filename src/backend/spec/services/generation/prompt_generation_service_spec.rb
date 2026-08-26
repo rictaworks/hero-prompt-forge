@@ -91,10 +91,11 @@ RSpec.describe Generation::PromptGenerationService do
 
     # **素材がそろってから当てます**（issue #161）。
     it '排除する語に当たった素材を落とします' do
-      dictionary.update!(anti_ai_rules: { 'forbidden_terms' => ['a 35mm lens'],
+      dictionary.update!(anti_ai_rules: { 'forbidden_terms' => ['sakuradou'],
                                           'negative_prompt_terms' => ['deformed hands'] })
-      removed = packages.first.draft.notes
-                        .select { |note| note[:kind] == Generation::RuleEngine::REMOVED_NOTE_KIND }
+      built = packages(service_summary: '「さくら堂」という店を営んでいます。')
+      removed = built.first.draft.notes
+                     .select { |note| note[:kind] == Generation::RuleEngine::REMOVED_NOTE_KIND }
 
       expect(removed).not_to be_empty
     end
@@ -142,6 +143,26 @@ RSpec.describe Generation::PromptGenerationService do
       end
 
       expect { packages }.to raise_error(described_class::MissingCopySpaceError)
+    end
+  end
+
+  # **撮影指示を欠く案は出力しません**（requirements.md 4.2）。
+  describe '撮影の指示' do
+    it 'すべての案が撮影の指示を持ちます' do
+      expect(packages).to all(satisfy { |package| package.draft.main_terms.grep(/lens/).any? })
+    end
+
+    # **規則辞書の「排除する語」に当たると、指示ごと落ちます。**
+    it '指示が落ちていれば出力しません' do
+      dictionary.update!(anti_ai_rules: { 'forbidden_terms' => ['a 35mm lens'],
+                                          'negative_prompt_terms' => ['deformed hands'] })
+
+      expect { packages }.to raise_error(described_class::MissingSpecificationsError)
+    end
+
+    # **案ごとに外した指示は、控えからも外れます**（issue #50）。
+    it '案ごとに外した指示では止まりません' do
+      expect { packages }.not_to raise_error
     end
   end
 

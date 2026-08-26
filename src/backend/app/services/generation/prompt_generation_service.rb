@@ -59,6 +59,9 @@ module Generation
     # 出力の直前で、コピースペースの確保が失われていた場合に投げます。
     class MissingCopySpaceError < StandardError; end
 
+    # 出力の直前で、撮影の指示が失われていた場合に投げます。
+    class MissingSpecificationsError < StandardError; end
+
     # 規則辞書の版が途中で変わった場合に投げます。
     class VersionMismatchError < StandardError; end
 
@@ -159,6 +162,7 @@ module Generation
     # 1 案を、出力の形へ整えます。
     def packaged(draft, input)
       ensure_reserved!(draft)
+      ensure_specifications!(draft)
       ensure_same_version!(draft)
 
       Package.new(variation: variation_of(draft),
@@ -181,6 +185,24 @@ module Generation
 
       raise MissingCopySpaceError,
             'コピースペースの指定が失われた案は出力しません。' # 開発者向け
+    end
+
+    # **撮影の指示を欠く案は出力しません**（requirements.md 4.2）。
+    #
+    # アンチAIルック規則は素材がそろってから当てますので、**規則辞書の
+    # 「排除する語」に撮影の指示が当たると、指示ごと落ちます**
+    # （PR #163 の 2 回目のレビューで実測されました）。
+    #
+    # **控えが挙げた指示が、素材に残っていることを確かめます。**
+    # 案ごとに外した指示は、展開の段が控えからも外していますので、
+    # ここでは当たりません。
+    def ensure_specifications!(draft)
+      note = draft.notes.find { |item| item[:kind] == StyleSpec::SPECIFICATIONS_NOTE_KIND }
+      missing = Array(note && note[:specifications]) - draft.main_terms
+      return if missing.empty?
+
+      raise MissingSpecificationsError,
+            "撮影の指示が失われた案は出力しません: #{missing.size} 件" # 開発者向け
     end
 
     # **規則辞書の版は、最初から最後まで 1 つです。**
