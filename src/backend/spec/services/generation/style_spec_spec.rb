@@ -486,7 +486,7 @@ RSpec.describe Generation::StyleSpec do
     it '実写系で、そのまま読める撮影の指示が出ます' do
       terms = seed_spec.apply(draft_for('photoreal')).main_terms
 
-      expect(terms).to include('35mm lens')
+      expect(terms).to include('a 35mm lens')
     end
 
     it '実写系の指示に、記号や数値だけのものが混ざりません' do

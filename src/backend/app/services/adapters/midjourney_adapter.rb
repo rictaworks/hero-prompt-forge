@@ -21,10 +21,17 @@ module Adapters
     # パラメータの区切りです。
     PARAMETER_SEPARATOR = ' '
 
+    # **この記法で特別な意味を持つ文字です。**
+    # 本文の途中に `--` が現れると、パラメータとして読まれます。
+    # Midjourney はパラメータを本文の途中に置けません。
+    RESERVED_CHARACTERS = /--/
+
     class << self
       def model_key = MODEL_KEY
 
       def required_keys = REQUIRED_KEYS
+
+      def reserved_characters = RESERVED_CHARACTERS
     end
 
     # **打ち消しは、パラメータの中に置きます。専用の欄ではありません。**

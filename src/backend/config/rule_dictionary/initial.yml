@@ -17,7 +17,7 @@
 # 生成が必ず InvalidDictionaryError で失敗します。
 # v2026.08.2 は業種ごとの人物の見込み（`people`）を持たないため、その環境では
 # 人物の構図を当てるかどうかを決められず、生成が失敗します。
-version: v2026.08.3
+version: v2026.08.4
 
 # AI が作った画像にありがちな表現を抑える規則です（requirements.md 4.2）。
 anti_ai_rules:
@@ -65,11 +65,14 @@ style_spec_rules:
       - fill_light
       - rim_light
       - depth_of_field
+    # **冠詞を付けます。** 自然文で書くモデル（DALL-E 系・nano banana 系）は、
+    # 素材をそのまま文の中へ入れます。`The image shows 35mm lens` は文として
+    # 成立しません（PR #154 の 2 回目のレビューより）。
     lens_mm:
-      - 35mm lens
-      - 24mm wide angle lens
-      - 50mm lens
-      - 85mm portrait lens
+      - a 35mm lens
+      - a 24mm wide angle lens
+      - a 50mm lens
+      - an 85mm portrait lens
     lighting:
       key_light: soft key light from a north-facing window
       fill_light: bounced fill from a white wall
@@ -87,7 +90,7 @@ style_spec_rules:
       - palette
     line_quality: clean tapered linework
     shading: flat shading with limited gradients
-    palette: restrained palette of three to four colors
+    palette: a restrained palette of three to four colors
   three_d:
     required:
       - material
@@ -95,7 +98,7 @@ style_spec_rules:
       - lighting
     material: physically based materials with visible surface grain
     rendering: path traced rendering, neutral tone mapping
-    lighting: single dominant light source with soft shadows
+    lighting: a single dominant light source with soft shadows
   abstract:
     required:
       - geometry

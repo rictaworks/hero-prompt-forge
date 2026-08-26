@@ -30,6 +30,9 @@ module Adapters
     # 素材が、そのモデルの記法を壊す文字を含む場合に投げます。
     class UnsafeTermError < StandardError; end
 
+    # 記法の定義が読めない、または内容が足りない場合に投げます。
+    InvalidDefinitionError = AdapterRules::InvalidDefinitionError
+
     # 実装していない約束を呼ばれた場合に投げます。
     #
     # **Ruby が持つ `NotImplementedError` と同じ名前にしません。**
@@ -70,6 +73,12 @@ module Adapters
         raise AdapterNotImplementedError, "#{self} が required_keys を実装していません" # 開発者向け
       end
 
+      # **本文へ入る素材が含んではならない文字です。**
+      # 記法で特別な意味を持たないモデルは `nil` を返します。
+      def reserved_characters
+        nil
+      end
+
       # **仕様が定める 4 系統をすべて持ちます**（requirements.md 4.1）。
       def adapters
         [MidjourneyAdapter, DalleAdapter, StableDiffusionAdapter, NanoBananaAdapter]
@@ -105,14 +114,26 @@ module Adapters
     private
 
     def formatted(draft)
+      ensure_terms_safe!(draft)
       main_prompt = main_prompt_for(draft)
 
       Formatted.new(
         main_prompt: main_prompt,
         negative_prompt: negative_prompt_for(draft),
         parameters: parameters_for(draft),
-        prompt: prompt_for(draft, main_prompt)
+        prompt: prompt_for(draft, main_prompt),
+        notes: notes_for(draft)
       )
+    end
+
+    # **本文へ入るすべての素材を検めます。** 検め方は TermGuard が持ちます。
+    def ensure_terms_safe!(draft)
+      TermGuard.new(self.class.reserved_characters).ensure_safe!(draft.main_terms)
+    end
+
+    # 整形の過程で残す控えです。**既定では残しません。**
+    def notes_for(_draft)
+      []
     end
 
     # **既定では、本文がそのまま最終形です。**
@@ -126,21 +147,9 @@ module Adapters
       @rules ||= AdapterRules.for(self.class.model_key, keys: self.class.required_keys)
     end
 
-    # **素材が 1 件も無い下書きを整形しません。**
-    # 空の指示を生成モデルへ渡すと、何が出るか決まりません。
-    #
-    # **コピースペースを持たない下書きも整形しません。**
-    # requirements.md 4.2 は「コピースペースを持たないヒーローイメージ用
-    # プロンプトは出力しない」と定めています。**ここが最後の関所です。**
+    # **整形できる下書きかどうかを検めます。** 検め方は DraftGuard が持ちます。
     def ensure_draft!(draft)
-      unless draft.respond_to?(:main_terms) && draft.respond_to?(:negative_terms)
-        raise InvalidDraftError, "下書きを渡してください: #{draft.class}" # 開発者向け
-      end
-
-      raise InvalidDraftError, '素材がありません。' if draft.main_terms.empty? # 開発者向け
-      return if Generation::CopySpace.reserved?(draft)
-
-      raise InvalidDraftError, 'コピースペースの指定がありません。' # 開発者向け
+      DraftGuard.new.ensure_formattable!(draft)
     end
 
     def main_prompt_for(_draft)

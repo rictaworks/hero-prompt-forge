@@ -37,10 +37,20 @@ stable_diffusion:
 dalle:
   # 先頭の 1 文です。**述語のある文にします。**
   opening: "This is a hero image for a website"
-  # アスペクト比を述べる句です。**素材が既に述べている場合は付けません。**
-  frame: ", composed for a %<aspect_ratio>s frame"
+  # 画面の比を述べる 1 文です。**述語をここで与えます。**
+  #
+  # **コピースペースの段が比を述べる素材を作っていれば、その言い回しを
+  # `%<clause>s` へ入れます。** 素材はいずれも `composed for ...` のように
+  # 述語を持たない句ですので、そのままでは文になりません。
+  frame: "The whole frame is %<clause>s"
+  # 比を述べる素材が無い下書きのための言い回しです。
+  default_frame_clause: "composed as a %<aspect_ratio>s crop"
   # 素材を並べる文です。**述語を持たせます。**
-  body: "The image includes %<terms>s"
+  #
+  # **`includes` を使いません。** `include` は目的語に名詞句を取ります。
+  # `composed for a 16:9 wide crop` のような過去分詞句を受けると、文になりません
+  # （PR #154 の 2 回目のレビューより）。
+  body: "The image shows %<terms>s"
   term_separator: ", "
   final_separator: ", and "
   pair_separator: " and "
@@ -49,8 +59,16 @@ dalle:
   # 画像の大きさです。
   #
   # **この呼び出しは `16:9` のような比を受け付けません。** 画素で指定します。
-  # 受け付ける大きさは決まった数しかありませんので、**横長のうち最も近いもの**
-  # を選びます。**正確な比は本文で伝えます。**
+  #
+  # **対象は DALL-E 3（`dall-e-3`）の画像生成です。** この版が受け付ける
+  # 横長の大きさは `1792x1024` の 1 つだけです。新しい呼び出し（`gpt-image-1`）
+  # は `1536x1024` を受け付け、`1792x1024` を弾きます。**版が変わったときに
+  # どちらへ追随すべきかを判断できるよう、対象を明記します**（requirements.md 8）。
+  #
+  # **選べる大きさが、指定された比と違う場合があります。**
+  # 黙って寄せません。**すり替えた事実を控えへ残し、画面に出します**
+  # （PR #154 の 2 回目のレビューより）。
+  api_version: "dall-e-3"
   sizes:
     "16:9": "1792x1024"
     "21:9": "1792x1024"
@@ -64,8 +82,9 @@ dalle:
 # 「出したいものを肯定形で書く」ことが案内されています（PR #154 のレビューより）。
 nano_banana:
   opening: "This is a hero image for a website"
-  frame: ", composed for a %<aspect_ratio>s frame"
-  body: "The image includes %<terms>s"
+  frame: "The whole frame is %<clause>s"
+  default_frame_clause: "composed as a %<aspect_ratio>s crop"
+  body: "The image shows %<terms>s"
   term_separator: ", "
   final_separator: ", and "
   pair_separator: " and "

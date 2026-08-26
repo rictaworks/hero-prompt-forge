@@ -3,22 +3,32 @@
 require 'rails_helper'
 
 RSpec.describe Adapters::ModelAdapter do
-  let(:main_terms) do
-    ['a calm office', '35mm lens', 'clear copy space across the left third of the frame']
-  end
+  # **実際の経路から素材を取ります**（PR #154 の 2 回目のレビューより）。
+  # 整形へ届く下書きは、必ずコピースペースの段を通っています。
+  let(:extra_terms) { ['a calm office', '35mm lens'] }
 
   let(:negative_terms) { ['deformed hands', 'watermark'] }
 
   after { Adapters::AdapterRules.reset! }
 
-  def draft_for(**overrides)
-    terms = overrides.delete(:main_terms) || main_terms
+  def bare_draft(**overrides)
+    terms = overrides.key?(:main_terms) ? overrides.delete(:main_terms) : extra_terms
     negatives = overrides.key?(:negative_terms) ? overrides.delete(:negative_terms) : negative_terms
 
     Generation::Draft.new(
-      input: { aspect_ratio: '16:9', target_model: 'midjourney' }.merge(overrides),
+      input: { aspect_ratio: '16:9', copy_space_position: 'left',
+               target_model: 'midjourney' }.merge(overrides),
       main_terms: terms, negative_terms: negatives
     )
+  end
+
+  def draft_for(**overrides)
+    Generation::CopySpace.new.apply(bare_draft(**overrides))
+  end
+
+  # コピースペースの段を通っていない下書きです。**控えを持ちません。**
+  def untraced_draft(**overrides)
+    bare_draft(main_terms: extra_terms + ['clear copy space on the left third'], **overrides)
   end
 
   describe '.for' do
@@ -114,13 +124,25 @@ RSpec.describe Adapters::ModelAdapter do
             .to raise_error(described_class::InvalidDraftError)
         end
 
+        # **本文へ入るすべての素材を検めます**（PR #154 の 2 回目のレビューより）。
+        it 'この記法で意味を持つ文字は、どの素材にあっても弾きます' do
+          pattern = adapter.class.reserved_characters
+          next if pattern.nil?
+
+          unsafe = draft_for(main_terms: ['a calm office (soft light) --ar 1:1'])
+
+          expect { adapter.format(unsafe) }
+            .to raise_error(described_class::UnsafeTermError)
+        end
+
         it '下書きでなければ失敗します' do
           expect { adapter.format('下書きではありません') }
             .to raise_error(described_class::InvalidDraftError)
         end
 
         it 'アスペクト比が無ければ失敗します' do
-          without = Generation::Draft.new(input: {}, main_terms: main_terms)
+          without = Generation::Draft.new(input: {},
+                                          main_terms: ['clear copy space on the left'])
 
           expect { adapter.format(without) }
             .to raise_error(described_class::InvalidDraftError)
@@ -128,7 +150,7 @@ RSpec.describe Adapters::ModelAdapter do
 
         # **コピースペースを持たない案を出しません**（requirements.md 4.2）。
         it 'コピースペースの指定が無ければ失敗します' do
-          without = draft_for(main_terms: ['a calm office', '35mm lens'])
+          without = bare_draft(main_terms: ['a calm office', '35mm lens'])
 
           expect { adapter.format(without) }
             .to raise_error(described_class::InvalidDraftError)
@@ -199,6 +221,14 @@ RSpec.describe Adapters::ModelAdapter do
       expect(formatted.to_prompt.scan('deformed hands').size).to eq(1)
     end
 
+    # **本文の途中にパラメータを置けません**（PR #154 の 2 回目のレビューより）。
+    it '素材にパラメータの印が混ざれば弾きます' do
+      unsafe = bare_draft(main_terms: ['a calm office --ar 1:1', 'clear copy space on the left'])
+
+      expect { described_class.for('midjourney').format(unsafe) }
+        .to raise_error(described_class::UnsafeTermError)
+    end
+
     # **値の無い `--no` は受け付けられません。**
     it '打ち消しが 1 件も無ければ、打ち消しのパラメータを付けません' do
       bare = described_class.for('midjourney').format(draft_for(negative_terms: []))
@@ -225,7 +255,12 @@ RSpec.describe Adapters::ModelAdapter do
 
         # **述語を持たない名詞句を並べません**（PR #154 のレビューより）。
         it '述語のある文で素材を述べます' do
-          expect(formatted.main_prompt).to include('The image includes ')
+          expect(formatted.main_prompt).to include('The image shows ')
+        end
+
+        # **`includes` は過去分詞句を受けられません**（2 回目のレビューより）。
+        it '過去分詞句を目的語にしません' do
+          expect(formatted.main_prompt).not_to match(/shows [^.]*, and composed for/)
         end
 
         it '素材を句点で分断しません' do
@@ -237,33 +272,42 @@ RSpec.describe Adapters::ModelAdapter do
         end
 
         it '最後の素材を and でつなぎます' do
-          expect(formatted.main_prompt).to include(', and clear copy space')
+          expect(formatted.main_prompt).to include(', and ')
         end
 
-        # **アスペクト比を二度言いません。**
-        it '素材が既にアスペクト比を述べていれば、重ねません' do
-          told = draft_for(main_terms: main_terms + ['composed for a 16:9 wide crop'])
-          prompt = described_class.for(model).format(told).main_prompt
-
-          expect(prompt.scan('16:9').size).to eq(1)
+        # **アスペクト比を、独立した 1 文で述べます。**
+        it '画面の比を 1 文で述べます' do
+          expect(formatted.main_prompt).to match(/The whole frame is [^.]+\.\z/)
         end
 
-        it '素材が述べていなければ、先頭で伝えます' do
-          expect(formatted.main_prompt).to include('composed for a 16:9 frame')
+        # **二度言いません。**
+        it '画面の比を二度言いません' do
+          expect(formatted.main_prompt.scan('16:9').size).to eq(1)
+        end
+
+        it '画面の比を述べる素材を、並びへ混ぜません' do
+          expect(formatted.main_prompt).not_to match(/shows [^.]*16:9/)
+        end
+
+        # **コピースペースの段の控えが無い下書きでも、比を述べます。**
+        it '控えが無ければ、設定の言い回しで述べます' do
+          prompt = described_class.for(model).format(untraced_draft).main_prompt
+
+          expect(prompt).to include('The whole frame is composed as a 16:9 crop.')
         end
 
         it '素材が 2 件なら読点を挟みません' do
-          two = draft_for(main_terms: ['a calm office', 'clear copy space on the left'])
+          two = untraced_draft(main_terms: ['a calm office', 'clear copy space on the left'])
           prompt = described_class.for(model).format(two).main_prompt
 
           expect(prompt).to include('a calm office and clear copy space on the left.')
         end
 
         it '素材が 1 件ならそのまま述べます' do
-          one = draft_for(main_terms: ['clear copy space on the left'])
+          one = untraced_draft(main_terms: ['clear copy space on the left'])
           prompt = described_class.for(model).format(one).main_prompt
 
-          expect(prompt).to include('The image includes clear copy space on the left.')
+          expect(prompt).to include('The image shows clear copy space on the left.')
         end
       end
     end
@@ -294,8 +338,25 @@ RSpec.describe Adapters::ModelAdapter do
     end
 
     it '対応の無いアスペクト比なら失敗します' do
-      expect { described_class.for('dalle').format(draft_for(aspect_ratio: '5:4')) }
-        .to raise_error(described_class::InvalidDraftError)
+      unknown = untraced_draft(aspect_ratio: '5:4')
+
+      expect { described_class.for('dalle').format(unknown) }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **黙って別の比へ寄せません**（PR #154 の 2 回目のレビューより）。
+    it '比が違う大きさを選んだら、控えへ残します' do
+      note = described_class.for('dalle').format(draft_for(aspect_ratio: '3:2')).notes.first
+
+      expect(note[:kind]).to eq(Adapters::DalleAdapter::SIZE_SUBSTITUTED_NOTE_KIND)
+      expect(note[:aspect_ratio]).to eq('3:2')
+      expect(note[:size]).to eq('1792x1024')
+    end
+
+    it '控えに、どの呼び出しの版かを残します' do
+      note = described_class.for('dalle').format(draft_for(aspect_ratio: '3:2')).notes.first
+
+      expect(note[:api_version]).to eq('dall-e-3')
     end
   end
 
@@ -327,7 +388,7 @@ RSpec.describe Adapters::ModelAdapter do
 
     # **記法で意味を持つ文字が混ざったら、その場で失敗させます。**
     ['clear copy space (left third) for a headline',
-     'clear copy space: left third'].each do |term|
+     'a calm office (soft light)'].each do |term|
       it "「#{term}」なら失敗します" do
         unsafe = draft_for(main_terms: ['a calm office', term])
 
@@ -336,20 +397,48 @@ RSpec.describe Adapters::ModelAdapter do
       end
     end
 
-    it '重みを付けない素材の括弧は許します' do
-      safe = draft_for(main_terms: ['a calm office (seen from above)',
-                                    'clear copy space on the left'])
+    # **括弧は、どこにあっても強調です**（PR #154 の 2 回目のレビューより）。
+    it '重みを付けない素材の括弧も弾きます' do
+      unsafe = draft_for(main_terms: ['a calm office (seen from above)'])
 
-      expect { described_class.for('stable_diffusion').format(safe) }.not_to raise_error
+      expect { described_class.for('stable_diffusion').format(unsafe) }
+        .to raise_error(described_class::UnsafeTermError)
+    end
+
+    # **コロンは括弧の中でだけ重みの区切りです。**
+    it '重みを付けない素材のコロンは許します' do
+      expect { described_class.for('stable_diffusion').format(draft_for) }.not_to raise_error
+    end
+
+    it '重みを付ける素材のコロンは弾きます' do
+      unsafe = bare_draft(main_terms: ['clear copy space: left third'])
+
+      expect { described_class.for('stable_diffusion').format(unsafe) }
+        .to raise_error(described_class::UnsafeTermError)
+    end
+
+    # **例外に素材そのものを出しません。**
+    it '例外に素材そのものを出しません' do
+      unsafe = bare_draft(main_terms: ['clear copy space: 社外秘の語'])
+
+      expect { described_class.for('stable_diffusion').format(unsafe) }
+        .to raise_error(described_class::UnsafeTermError, /^((?!社外秘).)*$/)
+    end
+
+    it '当てた重みの数を控えへ残します' do
+      note = formatted.notes.first
+
+      expect(note[:kind]).to eq(Adapters::StableDiffusionAdapter::EMPHASIS_NOTE_KIND)
+      expect(note[:emphasized]).to eq(1)
     end
   end
 
   describe '整形の結果' do
-    it '本文・打ち消し・パラメータ・最終形を持ちます' do
+    it '本文・打ち消し・パラメータ・最終形・控えを持ちます' do
       formatted = described_class.for('midjourney').format(draft_for)
 
       expect(formatted.to_h.keys)
-        .to contain_exactly(:main_prompt, :negative_prompt, :parameters, :prompt)
+        .to contain_exactly(:main_prompt, :negative_prompt, :parameters, :prompt, :notes)
     end
   end
 

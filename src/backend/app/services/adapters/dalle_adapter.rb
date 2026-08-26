@@ -15,6 +15,10 @@ module Adapters
   # **画像の大きさは画素で指定します。** この呼び出しは `16:9` のような比を
   # 受け付けません（PR #154 のレビューより）。受け付ける大きさは決まった数しか
   # ありませんので、**横長のうち最も近いもの**を選び、**正確な比は本文で伝えます。**
+  #
+  # **すり替えた事実を控えへ残します。** 黙って寄せると、`aspect_ratio` ・
+  # `size` ・ 本文の 3 つが別の比を指し、受け取った利用者はどれに従えばよいか
+  # 決められません。アートディレクションノート（issue #51）が、これを見せます。
   class DalleAdapter < NarrativeAdapter
     MODEL_KEY = 'dalle'
 
@@ -23,6 +27,12 @@ module Adapters
 
     # 大きさの対応表の鍵です。
     SIZES_KEY = 'sizes'
+
+    # 対象の呼び出しの版の鍵です。
+    API_VERSION_KEY = 'api_version'
+
+    # 大きさをすり替えたことを残す印です。
+    SIZE_SUBSTITUTED_NOTE_KIND = :size_substituted
 
     class << self
       def model_key = MODEL_KEY
@@ -34,6 +44,32 @@ module Adapters
     end
 
     private
+
+    # **選べる大きさが、指定された比と違う場合は控えへ残します。**
+    #
+    # 黙って寄せると、`aspect_ratio` ・ `size` ・ 本文の 3 つが別の比を指し、
+    # 受け取った利用者はどれに従えばよいか決められません
+    # （PR #154 の 2 回目のレビューより）。
+    def notes_for(draft)
+      aspect_ratio = input_value(draft, :aspect_ratio)
+      size = size_for(aspect_ratio)
+      return [] if same_ratio?(aspect_ratio, size)
+
+      [{ kind: SIZE_SUBSTITUTED_NOTE_KIND, aspect_ratio: aspect_ratio, size: size,
+         api_version: rules.fetch(API_VERSION_KEY) }]
+    end
+
+    # 指定された比と、選んだ大きさの比が同じかどうかを返します。
+    def same_ratio?(aspect_ratio, size)
+      ratio_of(aspect_ratio, ':') == ratio_of(size, 'x')
+    end
+
+    def ratio_of(value, separator)
+      width, height = value.split(separator).map(&:to_f)
+      return nil if height.nil? || height.zero?
+
+      (width / height).round(2)
+    end
 
     # **打ち消しの欄がありません。** 空ではなく、無いことを返します。
     def negative_prompt_for(_draft)
@@ -53,7 +89,7 @@ module Adapters
       size = sizes.is_a?(Hash) ? sizes[aspect_ratio] : nil
       return size if size.is_a?(String) && !size.strip.empty?
 
-      raise InvalidDraftError,
+      raise InvalidDefinitionError,
             "画像の大きさの対応がありません: #{aspect_ratio}" # 開発者向け
     end
   end

@@ -58,7 +58,7 @@ module Generation
       instructions = CopySpaceRules.instructions_for(position)
       ratio_instruction = CopySpaceRules.aspect_ratio_instruction(aspect_ratio)
 
-      traced(draft, position, aspect_ratio, instructions + [ratio_instruction])
+      traced(draft, position, aspect_ratio, instructions + [ratio_instruction], ratio_instruction)
     end
 
     # その下書きがコピースペースの指定を持っているかどうかを返します。
@@ -100,14 +100,19 @@ module Generation
             'コピースペースはすでに規定されています。' # 開発者向け
     end
 
-    def traced(draft, position, aspect_ratio, instructions)
+    # **画面の比を述べる素材そのものを、ノートへ残します。**
+    # 整形の段（issue #47、#49）は、この素材を独立した 1 文として述べます。
+    # 素材の文字列を照合して見分けると、言い回しが変わったときに黙って外れます
+    # （PR #154 の 2 回目のレビューより）。
+    def traced(draft, position, aspect_ratio, instructions, ratio_instruction)
       Trace.step('generation.copy_space_applied',
                  position: position,
                  aspect_ratio: aspect_ratio,
                  instructions: instructions.size) do
         draft.add(
           main_terms: instructions,
-          notes: [{ kind: NOTE_KIND, position: position, aspect_ratio: aspect_ratio }]
+          notes: [{ kind: NOTE_KIND, position: position, aspect_ratio: aspect_ratio,
+                    aspect_ratio_term: ratio_instruction }]
         )
       end
     end
