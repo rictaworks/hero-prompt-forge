@@ -466,11 +466,11 @@ RSpec.describe Quota::Reservation do
     end
 
     def exhausted_total
-      total_for(Metrics::Recorder::QUOTA_EXHAUSTED)
+      total_for(MetricEvent::QUOTA_EXHAUSTED)
     end
 
     def reclaimed_total
-      total_for(Metrics::Recorder::QUOTA_RECLAIMED)
+      total_for(MetricEvent::QUOTA_RECLAIMED)
     end
 
     def queued_request
@@ -492,8 +492,12 @@ RSpec.describe Quota::Reservation do
       expect(exhausted_total).to eq(1)
     end
 
-    # **巻き戻りません。** 枠を取る処理の外で記録します。
-    it '上限到達の記録が巻き戻りません' do
+    # **枠を取る処理の巻き戻しには巻き込まれません。**
+    #
+    # **ただし、呼び出す側がトランザクションで包むと巻き戻ります。**
+    # `Metrics::Recorder` は自前のトランザクションを持ちません。
+    # この制限は下の例で固定しています（PR #164 のレビューより）。
+    it '枠を取る処理の巻き戻しに巻き込まれません' do
       described_class.reserve!(user: user, now: now)
       2.times do
         described_class.reserve!(user: user, now: now)
@@ -521,6 +525,61 @@ RSpec.describe Quota::Reservation do
                               now: now)
 
       expect(reclaimed_total).to eq(0)
+    end
+
+    # **測定の記録は、本業の結果を書き換えません**（PR #164 のレビューより）。
+    describe '記録の置き場が落ちている場合' do
+      before do
+        allow(Metrics::Recorder).to receive(:record)
+          .and_raise(ActiveRecord::StatementInvalid, 'db down') # 開発者向け
+      end
+
+      # **上限到達のお知らせが、記録の失敗に置き換わりません。**
+      it '上限到達をそのまま知らせます' do
+        described_class.reserve!(user: user, now: now)
+
+        expect { described_class.reserve!(user: user, now: now) }
+          .to raise_error(described_class::ExhaustedError)
+      end
+
+      it '次回のリセット時刻を添えます' do
+        described_class.reserve!(user: user, now: now)
+
+        described_class.reserve!(user: user, now: now)
+      rescue described_class::ExhaustedError => e
+        expect(e.reset_at).to eq(Quota::QuotaDay.reset_at(Quota::QuotaDay.of(now)))
+      end
+
+      # **決着したあとに記録が失敗しても、やり直せない状態を残しません。**
+      it '返還は成功したままです' do
+        request = failed_request
+
+        expect { described_class.settle!(request, now: now) }.not_to raise_error
+      end
+
+      it '枠は返還済みになります' do
+        consumption = described_class.settle!(failed_request, now: now)
+
+        expect(consumption.status).to eq('refunded')
+      end
+    end
+
+    # **既知の制限です。** 呼び出す側がトランザクションで包むと、
+    # 断った事実の記録まで一緒に巻き戻ります。**包んで呼ばないでください。**
+    #
+    # **この制限を、テストとして書き残します。** 直したときにこの例が赤くなり、
+    # 申し送りを消し忘れずに済みます。
+    it '呼び出す側がトランザクションで包むと巻き戻ります' do
+      begin
+        QuotaConsumption.transaction do
+          described_class.reserve!(user: user, now: now)
+          described_class.reserve!(user: user, now: now)
+        end
+      rescue described_class::ExhaustedError
+        nil
+      end
+
+      expect(exhausted_total).to eq(0)
     end
   end
 end

@@ -168,14 +168,24 @@ module Quota
       # **枠を取る処理の外で記録します。** 中で記録すると、上限到達で
       # 巻き戻るときに、記録まで一緒に巻き戻ります。
       #
+      # **`Metrics::SideChannel` を通します。** 直に呼ぶと、記録が失敗したときに
+      # 上限到達のお知らせが失われます（PR #164 のレビューで実測されました）。
+      #
       # **利用者の識別子を渡しません。** 残すのは軸の名前と日と件数だけです。
+      #
+      # **この持ち場を、呼び出す側のトランザクションで包まないでください。**
+      # 包むと、断った事実の記録まで一緒に巻き戻ります。
       def record_exhausted(now)
-        Metrics::Recorder.record(Metrics::Recorder::QUOTA_EXHAUSTED, now: now)
+        Metrics::SideChannel.record(MetricEvent::QUOTA_EXHAUSTED, now: now)
       end
 
       # クォータ返還の発生数を残します（requirements.md 7.1）。
+      #
+      # **決着したあとに記録します。** 直に呼ぶと、記録が失敗したときに、
+      # 枠は返っているのに呼び出す側が失敗を受け取ります。やり直すと
+      # 予約中の記録がもう無く、**やり直しの効かない状態が残ります。**
       def record_reclaimed(now)
-        Metrics::Recorder.record(Metrics::Recorder::QUOTA_RECLAIMED, now: now)
+        Metrics::SideChannel.record(MetricEvent::QUOTA_RECLAIMED, now: now)
       end
 
       def exhausted(quota_day)

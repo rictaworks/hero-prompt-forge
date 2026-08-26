@@ -11,13 +11,16 @@ module Metrics
   #
   # **数え上げは、データベースの一意制約に守らせます。** 同じ日・同じ軸へ
   # 並列に記録しても、行が 2 つできません。
+  #
+  # **自前のトランザクションを持ちません。** 呼び出す側がトランザクションで
+  # 包むと、**その巻き戻しに巻き込まれて記録が消えます**（PR #164 のレビューで
+  # 実測されました）。**包んで呼ばないでください。**
+  #
+  # **本業の途中から直に呼ばないでください。** 記録が失敗すると、本業の失敗の
+  # 種類が書き換わります。本業から呼ぶ場合は `Metrics::SideChannel` を通します。
   class Recorder
     # 定義に無い軸を渡された場合に投げます。
     class UnknownAxisError < StandardError; end
-
-    # 軸の名前です。**文字列を呼び出す側へ書き写しません。**
-    QUOTA_EXHAUSTED = 'quota_exhausted'
-    QUOTA_RECLAIMED = 'quota_reclaimed'
 
     class << self
       # その時刻のクォータ日で、軸の件数を 1 つ増やします。
@@ -36,7 +39,7 @@ module Metrics
       def total(axis, from:, to:)
         ensure_axis!(axis)
 
-        MetricEvent.for_axis(axis).between(from, to).sum(:count)
+        MetricEvent.for_axis(axis).between(from, to).sum(:occurrences)
       end
 
       private
@@ -53,9 +56,9 @@ module Metrics
       # 日と軸の重なりはデータベースの一意索引が止めます。
       def increment(axis, occurred_on)
         MetricEvent.upsert( # rubocop:disable Rails/SkipsModelValidations
-          { axis: axis, occurred_on: occurred_on, count: 1 },
+          { axis: axis, occurred_on: occurred_on, occurrences: 1 },
           unique_by: %i[axis occurred_on],
-          on_duplicate: Arel.sql('count = metric_events.count + 1')
+          on_duplicate: Arel.sql('occurrences = metric_events.occurrences + 1')
         )
 
         MetricEvent.find_by!(axis: axis, occurred_on: occurred_on)

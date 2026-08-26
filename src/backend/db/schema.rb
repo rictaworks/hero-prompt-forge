@@ -25,10 +25,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090000) do
 
   create_table "metric_events", force: :cascade do |t|
     t.string "axis", null: false, comment: "測定軸の名前（requirements.md 7.1）"
-    t.integer "count", default: 0, null: false, comment: "その日の件数"
-    t.datetime "created_at", null: false
     t.date "occurred_on", null: false, comment: "JST 03:00 を境界とするクォータ日"
-    t.datetime "updated_at", null: false
+    t.integer "occurrences", default: 0, null: false, comment: "その日の件数"
     t.index ["axis", "occurred_on"], name: "index_metric_events_on_axis_and_occurred_on", unique: true
   end
 
