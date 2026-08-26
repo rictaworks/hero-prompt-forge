@@ -162,6 +162,115 @@ RSpec.describe Generation::RuleEngine do
     end
   end
 
+  # **規則辞書は人が編集するデータです。中身を信用しません。**
+  # 空の語が 1 つ混ざるだけで、すべての素材に当たってメインプロンプトが消えます。
+  describe '規則辞書の中身' do
+    def engine_with(forbidden)
+      dictionary = RuleDictionary.create!(
+        version: "vspec.terms-#{forbidden.hash.abs}",
+        anti_ai_rules: { 'forbidden_terms' => forbidden, 'negative_prompt_terms' => ['x'] }
+      )
+
+      described_class.new(dictionary: dictionary)
+    end
+
+    it '空の語が混ざっていれば、組み立ての時点で失敗します' do
+      expect { engine_with(['purple to teal gradient', '']) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '空白だけの語が混ざっていれば失敗します' do
+      expect { engine_with(['purple to teal gradient', '   ']) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '文字列でない語が混ざっていれば失敗します' do
+      expect { engine_with(['purple to teal gradient', 123]) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '注入する語に空の語が混ざっていれば失敗します' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.empty-negative',
+        anti_ai_rules: { 'forbidden_terms' => ['a'], 'negative_prompt_terms' => ['x', ''] }
+      )
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+  end
+
+  # **英字の語は、語の切れ目で見ます。**
+  # `teal` を登録したときに `stealth` を巻き込むと、関係のない指示が消えます。
+  describe '短い語を登録した場合' do
+    let(:short_terms) do
+      RuleDictionary.create!(
+        version: 'vspec.short',
+        anti_ai_rules: {
+          'forbidden_terms' => %w[teal purple glow 3d art neon flare saturated],
+          'negative_prompt_terms' => ['x']
+        }
+      )
+    end
+
+    let(:short_engine) { described_class.new(dictionary: short_terms) }
+
+    def kept_by_short(term)
+      short_engine.apply(short_engine.start(input).add(main_terms: [term])).main_terms
+    end
+
+    [
+      'stealth startup founders at a whiteboard',
+      'a heartfelt customer testimonial scene',
+      'artisan coffee roastery counter',
+      'a factory line with metal parts',
+      'glowing laptop screen in a dim room',
+      'afterglow of sunset over the city'
+    ].each do |term|
+      it "「#{term}」を巻き込みません" do
+        expect(kept_by_short(term)).to eq([term])
+      end
+    end
+
+    [
+      ['teal accent on a brand sign', 'teal'],
+      ['3d printed prototype on a workbench', '3d'],
+      ['neon lights along the street', 'neon']
+    ].each do |term, matched|
+      it "「#{term}」は取り除きます" do
+        expect(kept_by_short(term)).to be_empty
+      end
+
+      it "「#{term}」で当たった語は #{matched} です" do
+        draft = short_engine.apply(short_engine.start(input).add(main_terms: [term]))
+
+        expect(draft.notes.first[:matched]).to eq(matched)
+      end
+    end
+  end
+
+  describe '素材の型' do
+    def applied(main_terms)
+      engine.apply(engine.start(input).add(main_terms: main_terms))
+    end
+
+    it '文字列でない素材は失敗させます' do
+      expect { applied([123]) }.to raise_error(described_class::InvalidDraftError)
+    end
+
+    it '空の素材は失敗させます' do
+      expect { applied([nil]) }.to raise_error(described_class::InvalidDraftError)
+    end
+  end
+
+  describe '#avoided_compositions の複製' do
+    it '返した一覧へ足しても、規則の中身は変わりません' do
+      engine.avoided_compositions << 'すり替えました'
+
+      expect(engine.avoided_compositions).to eq(['large frontal face close-up'])
+    end
+  end
+
   describe '規則辞書の不備' do
     it '辞書が無ければ組み立てられません' do
       expect { described_class.new(dictionary: nil) }
@@ -185,23 +294,56 @@ RSpec.describe Generation::RuleEngine do
     end
   end
 
-  describe '初期の規則辞書での適用' do
-    before { load Rails.root.join('db/seeds.rb') }
+  # 仕様（requirements.md 4.2）が挙げるクリシェを、規則として書けることを確かめます。
+  #
+  # **`db/seeds.rb` を読み込みません。** seeds は同じ版があれば何もしないため、
+  # 読み込む形にすると、テスト用データベースに残っている行の状態でテストの結果が
+  # 変わります。初期データそのものの中身は `spec/models/rule_dictionary_spec.rb`
+  # が確かめます。ここで確かめるのは、規則を当てる仕組みの側です。
+  describe '仕様が挙げるクリシェ' do
+    let(:spec_dictionary) do
+      RuleDictionary.create!(
+        version: 'vspec.cliche',
+        anti_ai_rules: {
+          'forbidden_terms' => [
+            'purple to teal gradient',
+            'floating 3d shapes',
+            'hyper saturated',
+            'lens flare everywhere'
+          ],
+          'negative_prompt_terms' => [
+            'oversaturation', 'excessive bokeh', 'deformed hands', 'extra fingers'
+          ]
+        }
+      )
+    end
 
-    it '仕様が挙げるクリシェを排除します' do
-      current = described_class.new(dictionary: RuleDictionary.current)
-      draft = current.apply(
-        current.start(input).add(main_terms: ['purple to teal gradient', 'a calm office'])
+    let(:spec_engine) { described_class.new(dictionary: spec_dictionary) }
+
+    it 'クリシェ配色を排除します' do
+      draft = spec_engine.apply(
+        spec_engine.start(input).add(main_terms: ['purple to teal gradient', 'a calm office'])
       )
 
       expect(draft.main_terms).to eq(['a calm office'])
     end
 
-    it '破綻した手指を避ける語を注入します' do
-      current = described_class.new(dictionary: RuleDictionary.current)
-      draft = current.apply(current.start(input))
+    it '意味の無い浮遊物を排除します' do
+      draft = spec_engine.apply(spec_engine.start(input).add(main_terms: ['floating 3d shapes']))
 
-      expect(draft.negative_terms).to include('deformed hands')
+      expect(draft.main_terms).to be_empty
+    end
+
+    it '破綻した手指を避ける語を注入します' do
+      draft = spec_engine.apply(spec_engine.start(input))
+
+      expect(draft.negative_terms).to include('deformed hands', 'extra fingers')
+    end
+
+    it '過剰な彩度とボケを避ける語を注入します' do
+      draft = spec_engine.apply(spec_engine.start(input))
+
+      expect(draft.negative_terms).to include('oversaturation', 'excessive bokeh')
     end
   end
 end

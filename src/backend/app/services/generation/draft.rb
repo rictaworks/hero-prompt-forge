@@ -12,6 +12,9 @@ module Generation
   #
   # 凍らせるのは器だけではありません。**中身まで凍らせます。** 器だけを凍らせても、
   # 連想配列の中の値は書き換えられ、「書き換えません」という約束が守られません。
+  #
+  # **複製してから凍らせます。** 渡された配列をその場で凍らせると、下書きを作った
+  # だけで、呼び出す側の配列が使えなくなります。
   class Draft
     # 正規化済みの入力です。
     attr_reader :input
@@ -25,22 +28,25 @@ module Generation
     attr_reader :dictionary_version
 
     def initialize(input:, main_terms: [], negative_terms: [], notes: [], dictionary_version: nil)
-      @input = self.class.deep_freeze(input)
-      @main_terms = self.class.deep_freeze(main_terms)
-      @negative_terms = self.class.deep_freeze(negative_terms)
-      @notes = self.class.deep_freeze(notes)
+      @input = self.class.deep_copy_freeze(input)
+      @main_terms = self.class.deep_copy_freeze(main_terms)
+      @negative_terms = self.class.deep_copy_freeze(negative_terms)
+      @notes = self.class.deep_copy_freeze(notes)
       @dictionary_version = dictionary_version.freeze
       freeze
     end
 
-    # 中身まで凍らせます。器だけでは、連想配列の中の値を書き換えられます。
-    def self.deep_freeze(value)
+    # 複製して、中身まで凍らせます。
+    #
+    # 器だけでは、連想配列の中の値を書き換えられます。複製しないと、渡した側の
+    # 配列まで凍ります。
+    def self.deep_copy_freeze(value)
       case value
-      when Hash then value.each_value { |item| deep_freeze(item) }
-      when Array then value.each { |item| deep_freeze(item) }
+      when Hash then value.to_h { |key, item| [key, deep_copy_freeze(item)] }.freeze
+      when Array then value.map { |item| deep_copy_freeze(item) }.freeze
+      when String then value.dup.freeze
+      else value.freeze
       end
-
-      value.freeze
     end
 
     # 素材を足した下書きを返します。同じ語は重ねません。

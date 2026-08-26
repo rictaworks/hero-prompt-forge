@@ -13,9 +13,7 @@ module Generation
   # どのクリシェに当たって消えたのかを追えません。黙って消すと、利用者が指定した
   # つもりの表現が反映されない理由が分かりません。
   #
-  # 語の照合は、表記のゆれを取り除いてから行います。大文字と小文字の違い・連続する
-  # 空白・ハイフンは「同じ語の別の書き方」です。`Purple to teal gradient` と
-  # `purple to teal gradient` は同じものを指します。
+  # 規則辞書の中身を検め、語を照合する仕事は AntiAiRules が持ちます。
   #
   # 適用した規則辞書の版を下書きへ記録します。あとから「どの版で作ったか」を
   # 追えるようにするためです（requirements.md 7.2）。
@@ -23,34 +21,26 @@ module Generation
     # 規則辞書が渡されていない場合に投げます。
     class MissingDictionaryError < StandardError; end
 
-    # 規則辞書の内容が足りない場合に投げます。
-    class InvalidDictionaryError < StandardError; end
+    # 規則辞書の内容が足りない、または壊れている場合に投げます。
+    InvalidDictionaryError = AntiAiRules::InvalidDictionaryError
 
-    # 排除する語の鍵です。
-    FORBIDDEN_TERMS_KEY = 'forbidden_terms'
-    # 注入する語の鍵です。
-    NEGATIVE_TERMS_KEY = 'negative_prompt_terms'
-    # 既定で避ける構図の鍵です。
-    AVOIDED_COMPOSITIONS_KEY = 'avoided_compositions'
+    # 渡された素材が文字列でない場合に投げます。
+    class InvalidDraftError < StandardError; end
 
     # ノートに残す印です。文言ではなく記号で持ちます。
     REMOVED_NOTE_KIND = :anti_ai_removed
 
-    # 表記のゆれを取り除く際に、空白として扱う記号です。
-    WORD_SEPARATORS = /[-_\u3000\s]+/
-
     def initialize(dictionary:)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
-      @dictionary = dictionary
-      @rules = dictionary.anti_ai_rules
-      ensure_rules!
+      @version = dictionary.version
+      @rules = AntiAiRules.new(dictionary)
     end
 
     # 正規化済みの入力から、下書きを起こします。
     # @return [Draft]
     def start(input)
-      Draft.new(input: input, dictionary_version: dictionary.version)
+      Draft.new(input: input, dictionary_version: version)
     end
 
     # 規則を適用した下書きを返します。
@@ -58,43 +48,26 @@ module Generation
     def apply(draft)
       kept, removed = partition(draft.main_terms)
 
-      draft.replace(
-        main_terms: kept,
-        negative_terms: (draft.negative_terms + negative_terms).uniq,
-        notes: draft.notes + removal_notes(removed),
-        dictionary_version: dictionary.version
-      )
-    end
-
-    # 表記のゆれを取り除きます。照合の前に、両側へ同じ手当てをします。
-    def self.normalize(term)
-      term.to_s.downcase.gsub(WORD_SEPARATORS, ' ').strip
+      Trace.step('generation.anti_ai_rules_applied',
+                 dictionary_version: version, kept: kept.size, removed: removed.size) do
+        applied(draft, kept, removed)
+      end
     end
 
     # 既定で避ける構図です。利用者が明示した場合のみ許します。
-    def avoided_compositions
-      Array(rules[AVOIDED_COMPOSITIONS_KEY])
-    end
+    delegate :avoided_compositions, to: :rules
 
     private
 
-    attr_reader :dictionary, :rules
+    attr_reader :version, :rules
 
-    def ensure_rules!
-      return if rules.is_a?(Hash) &&
-                rules[FORBIDDEN_TERMS_KEY].is_a?(Array) &&
-                rules[NEGATIVE_TERMS_KEY].is_a?(Array)
-
-      raise InvalidDictionaryError,
-            "規則辞書のアンチAIルックの定義が足りません: #{dictionary.version}" # 開発者向け
-    end
-
-    def forbidden_terms
-      rules.fetch(FORBIDDEN_TERMS_KEY)
-    end
-
-    def negative_terms
-      rules.fetch(NEGATIVE_TERMS_KEY)
+    def applied(draft, kept, removed)
+      draft.replace(
+        main_terms: kept,
+        negative_terms: (draft.negative_terms + rules.negative_terms).uniq,
+        notes: draft.notes + removal_notes(removed),
+        dictionary_version: version
+      )
     end
 
     # 排除する語を含む素材を取り除きます。語そのものだけでなく、語を含む
@@ -107,18 +80,19 @@ module Generation
       removed = []
 
       terms.each do |term|
-        matched = matched_forbidden(term)
+        ensure_material!(term)
+        matched = rules.forbidden_match(term)
         matched.nil? ? kept << term : removed << { term: term, matched: matched }
       end
 
       [kept, removed]
     end
 
-    # その素材が、どの排除する語に当たるかを返します。当たらなければ空です。
-    def matched_forbidden(term)
-      normalized = self.class.normalize(term)
+    def ensure_material!(term)
+      return if term.is_a?(String)
 
-      forbidden_terms.find { |forbidden| normalized.include?(self.class.normalize(forbidden)) }
+      raise InvalidDraftError,
+            "素材は文字列で渡してください: #{term.class}" # 開発者向け
     end
 
     def removal_notes(removed)
