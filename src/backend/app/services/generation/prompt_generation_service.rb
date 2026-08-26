@@ -14,8 +14,9 @@ module Generation
   #   6. アンチAIルック規則の適用（4.1 の 2）
   #   7. バリエーション3案の展開（4.1 の 8）
   #   8. 矛盾の解決と統合（4.1 の 5）
-  #   9. モデル別の整形（4.1 の 7）
-  #  10. アートディレクションノート（4.1 の 9）
+  #   9. LLM による精緻化、または縮退（4.1 の 10、4.2）
+  #  10. モデル別の整形（4.1 の 7）
+  #  11. アートディレクションノート（4.1 の 9）
   #
   # **正規化を、禁止入力の検出より先に置きます。** 検出は文章を舐めますので、
   # **長さの上限を通していない文字列を渡すと、際限なく時間がかかります**
@@ -39,9 +40,6 @@ module Generation
   # **規則辞書の版は、最初から最後まで 1 つです。** 途中で差し替わると、
   # どの版で作ったのかを追えません（requirements.md 7.2）。
   #
-  # **人物の見込みの上書き（issue #147）は、まだつないでいません。**
-  # 上書きの仕組みが別の PR で進んでいるためです。**マージ後に、
-  # `StyleSpec.new(people_override:)` へプロジェクトの設定を渡してください。**
   class PromptGenerationService
     # 規則辞書が渡されていない場合に投げます。
     class MissingDictionaryError < StandardError; end
@@ -71,18 +69,22 @@ module Generation
     # 落ちません（PR #163 のレビューで実測されました）。
     STEPS = %i[proper_nouns style_spec copy_space anti_ai_rules].freeze
 
-    # 1 案ぶんの出力です。
-    Package = Struct.new(:variation, :formatted, :note, :draft, keyword_init: true) do
-      def to_h
-        { variation: variation, formatted: formatted.to_h, note: note.to_h }
-      end
-    end
+    # 1 案ぶんの出力は PromptPackage が持ちます。
+    Package = PromptPackage
 
     # @param dictionary [RuleDictionary] 規則辞書です
-    def initialize(dictionary:)
+    # @param people_override [String, nil] 人物の見込みの上書きです（issue #147）
+    #
+    # **上書きは、利用者の入力ではなくプロジェクトの設定です。**
+    # 下書きの入力（`Draft#input`）は利用者由来の器ですので、そこへ混ぜません。
+    #
+    # **この段はリクエストごとに作ります。** 上書きが組み立て時の状態に
+    # なりますので、使い回すと他社の設定が混ざります（PR #158 のレビューより）。
+    def initialize(dictionary:, people_override: nil)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
       @dictionary = dictionary
+      @people_override = people_override
     end
 
     # 3 案ぶんのプロンプトパッケージを返します。
@@ -96,7 +98,7 @@ module Generation
 
     private
 
-    attr_reader :dictionary
+    attr_reader :dictionary, :people_override
 
     # **どの段で失敗したかが記録から分かるようにします。**
     def traced(raw, &)
@@ -140,23 +142,36 @@ module Generation
       STEPS.reduce(engine.start(input)) { |draft, step| apply_step(step, draft, engine) }
     end
 
+    def style_spec
+      StyleSpec.new(dictionary: dictionary, people_override: people_override)
+    end
+
     def apply_step(step, draft, engine)
       case step
       when :proper_nouns then ProperNoun.new.apply(draft)
-      when :style_spec then StyleSpec.new(dictionary: dictionary).apply(draft)
+      when :style_spec then style_spec.apply(draft)
       when :copy_space then CopySpace.new.apply(draft)
       when :anti_ai_rules then engine.apply(draft)
       end
     end
 
-    # 3 案へ展開し、案ごとに統合します。
+    # 3 案へ展開し、案ごとに統合して磨きます。
     #
     # **統合は案ごとに行います。** 案によって外す素材が違いますので、
     # 先に統合すると、外した素材を指す説明が残ります。
+    #
+    # **磨きは統合の後です。** 磨いた素材は、当たった語をそのまま含むことが
+    # ありますので、統合より前に磨くと、弱めた色が丸ごと落ちます。
+    #
+    # **磨けなければ縮退します。** 印と理由が控えへ残ります（issue #53）。
     def expanded(draft)
       VariationExpander.new(dictionary: dictionary).expand(draft).map do |variation|
-        ConflictResolver.new(dictionary: dictionary).resolve(variation)
+        composer.compose(ConflictResolver.new(dictionary: dictionary).resolve(variation))
       end
+    end
+
+    def composer
+      @composer ||= DegradedComposer.new(dictionary: dictionary)
     end
 
     # 1 案を、出力の形へ整えます。

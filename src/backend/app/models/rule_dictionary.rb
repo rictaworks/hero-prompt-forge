@@ -8,6 +8,9 @@ class RuleDictionary < ApplicationRecord
   # 公開済みの版を書き換えようとした場合に投げます。
   class PublishedVersionError < StandardError; end
 
+  # 公開済みの版が 1 つも無い場合に投げます。
+  class MissingCurrentError < StandardError; end
+
   validates :version, presence: true, uniqueness: true
 
   scope :published, -> { where.not(published_at: nil) }
@@ -17,6 +20,17 @@ class RuleDictionary < ApplicationRecord
   # いま使う版を返します。公開済みのうち、最後に公開したものです。
   def self.current(now: Time.current)
     published.where(published_at: ..now).order(published_at: :desc).first
+  end
+
+  # いま使う版を返します。**無ければ、その場で失敗させます。**
+  #
+  # 版が無いまま生成へ進むと、規則も撮影の指示も当たらないプロンプトが出ます。
+  # **既定へ寄せません。**
+  def self.current!(now: Time.current)
+    found = current(now: now)
+    return found if found
+
+    raise MissingCurrentError, '公開済みの規則辞書がありません。' # 開発者向け
   end
 
   def published?

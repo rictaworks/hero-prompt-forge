@@ -233,8 +233,20 @@ RSpec.describe Generation::PromptGenerationService do
   end
 
   describe '受け渡しの形' do
-    it '案・整形の結果・ノートを持ちます' do
-      expect(packages.first.to_h.keys).to contain_exactly(:variation, :formatted, :note)
+    it '案・整形の結果・ノート・縮退の印を持ちます' do
+      expect(packages.first.to_h.keys)
+        .to contain_exactly(:variation, :formatted, :note, :degraded)
+    end
+
+    # **縮退した案には印が残ります**（issue #53）。
+    it '磨けなければ縮退の印が立ちます' do
+      expect(packages).to all(be_degraded)
+    end
+
+    it '案の番号と構図の種別を引けます' do
+      expect(packages.map(&:number)).to eq([1, 2, 3])
+      expect(packages.map(&:composition_type))
+        .to eq(%w[subject_led environment_led abstract_background])
     end
   end
 end
