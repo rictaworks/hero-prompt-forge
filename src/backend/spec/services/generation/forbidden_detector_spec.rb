@@ -157,6 +157,99 @@ RSpec.describe Generation::ForbiddenDetector do
     end
   end
 
+  # **一覧に載せていない語**を含む言い回しです。語彙ではなく語の形で見分けて
+  # いることを確かめます。ここが通らないと、職種名を足し続ける保守に戻ります。
+  describe '一覧に無い職種に敬称が付く言い回し' do
+    [
+      '美容師さんが担当します。',
+      '税理士さんに相談できます。',
+      '看護師さんが常駐します。',
+      '調理師さんが仕込みをします。',
+      '検査員さんが確認します。',
+      '管理人さんが常駐します。',
+      'カメラマンさんが撮影します。',
+      'ネイリストさんの手元を写します。',
+      'ドライバーさんの休憩室です。',
+      '配達員さんが笑顔で届けます。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+  end
+
+  describe '自分のものを指す所有格とロゴ' do
+    [
+      'お客様のロゴを看板に反映します。',
+      '事務所のロゴを右下に小さく置きます。',
+      'ブランドのロゴを中央に配置してください。',
+      'チームのロゴを制作するデザイン会社です。',
+      '学校のロゴを校舎の壁に入れます。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+  end
+
+  describe '人物と関係のない「実在」' do
+    [
+      '実在する当院の外観写真を掲載しています。',
+      '実在の店舗を撮影した写真のような質感にします。',
+      '実在する工場の設備をそのまま写します。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+  end
+
+  # **見送る言い回しを先に書けば迂回できる、という状態を作りません。**
+  describe '見送る言い回しが先にある場合' do
+    it '自分のロゴを先に書いても、他社のロゴを見つけます' do
+      result = detect('自社のロゴと他社のロゴを並べた構図にしたいです。')
+
+      expect(result).to be_forbidden
+      expect(kinds_in(result)).to include(:brand_logo)
+    end
+
+    it '職種の呼び方を先に書いても、人名を見つけます' do
+      result = detect('担当者さんと山田太郎さんが対応します。')
+
+      expect(result).to be_forbidden
+      expect(kinds_in(result)).to include(:real_person)
+    end
+  end
+
+  describe '理由の重なり' do
+    it '同じ内容の理由を重ねて返しません' do
+      result = detect('Apple のロゴを背景に入れてください。')
+
+      expect(result.reasons.map(&:to_h).uniq.size).to eq(result.reasons.size)
+    end
+  end
+
+  describe '記録に残す内容' do
+    it '見つかった語を記録へ残しません' do
+      allow(Trace).to receive(:step).and_call_original
+
+      detect('田中太郎さんの写真を使います。')
+
+      expect(Trace).to have_received(:step)
+        .with('generation.forbidden_detected', hash_including(:kinds, :count))
+    end
+
+    it '種別と件数だけを残します' do
+      allow(Trace).to receive(:step).and_call_original
+
+      detect('田中太郎さんの写真を使います。')
+
+      expect(Trace).to have_received(:step) { |_name, context|
+        expect(context.keys).to contain_exactly(:kinds, :count)
+      }
+    end
+  end
+
   # app-ui/degraded.html の差し戻し画面のモックが掲げる例文です。
   # モックは理由を2行示しますので、2種別を返せる必要があります。
   describe '差し戻し画面のモックの例文' do

@@ -13,8 +13,8 @@ module Generation
   #
   # **通してよい文章を止めないことを、検出することと同じくらい重視します。**
   # 「代表取締役社長」「オーナー様」「ロゴ制作」のような普通の言い回しで生成を
-  # お断りすると、権利の問題と関係のない利用者が使えなくなります。規則ごとに
-  # 見送る語を持ち、通してよい文章をテストで固定しています。
+  # お断りすると、権利の問題と関係のない利用者が使えなくなります。見送る語を
+  # 並べるのではなく、語の形で見分けます（`config/forbidden_inputs.yml` を参照）。
   #
   # 見つかった理由には、種別・見つかった語・直し方の鍵だけを持たせます。利用者へ
   # 見せる文言はこの層で作りません。上位の層が鍵から組み立てます。
@@ -76,8 +76,7 @@ module Generation
         {
           kind: fetch_required(rule, 'kind').to_sym,
           suggestion_key: fetch_required(rule, 'suggestion_key').to_sym,
-          matchers: patterns.map { |pattern| Regexp.new(pattern) },
-          exceptions: Array(rule['exceptions'])
+          matchers: patterns.map { |pattern| Regexp.new(pattern) }
         }
       end
 
@@ -112,33 +111,31 @@ module Generation
     attr_reader :rules
 
     def detect(text)
-      Result.new(reasons: recorded(rules.flat_map { |rule| reasons_for(rule, text) }))
+      Result.new(reasons: recorded(rules.flat_map { |rule| reasons_for(rule, text) }.uniq))
     end
 
+    # **見つかった箇所をすべて拾います。** 最初の1件だけを見ると、先に書かれた
+    # 語で判定が終わり、後ろに書かれた本当の言及を取りこぼします。
     def reasons_for(rule, text)
-      rule[:matchers].filter_map do |matcher|
-        matched = matcher.match(text)
-        next if matched.nil?
-        next if excepted?(rule, matched[0])
-
-        Reason.new(kind: rule[:kind], matched: matched[0],
-                   suggestion_key: rule[:suggestion_key])
+      rule[:matchers].flat_map do |matcher|
+        text.scan(matcher).map do
+          Reason.new(kind: rule[:kind], matched: Regexp.last_match(0),
+                     suggestion_key: rule[:suggestion_key])
+        end
       end
     end
 
-    # 見つかった語が、見送る語を含む場合は理由にしません。
-    def excepted?(rule, matched)
-      rule[:exceptions].any? { |exception| matched.include?(exception) }
-    end
-
-    # 差し戻した事実を記録へ残します。**利用者の文章そのものは残しません。**
-    # 種別と見つかった語だけを残し、誤って止めていないかを運用で追えるようにします。
+    # 差し戻した事実を記録へ残します。
+    #
+    # **残すのは種別と件数だけです。** 見つかった語には実在の方のお名前が
+    # 入り得ます。記録は保管期間が長く、閲覧できる範囲も広くなります。
+    # 誤って止めていないかを運用で追う目的は、種別と件数でも果たせます。
     def recorded(reasons)
       return reasons if reasons.empty?
 
       Trace.step('generation.forbidden_detected',
                  kinds: reasons.map(&:kind).uniq,
-                 matched: reasons.map(&:matched)) { reasons }
+                 count: reasons.size) { reasons }
     end
   end
 end
