@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,6 +21,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_130000) do
     t.integer "rating", comment: "5段階の評価。未評価は空です"
     t.datetime "updated_at", null: false
     t.index ["prompt_output_id"], name: "index_evaluation_notes_on_prompt_output_id", unique: true
+  end
+
+  create_table "metric_events", force: :cascade do |t|
+    t.string "axis", null: false, comment: "測定軸の名前（requirements.md 7.1）"
+    t.integer "count", default: 0, null: false, comment: "その日の件数"
+    t.datetime "created_at", null: false
+    t.date "occurred_on", null: false, comment: "JST 03:00 を境界とするクォータ日"
+    t.datetime "updated_at", null: false
+    t.index ["axis", "occurred_on"], name: "index_metric_events_on_axis_and_occurred_on", unique: true
   end
 
   create_table "presets", force: :cascade do |t|

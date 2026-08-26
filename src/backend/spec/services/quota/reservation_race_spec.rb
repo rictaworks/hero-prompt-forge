@@ -43,7 +43,10 @@ RSpec.describe Quota::Reservation do
 
   after { clear_leftovers }
 
+  # **測定軸の記録も片づけます**（issue #63）。
+  # この試験はトランザクションの外で書きますので、残すと次の試験へ持ち越します。
   def clear_leftovers
+    MetricEvent.delete_all
     User.where(x_user_id: x_user_id).find_each do |leftover|
       QuotaConsumption.where(user_id: leftover.id).find_each(&:destroy!)
       Project.where(user_id: leftover.id).find_each do |owned|

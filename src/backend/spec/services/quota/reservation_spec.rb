@@ -455,4 +455,72 @@ RSpec.describe Quota::Reservation do
       expect(described_class.remaining_for?(user, now: now)).to be(true)
     end
   end
+
+  # **測定軸を記録します**（requirements.md 7.1、issue #63）。
+  #
+  # **個人を特定できる形で記録しません。** 残すのは軸の名前・日・件数だけです。
+  describe '測定軸の記録' do
+    def total_for(axis)
+      day = Quota::QuotaDay.of(now)
+      Metrics::Recorder.total(axis, from: day, to: day)
+    end
+
+    def exhausted_total
+      total_for(Metrics::Recorder::QUOTA_EXHAUSTED)
+    end
+
+    def reclaimed_total
+      total_for(Metrics::Recorder::QUOTA_RECLAIMED)
+    end
+
+    def queued_request
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request
+    end
+
+    def failed_request
+      queued_request.tap { |request| request.transition_to!('failed') }
+    end
+
+    it '上限到達を数えます' do
+      described_class.reserve!(user: user, now: now)
+
+      expect { described_class.reserve!(user: user, now: now) }
+        .to raise_error(described_class::ExhaustedError)
+      expect(exhausted_total).to eq(1)
+    end
+
+    # **巻き戻りません。** 枠を取る処理の外で記録します。
+    it '上限到達の記録が巻き戻りません' do
+      described_class.reserve!(user: user, now: now)
+      2.times do
+        described_class.reserve!(user: user, now: now)
+      rescue described_class::ExhaustedError
+        nil
+      end
+
+      expect(exhausted_total).to eq(2)
+    end
+
+    it '上限に達していなければ数えません' do
+      described_class.reserve!(user: user, now: now)
+
+      expect(exhausted_total).to eq(0)
+    end
+
+    it 'クォータ返還を数えます' do
+      described_class.settle!(failed_request, now: now)
+
+      expect(reclaimed_total).to eq(1)
+    end
+
+    it '確定では返還を数えません' do
+      described_class.settle!(queued_request.tap { |request| request.transition_to!('completed') },
+                              now: now)
+
+      expect(reclaimed_total).to eq(0)
+    end
+  end
 end
