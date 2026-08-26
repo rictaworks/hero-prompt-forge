@@ -1,0 +1,76 @@
+# バリエーション3案の展開の規則です（requirements.md 4.1 の 8）。
+#
+# **構図の異なる 3 案を出します。** 同じ絵の色違いではありません。
+# **何を主役にするか**を変えます。
+#
+#   subject_led         : 被写体主導。人や物を主役にします
+#   environment_led     : 環境主導。場所と空気を主役にし、被写体を小さく置きます
+#   abstract_background : 抽象背景。具体物を置かず、面と光で見せます
+#
+# **案ごとに外す素材を、役割で指定します。** 抽象背景の案は、被写体があることを
+# 前提にした指示をすべて外します。役割は次のいずれかです。
+#
+#   person_safety                     : 人物を避ける構図です
+#   reserved / subject / gaze / restraint : コピースペースの段が置く指示です
+#   （上記以外）                        : スタイル仕様化規則の項目名です
+#
+# **値は、そのままプロンプトへ入れられる英文です。**
+# **素材は 1 件 1 指示です。** 1 件へ複数の指示を詰め込むと、アンチAIルック規則が
+# 1 語に当たったときに、関係のない指示まで道連れになります。
+#
+# **打ち消しの言い回しを書きません。** 生成モデルは打ち消しの解釈が弱く、
+# かえってその要素を呼び込みます。
+#
+# **コピースペースの指定を打ち消す指示を書きません。** 余白の確保は最上位の
+# 指定です（requirements.md 4.1 の 5）。
+
+# 案の順です。**1 案目が既定の案です。**
+order:
+  - subject_led
+  - environment_led
+  - abstract_background
+
+# **余白と衝突する言い回しです。** ここに挙げた語を `focus` に書くと、
+# 読み込みの時点で失敗します。
+#
+# **文章で「書きません」と約束するだけでは守られません。**
+# 規則は人が編集するデータです（PR #155 のレビューより）。
+copy_space_conflicts:
+  - filling the frame
+  - fills the frame
+  - covering the frame
+  - covers the frame
+  - edge to edge
+  - full bleed
+  - across the whole frame
+
+compositions:
+  subject_led:
+    # 主役の置き方です。
+    focus: the main subject rendered large and sharp in the foreground
+    # その案で外す素材の役割です。**外す理由が同じものは、まとめて外します。**
+    drops: []
+  environment_led:
+    # **余白を打ち消しません。** `filling the frame` と書くと、最上位の指定である
+    # コピースペースの確保を、あとから来るこの指示が上書きする読み方ができます。
+    focus: the surrounding space dominating the composition with the subject small within it
+    drops: []
+  abstract_background:
+    # **具体物を置きません。**
+    #
+    # そのため、**被写体があることを前提にした指示をすべて外します。**
+    # 人物を避ける構図だけを外すのでは、`the main subject placed at ...` や
+    # `shallow depth of field on the subject plane` が残り、
+    # 「具体物を置きません」と言いながら被写体の置き場所を指示する形になります
+    # （PR #155 のレビューより）。
+    #
+    #   person_safety  : スタイル仕様化が当てる、人物を避ける構図です
+    #   depth_of_field : 被写界深度です。被写体の面を基準にします
+    #   subject        : コピースペースの段が置く、被写体の位置です
+    #   gaze           : 同じく、被写体の収まりと視線です
+    focus: an abstract composition of planes, gradients and light
+    drops:
+      - person_safety
+      - depth_of_field
+      - subject
+      - gaze
