@@ -1,0 +1,96 @@
+# frozen_string_literal: true
+
+# 固有名詞の切り出しを、両方向で測ります（requirements.md 4.1 の 6）。
+#
+# **片方だけを追うと、通してよい文章を壊しても気づけません。**
+# PR #149 のレビューでは、一般的な紹介文 23 文のうち 20 文を名前として拾って
+# いました。**取りすぎと取りこぼしを、同じ重さで数えます。**
+#
+# 素材の一覧は、レビューと不具合報告で積み上げたものです。減らさずに足してください。
+class ProperNounCoverage
+  # 拾ってほしい名前です。**この名前だけ**が出ることを求めます。
+  def exact
+    {
+      '「さくら堂」という店を営んでいます。' => 'さくら堂',
+      '「櫻花堂」（おうかどう）をご紹介します。' => '櫻花堂',
+      '屋号は「はな花」です。' => 'はな花',
+      '株式会社ミライ工房が運営します。' => 'ミライ工房',
+      'ミライ工房株式会社です。' => 'ミライ工房',
+      # **「の」より後ろまで拾いません**（issue #153）。
+      '株式会社みらいの強みは提案力です。' => 'みらい',
+      '株式会社みらいの事業は住宅です。' => 'みらい',
+      '株式会社ひかりの実績をご覧ください。' => 'ひかり',
+      '株式会社あおばの想いをお伝えします。' => 'あおば'
+    }
+  end
+
+  # 名前の一部として「の」をまたぐものです。
+  def spanning
+    {
+      '株式会社さくらの家が運営します。' => 'さくらの家',
+      '合同会社あおぞらの丘は分譲住宅を扱います。' => 'あおぞらの丘',
+      '有限会社きらめきの工房をご紹介します。' => 'きらめきの工房',
+      'さくらの家株式会社が運営します。' => 'さくらの家'
+    }
+  end
+
+  # **1 件も拾ってはいけない文章です。**
+  #
+  # いずれも一般的な紹介文です。名前として拾うと、日本語のまま生成モデルへ
+  # 渡ります（PR #149 のレビューより）。
+  def untouched
+    [
+      '明るい部屋でお迎えします。',
+      '近所の本屋や食堂もご案内します。',
+      '古い校舎を改装した空間です。',
+      '田舎の風景が広がります。',
+      '「安心」をお届けします。',
+      '「ものづくり」に取り組んでいます。',
+      '囲炉裏（いろり）を囲む席がございます。',
+      '定休日（ていきゅうび）は水曜日です。',
+      '名前のとおり「明るい」雰囲気です。',
+      '落ち着いた歯科医院です。',
+      '当社の強みは提案力です。',
+      '弊社の事業は住宅の設計です。'
+    ]
+  end
+
+  def report
+    report_exact
+    report_spanning
+    report_untouched
+  end
+
+  private
+
+  def detector
+    @detector ||= Generation::ProperNoun.new
+  end
+
+  def names_in(text)
+    detector.call(service_summary: text).map(&:original)
+  end
+
+  def report_exact
+    wrong = exact.reject { |text, name| names_in(text) == [name] }
+
+    puts "その名前だけを拾うべき #{exact.size} 件 : ずれ #{wrong.size} 件"
+    wrong.each { |text, name| puts "  ずれ: #{text} 期待=#{name} 実際=#{names_in(text).inspect}" }
+  end
+
+  def report_spanning
+    missed = spanning.reject { |text, name| names_in(text).include?(name) }
+
+    puts "「の」をまたぐべき #{spanning.size} 件 : 取りこぼし #{missed.size} 件"
+    missed.each { |text, name| puts "  取りこぼし: #{text} 期待=#{name} 実際=#{names_in(text).inspect}" }
+  end
+
+  def report_untouched
+    caught = untouched.reject { |text| names_in(text).empty? }
+
+    puts "拾ってはいけない #{untouched.size} 件 : 取りすぎ #{caught.size} 件"
+    caught.each { |text| puts "  取りすぎ: #{text} -> #{names_in(text).inspect}" }
+  end
+end
+
+ProperNounCoverage.new.report

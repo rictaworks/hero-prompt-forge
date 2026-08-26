@@ -184,6 +184,41 @@ RSpec.describe Generation::ProperNoun do
     it '助詞や語尾を名前に含めません' do
       expect(found_in('株式会社ミライ工房です。').map(&:original)).to eq(['ミライ工房'])
     end
+
+    # **「の」より後ろまで拾いません**（issue #153）。
+    #
+    # **「の」が名前の一部か、文をつなぐ助詞かは、文字だけでは決まりません。**
+    # 名前に使われる語（`name_forming_words`）が続く場合だけまたぎます。
+    describe '「の」の扱い' do
+      {
+        '株式会社みらいの強みは提案力です。' => 'みらい',
+        '株式会社みらいの事業は住宅です。' => 'みらい',
+        '株式会社ひかりの実績をご覧ください。' => 'ひかり',
+        '株式会社あおばの想いをお伝えします。' => 'あおば'
+      }.each do |summary, name|
+        it "「#{summary}」から「#{name}」だけを取り出します" do
+          expect(found_in(summary).map(&:original)).to eq([name])
+        end
+      end
+
+      {
+        '株式会社さくらの家が運営します。' => 'さくらの家',
+        '合同会社あおぞらの丘は分譲住宅を扱います。' => 'あおぞらの丘',
+        '有限会社きらめきの工房をご紹介します。' => 'きらめきの工房',
+        'さくらの家株式会社が運営します。' => 'さくらの家'
+      }.each do |summary, name|
+        it "「#{summary}」から「#{name}」を切り詰めません" do
+          expect(found_in(summary).map(&:original)).to include(name)
+        end
+      end
+
+      # **一覧に無い語が続く場合は、「の」の手前で切ります。**
+      # 取りすぎるより、短く切るほうが害が小さいためです。
+      it '名前に使われない語が続けば、手前で切ります' do
+        expect(found_in('株式会社みらいの強みは提案力です。').map(&:original))
+          .not_to include('みらいの強み')
+      end
+    end
   end
 
   describe '見つからない場合' do
@@ -263,7 +298,16 @@ RSpec.describe Generation::ProperNoun do
 
     it '意味説明が英文でなければ失敗します' do
       allow(YAML).to receive(:safe_load_file)
-        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => '名前', 'patterns' => ['(a)'] }] })
+        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => '名前', 'patterns' => ['(a)'] }],
+                      'name_forming_words' => ['家'] })
+
+      expect { described_class.load_rules }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it '名前に使われる語の一覧が無ければ失敗します' do
+      allow(YAML).to receive(:safe_load_file)
+        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => 'a name', 'patterns' => ['(a)'] }] })
 
       expect { described_class.load_rules }
         .to raise_error(described_class::InvalidDefinitionError)
