@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
 
 import { AppBar } from "@/components/layout/AppBar";
-import { SCREENS, screenOf, UnknownScreenError } from "@/config/screens";
+import {
+  isImplemented,
+  SCREENS,
+  screenOf,
+  UnknownScreenError,
+} from "@/config/screens";
+import { text } from "@/strings";
 
 describe("AppBar", () => {
   it("プラン値と利用者名を表示します", () => {
@@ -20,16 +26,28 @@ describe("AppBar", () => {
     );
   });
 
+  // **未実装の画面へは導線を張りません。** 開いても何も無い状態を作りません。
+  // **一覧（`SCREENS`）が正です。** ここへ画面の名前を書き写しません。
   it("未実装の画面へは導線を張りません", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
-    // Projects・Presets・Admin はいずれも未実装のため、移動先を持ちません。
-    expect(screen.queryByRole("link", { name: /Projects/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Presets/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Admin/ })).toBeNull();
+    for (const key of ["projects", "presets", "admin"] as const) {
+      const label = text(`nav.${key}.en`);
+      const found = screen.queryByRole("link", { name: new RegExp(label) });
+
+      expect([label, found === null]).toEqual([label, !isImplemented(key)]);
+    }
   });
 
-  it("未実装の画面の名前は表示します", () => {
+  it("実装済みの画面へは移動先を張ります", () => {
+    render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
+
+    expect(
+      screen.getByRole("link", { name: new RegExp(text("nav.projects.en")) }),
+    ).toHaveAttribute("href", screenOf("projects").path ?? "");
+  });
+
+  it("画面の名前は、実装の有無にかかわらず表示します", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
     expect(screen.getByText("Projects")).toBeVisible();

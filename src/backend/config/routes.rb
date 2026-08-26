@@ -16,6 +16,10 @@ Rails.application.routes.draw do
   # 版を付けて、画面と足並みを揃えて変えられるようにします。
   namespace :api do
     namespace :v1 do
+      # いまログインしている利用者です。**上部バーが使います。**
+      # **プラン値の判定を求めません。** `pending` の方も自分の状態を見られます。
+      resource :session, only: %i[show], controller: 'session'
+
       # 生成リクエストです（requirements.md 4.1、12.1）。
       # **作成と取り出しだけです。** 途中で書き換える経路を作りません。
       resources :prompt_requests, only: %i[create show]

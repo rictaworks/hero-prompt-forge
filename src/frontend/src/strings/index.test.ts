@@ -25,6 +25,8 @@ describe("strings", () => {
       "app.wordmark",
       "nav.",
       "errors.unexpected.traceLabel",
+      // 選択肢の呼び名です。**文ではありません。**
+      "choices.",
     ];
 
     const isLabel = (path: string): boolean =>
