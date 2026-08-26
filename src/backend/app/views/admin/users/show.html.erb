@@ -1,0 +1,61 @@
+<h2><%= @user.display_name %></h2>
+
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.x_user_id') %></th><td><%= @user.x_user_id %></td></tr>
+    <tr><th><%= t('admin.headings.plan') %></th><td><%= @user.plan %></td></tr>
+    <tr>
+      <th><%= t('admin.headings.plan_checked_at') %></th>
+      <td><%= @user.plan_checked_at ? l(@user.plan_checked_at, format: :reset_at) : t('admin.labels.none') %></td>
+    </tr>
+    <tr>
+      <th><%= t('admin.headings.recheck_available_at') %></th>
+      <td><%= @user.recheck_available_at ? l(@user.recheck_available_at, format: :reset_at) : t('admin.labels.none') %></td>
+    </tr>
+  </tbody>
+</table>
+
+<%= button_to t('admin.labels.recheck'), recheck_admin_user_path(@user) %>
+
+<h3><%= t('admin.headings.quota_today') %></h3>
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.quota_day') %></th><td><%= @quota_day %></td></tr>
+    <tr>
+      <th><%= t('admin.headings.quota_status') %></th>
+      <td><%= @consumption ? @consumption.status : t('admin.labels.none') %></td>
+    </tr>
+    <tr>
+      <th><%= t('admin.headings.reset_by_admin') %></th>
+      <td><%= @consumption&.reset_by_admin ? t('admin.labels.published') : t('admin.labels.none') %></td>
+    </tr>
+  </tbody>
+</table>
+
+<%= button_to t('admin.labels.reset_quota'), reset_quota_admin_user_path(@user) %>
+
+<h3><%= t('admin.headings.admin_actions') %></h3>
+<% if @actions.empty? %>
+  <p><%= t('admin.users.no_actions') %></p>
+<% else %>
+  <table>
+    <thead>
+      <tr>
+        <th><%= t('admin.headings.occurred_at') %></th>
+        <th><%= t('admin.headings.actor') %></th>
+        <th><%= t('admin.headings.action') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @actions.each do |action| %>
+        <tr>
+          <td><%= l(action.created_at, format: :reset_at) %></td>
+          <td><%= action.actor %></td>
+          <td><%= action.action %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<p><%= link_to t('admin.labels.back'), admin_users_path %></p>

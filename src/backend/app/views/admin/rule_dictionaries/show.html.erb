@@ -1,0 +1,21 @@
+<h2><%= @dictionary.version %></h2>
+<p>
+  <%= @dictionary.published? ? t('admin.labels.published') : t('admin.labels.draft') %>
+  ／
+  <%= @dictionary.published? ? l(@dictionary.published_at, format: :reset_at) : t('admin.labels.none') %>
+</p>
+
+<% unless @dictionary.published? %>
+  <%= button_to t('admin.labels.publish'), publish_admin_rule_dictionary_path(@dictionary) %>
+<% end %>
+
+<h3><%= t('admin.headings.anti_ai_rules') %></h3>
+<pre><%= JSON.pretty_generate(@dictionary.anti_ai_rules) %></pre>
+
+<h3><%= t('admin.headings.style_spec_rules') %></h3>
+<pre><%= JSON.pretty_generate(@dictionary.style_spec_rules) %></pre>
+
+<h3><%= t('admin.headings.industry_defaults') %></h3>
+<pre><%= JSON.pretty_generate(@dictionary.industry_defaults) %></pre>
+
+<p><%= link_to t('admin.labels.back'), admin_rule_dictionaries_path %></p>

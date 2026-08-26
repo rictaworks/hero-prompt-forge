@@ -30,9 +30,15 @@ module AuthenticatesAdmin
 
   private
 
+  # **通った利用者名です。** 記録の「実施者」に使います（issue #66、#67）。
+  # **合言葉は残しません。**
+  attr_reader :admin_actor
+
   def authenticate_admin!
     authenticate_or_request_with_http_basic(REALM) do |name, password|
-      matches?(name, password)
+      matched = matches?(name, password)
+      @admin_actor = name if matched
+      matched
     end
   end
 

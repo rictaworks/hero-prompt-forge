@@ -1,0 +1,15 @@
+<%# 軸ごとの内訳です。**個人を特定できる値を渡しません。** %>
+<% if counts.blank? %>
+  <p><%= t('admin.labels.none') %></p>
+<% else %>
+  <table>
+    <tbody>
+      <% counts.sort_by { |_key, value| -value }.each do |key, value| %>
+        <tr>
+          <th><%= key %></th>
+          <td><%= value %><%= t('admin.headings.count_unit') %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

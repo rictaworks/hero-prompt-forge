@@ -1,0 +1,62 @@
+<h2><%= t('admin.headings.metrics') %></h2>
+<p><%= t('admin.metrics.description') %></p>
+<p><%= t('admin.metrics.unrecorded') %></p>
+
+<h3><%= t('admin.headings.requests_total') %></h3>
+<p><%= @summary[:requests][:total] %><%= t('admin.headings.count_unit') %></p>
+
+<h4><%= t('admin.headings.by_industry') %></h4>
+<%= render 'breakdown', counts: @summary[:requests][:by_industry] %>
+
+<h4><%= t('admin.headings.by_style_family') %></h4>
+<%= render 'breakdown', counts: @summary[:requests][:by_style_family] %>
+
+<h4><%= t('admin.headings.by_target_model') %></h4>
+<%= render 'breakdown', counts: @summary[:requests][:by_target_model] %>
+
+<h4><%= t('admin.headings.by_user') %></h4>
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.users_count') %></th><td><%= @summary[:requests][:by_user][:users] %></td></tr>
+    <tr><th><%= t('admin.headings.total') %></th><td><%= @summary[:requests][:by_user][:total] %></td></tr>
+    <tr><th><%= t('admin.headings.max') %></th><td><%= @summary[:requests][:by_user][:max] %></td></tr>
+    <tr><th><%= t('admin.headings.median') %></th><td><%= @summary[:requests][:by_user][:median] %></td></tr>
+  </tbody>
+</table>
+
+<h3><%= t('admin.headings.degraded_ratio') %></h3>
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.delivered') %></th><td><%= @summary[:degraded][:delivered] %></td></tr>
+    <tr><th><%= t('admin.headings.degraded') %></th><td><%= @summary[:degraded][:degraded] %></td></tr>
+    <tr><th><%= t('admin.headings.degraded_ratio') %></th><td><%= @summary[:degraded][:ratio] %><%= t('admin.headings.ratio_unit') %></td></tr>
+  </tbody>
+</table>
+
+<h3><%= t('admin.headings.evaluation') %></h3>
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.outputs') %></th><td><%= @summary[:evaluation][:outputs] %></td></tr>
+    <tr><th><%= t('admin.headings.notes') %></th><td><%= @summary[:evaluation][:notes] %></td></tr>
+    <tr><th><%= t('admin.headings.evaluation') %></th><td><%= @summary[:evaluation][:ratio] %><%= t('admin.headings.ratio_unit') %></td></tr>
+  </tbody>
+</table>
+
+<h4><%= t('admin.headings.by_rating') %></h4>
+<%= render 'breakdown', counts: @summary[:evaluation][:by_rating] %>
+
+<h3><%= t('admin.headings.regeneration') %></h3>
+<table>
+  <tbody>
+    <tr><th><%= t('admin.headings.projects') %></th><td><%= @summary[:regeneration][:projects] %></td></tr>
+    <tr><th><%= t('admin.headings.requests_total') %></th><td><%= @summary[:regeneration][:requests] %></td></tr>
+    <tr><th><%= t('admin.headings.regenerations') %></th><td><%= @summary[:regeneration][:regenerations] %></td></tr>
+    <tr><th><%= t('admin.headings.regeneration') %></th><td><%= @summary[:regeneration][:ratio] %><%= t('admin.headings.ratio_unit') %></td></tr>
+  </tbody>
+</table>
+
+<h3><%= t('admin.headings.quota_exhausted') %></h3>
+<p><%= @summary[:quota][:exhausted] %><%= t('admin.headings.count_unit') %></p>
+
+<h3><%= t('admin.headings.quota_reclaimed') %></h3>
+<p><%= @summary[:quota][:reclaimed] %><%= t('admin.headings.count_unit') %></p>

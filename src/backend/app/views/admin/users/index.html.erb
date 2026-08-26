@@ -1,0 +1,31 @@
+<h2><%= t('admin.headings.users') %></h2>
+<p><%= t('admin.users.description') %></p>
+
+<% if @users.empty? %>
+  <p><%= t('admin.users.empty') %></p>
+<% else %>
+  <table>
+    <thead>
+      <tr>
+        <th><%= t('admin.headings.x_user_id') %></th>
+        <th><%= t('admin.headings.display_name') %></th>
+        <th><%= t('admin.headings.plan') %></th>
+        <th><%= t('admin.headings.plan_checked_at') %></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @users.each do |user| %>
+        <tr>
+          <td><%= user.x_user_id %></td>
+          <td><%= user.display_name %></td>
+          <td><%= user.plan %></td>
+          <td>
+            <%= user.plan_checked_at ? l(user.plan_checked_at, format: :reset_at) : t('admin.labels.none') %>
+          </td>
+          <td><%= link_to t('admin.labels.show'), admin_user_path(user) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

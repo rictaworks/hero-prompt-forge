@@ -10,9 +10,20 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_27_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "admin_actions", force: :cascade do |t|
+    t.string "action", null: false, comment: "操作の種別"
+    t.string "actor", null: false, comment: "実施者（管理画面の利用者名）"
+    t.datetime "created_at", null: false
+    t.jsonb "details", default: {}, null: false, comment: "補足。秘匿値を入れません"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", comment: "対象の利用者。対象が無い操作では空です"
+    t.index ["created_at"], name: "index_admin_actions_on_created_at"
+    t.index ["user_id", "created_at"], name: "index_admin_actions_on_user_id_and_created_at"
+  end
 
   create_table "evaluation_notes", force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -292,6 +303,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_090000) do
     t.index ["x_user_id"], name: "index_users_on_x_user_id", unique: true
   end
 
+  add_foreign_key "admin_actions", "users"
   add_foreign_key "evaluation_notes", "prompt_outputs"
   add_foreign_key "presets", "users"
   add_foreign_key "projects", "users"

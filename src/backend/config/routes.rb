@@ -39,6 +39,23 @@ Rails.application.routes.draw do
   # **一般の利用者の画面（Next.js）とは入口を分けます。**
   namespace :admin do
     root to: 'dashboard#show'
+
+    # 規則辞書の編集です（issue #65）。
+    # **公開済みの版は書き換えません。** 内容を変える場合は新しい版を作ります。
+    resources :rule_dictionaries, only: %i[index show new create], path: 'rule-dictionaries' do
+      member { post :publish }
+    end
+
+    # 利用者とプラン値の管理です（issue #66）と、クォータの手動リセットです（issue #67）。
+    resources :users, only: %i[index show] do
+      member do
+        post :recheck
+        post :reset_quota, path: 'reset-quota'
+      end
+    end
+
+    # 利用状況の集計です（issue #68）。**仕様が定める軸だけを出します。**
+    resource :metrics, only: %i[show], controller: 'metrics'
   end
 
   # Rails の既定の死活確認です。**アプリが起動しているかどうかだけを見ます。**

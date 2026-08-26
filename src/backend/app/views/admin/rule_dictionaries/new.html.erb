@@ -1,0 +1,33 @@
+<h2><%= t('admin.headings.rule_dictionary_new') %></h2>
+<p><%= t('admin.rule_dictionaries.new_description') %></p>
+
+<% if @error %><p class="alert"><%= @error %></p><% end %>
+
+<%= form_with url: admin_rule_dictionaries_path, method: :post do |form| %>
+  <p>
+    <%= form.label :version, t('admin.headings.version') %><br>
+    <%= form.text_field :version, value: @version %>
+  </p>
+
+  <p><%= t('admin.rule_dictionaries.json_help') %></p>
+
+  <p>
+    <%= form.label :anti_ai_rules, t('admin.headings.anti_ai_rules') %><br>
+    <%= form.text_area :anti_ai_rules, rows: 12, cols: 100,
+                       value: JSON.pretty_generate(@dictionary.anti_ai_rules) %>
+  </p>
+  <p>
+    <%= form.label :style_spec_rules, t('admin.headings.style_spec_rules') %><br>
+    <%= form.text_area :style_spec_rules, rows: 20, cols: 100,
+                       value: JSON.pretty_generate(@dictionary.style_spec_rules) %>
+  </p>
+  <p>
+    <%= form.label :industry_defaults, t('admin.headings.industry_defaults') %><br>
+    <%= form.text_area :industry_defaults, rows: 20, cols: 100,
+                       value: JSON.pretty_generate(@dictionary.industry_defaults) %>
+  </p>
+
+  <p><%= form.submit t('admin.labels.create') %></p>
+<% end %>
+
+<p><%= link_to t('admin.labels.back'), admin_rule_dictionaries_path %></p>
