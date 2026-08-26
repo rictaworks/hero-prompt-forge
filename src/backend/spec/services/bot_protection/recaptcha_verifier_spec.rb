@@ -83,10 +83,21 @@ RSpec.describe BotProtection::RecaptchaVerifier do
       expect(a_request(:post, endpoint)).not_to have_been_made
     end
 
+    # **別の理由で緑にならないようにします**（PR #168 のレビューより）。
+    # 行動の名前と得点をそろえたうえで、`success` だけを偽にします。
     it '断られたら失敗させます' do
-      stub_verification(body: { success: false, 'error-codes': ['invalid-input-response'] })
+      stub_verification(body: { success: false, score: 0.9, action: 'generate_prompt',
+                                'error-codes': ['invalid-input-response'] })
 
       expect { verify }.to raise_error(described_class::VerificationFailedError)
+    end
+
+    it '断られた理由の種別を持ちます' do
+      stub_verification(body: { success: false, score: 0.9, action: 'generate_prompt' })
+
+      expect { verify }
+        .to raise_error(an_instance_of(described_class::VerificationFailedError)
+                          .and(having_attributes(kind: described_class::REJECTED)))
     end
 
     # **行動の名前が違えば通しません。** 他の画面で取った得点を使い回せません。
@@ -155,10 +166,49 @@ RSpec.describe BotProtection::RecaptchaVerifier do
     end
   end
 
+  # **設定の誤りは、設定の誤りとしてその場で失敗させます**
+  # （PR #168 のレビューより）。500 として利用者へ届けません。
   describe '設定' do
+    def written(values)
+      path = "tmp/recaptcha_#{values.hash.abs}.yml" # 開発者向け
+      Rails.root.join(path).write(values.to_yaml)
+      path
+    end
+
+    def sound
+      {
+        'verification_endpoint' => 'https://www.google.com/recaptcha/api/siteverify',
+        'minimum_score' => 0.5,
+        'expected_action' => 'generate_prompt',
+        'open_timeout_seconds' => 3,
+        'read_timeout_seconds' => 5,
+        'write_timeout_seconds' => 3
+      }
+    end
+
     it '項目が欠けていれば失敗させます' do
       expect { BotProtection::Settings.load(path: 'config/does_not_exist.yml') }
         .to raise_error(BotProtection::Settings::InvalidSettingsError)
+    end
+
+    it 'そろっていれば読めます' do
+      expect(BotProtection::Settings.load(path: written(sound))).to include('minimum_score' => 0.5)
+    end
+
+    {
+      '得点が文字列' => { 'minimum_score' => '0.5' },
+      '得点が範囲の外' => { 'minimum_score' => 1.5 },
+      '待つ秒数が文字列' => { 'read_timeout_seconds' => '5' },
+      '待つ秒数が 0' => { 'open_timeout_seconds' => 0 },
+      '行動の名前が空' => { 'expected_action' => '' },
+      '照合先が https ではありません' => {
+        'verification_endpoint' => 'http://www.google.com/recaptcha/api/siteverify'
+      }
+    }.each do |name, wrong|
+      it "#{name}なら失敗させます" do
+        expect { BotProtection::Settings.load(path: written(sound.merge(wrong))) }
+          .to raise_error(BotProtection::Settings::InvalidSettingsError)
+      end
     end
   end
 end

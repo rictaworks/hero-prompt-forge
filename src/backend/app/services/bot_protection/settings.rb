@@ -17,11 +17,20 @@ module BotProtection
       open_timeout_seconds read_timeout_seconds write_timeout_seconds
     ].freeze
 
+    # 待つ秒数の項目です。
+    TIMEOUT_KEYS = %w[
+      open_timeout_seconds read_timeout_seconds write_timeout_seconds
+    ].freeze
+
+    # 得点の取りうる範囲です。
+    SCORE_RANGE = (0.0..1.0)
+
     class << self
       # @return [Hash]
       def load(path: PATH)
         values = read(path)
         ensure_complete!(values, path)
+        ensure_types!(values, path)
 
         values
       end
@@ -44,6 +53,51 @@ module BotProtection
 
         raise InvalidSettingsError,
               "設定の項目が足りません: #{path} -> #{missing.inspect}" # 開発者向け
+      end
+
+      # **型と範囲まで検めます**（PR #168 のレビューより）。
+      #
+      # 得点の下限を文字列で書くと、比べる段で `ArgumentError` になり、
+      # **500 として利用者へ届きます。** 設定の誤りは、設定の誤りとして
+      # その場で失敗させます。
+      def ensure_types!(values, path)
+        ensure_score!(values, path)
+        ensure_timeouts!(values, path)
+        ensure_action!(values, path)
+        ensure_endpoint!(values, path)
+      end
+
+      def ensure_score!(values, path)
+        score = values.fetch('minimum_score')
+        return if score.is_a?(Numeric) && SCORE_RANGE.cover?(score)
+
+        raise InvalidSettingsError,
+              "得点の下限が 0.0〜1.0 の数値ではありません: #{path} -> #{score.inspect}" # 開発者向け
+      end
+
+      def ensure_timeouts!(values, path)
+        wrong = TIMEOUT_KEYS.reject do |key|
+          value = values.fetch(key)
+          value.is_a?(Numeric) && value.positive?
+        end
+        return if wrong.empty?
+
+        raise InvalidSettingsError,
+              "待つ秒数が正の数ではありません: #{path} -> #{wrong.inspect}" # 開発者向け
+      end
+
+      def ensure_action!(values, path)
+        return if values.fetch('expected_action').to_s.present?
+
+        raise InvalidSettingsError, "行動の名前が空です: #{path}" # 開発者向け
+      end
+
+      def ensure_endpoint!(values, path)
+        endpoint = values.fetch('verification_endpoint').to_s
+        return if endpoint.start_with?('https://')
+
+        raise InvalidSettingsError,
+              "照合先が https ではありません: #{path} -> #{endpoint.inspect}" # 開発者向け
       end
     end
   end

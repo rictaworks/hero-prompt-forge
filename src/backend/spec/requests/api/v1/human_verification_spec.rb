@@ -3,7 +3,7 @@
 require 'rails_helper'
 require 'webmock/rspec'
 
-# 人の操作であることの確かめです（requirements.md 5.1、issue #61）。
+# 人の操作であることの確かめです（requirements.md 5.2、issue #61）。
 RSpec.describe '人の操作の確かめ' do # rubocop:disable RSpec/DescribeClass
   let(:user) { User.create!(x_user_id: '9090909090', display_name: 'ゆい', plan: 'active') }
   let(:project) { Project.create!(user: user, industry: 'saas', style_family: 'photoreal') }
@@ -115,6 +115,47 @@ RSpec.describe '人の操作の確かめ' do # rubocop:disable RSpec/DescribeCla
 
       expect { post_request(token: 'token-value') } # 開発者向け
         .to raise_error(VerifiesHumans::MissingConfigurationError)
+    end
+  end
+
+  # **分かれ方は、環境だけで決まります。**
+  #
+  # 要求側の値（本文・見出し・クッキー）で切り替わってはなりません。
+  # **この負のテストが無いと、抜け道が入っても誰も気づけません**
+  # （PR #168 のレビューで、抜け道を入れても 37 例すべてが緑のままでした）。
+  describe '要求側の値で飛ばせないこと' do
+    before do
+      allow(AppEnvironment).to receive(:production?).and_return(true)
+      with_key(secret)
+    end
+
+    it '本文の項目では飛ばせません' do
+      post '/api/v1/prompt_requests',
+           params: { project_id: project.id, inputs: input_fields,
+                     skip_recaptcha: true, recaptcha: 'ok' }, # 開発者向け
+           as: :json
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    [{ 'X-Skip-Recaptcha' => 'true' },
+     { 'X-App-Env' => 'development' },
+     { 'APP_ENV' => 'development' }].each do |headers|
+      it "見出し #{headers.keys.first} では飛ばせません" do
+        post '/api/v1/prompt_requests',
+             params: { project_id: project.id, inputs: input_fields },
+             as: :json, headers: headers
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    it 'クッキーでは飛ばせません' do
+      cookies[:skip_recaptcha] = 'true' # 開発者向け
+
+      post_request
+
+      expect(response).to have_http_status(:forbidden)
     end
   end
 

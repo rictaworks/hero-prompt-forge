@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# 人の操作であることを確かめます（requirements.md 5.1、issue #61）。
+# 人の操作であることを確かめます（requirements.md 5.2、issue #61）。
 #
 # **Bot 対策を自作しません**（CLAUDE.md）。判定は reCAPTCHA へ委ねます。
 #

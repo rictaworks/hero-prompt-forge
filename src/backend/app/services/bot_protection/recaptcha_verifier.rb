@@ -3,7 +3,7 @@
 require 'net/http'
 
 module BotProtection
-  # reCAPTCHA v3 の照合です（requirements.md 5.1、issue #61）。
+  # reCAPTCHA v3 の照合です（requirements.md 5.2、issue #61）。
   #
   # **Bot 対策を自作しません**（CLAUDE.md）。得点の判定を Google へ委ねます。
   #
@@ -53,9 +53,16 @@ module BotProtection
       @settings = settings
     end
 
+    # 秘密鍵を読みます。**入口を 1 つにします**（PR #168 のレビューより）。
+    # 入口が 2 つあると、差し替えの取りこぼしが起きます。
+    # @return [String, nil]
+    def self.secret_key
+      ENV.fetch(SECRET_KEY_VARIABLE, nil).presence
+    end
+
     # 秘密鍵が用意されているかどうかを返します。
     def self.configured?
-      ENV[SECRET_KEY_VARIABLE].present?
+      secret_key.present?
     end
 
     # 照合します。通らなければ例外にします。
@@ -95,8 +102,8 @@ module BotProtection
     end
 
     def secret_key
-      key = ENV.fetch(SECRET_KEY_VARIABLE, nil)
-      return key if key.present?
+      key = self.class.secret_key
+      return key if key
 
       raise MissingSecretKeyError,
             "環境変数 #{SECRET_KEY_VARIABLE} が設定されていません。" # 開発者向け
