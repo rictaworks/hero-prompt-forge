@@ -126,5 +126,16 @@ RSpec.describe Project do
         expect(project).not_to be_valid
       end
     end
+
+    # **連想配列以外を保存させません**（PR #158 のレビューより）。
+    # 検証の中で例外が出ると、「値が正しくない」ではなく
+    # 「保存の仕組みが壊れた」ように見えます。
+    ['文字列です', [], 1].each do |value|
+      it "ブランドの設定が「#{value.inspect}」なら保存できません" do
+        project = build_project(brand_settings: value)
+
+        expect(project).not_to be_valid
+      end
+    end
   end
 end

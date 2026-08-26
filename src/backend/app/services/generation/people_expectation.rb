@@ -54,25 +54,30 @@ module Generation
     # 上書きの値が選択肢の外の場合に投げます。
     class InvalidOverrideError < StandardError; end
 
-    def initialize(dictionary:)
+    # @param dictionary [RuleDictionary] 業種の既定値を持ちます
+    # @param override [String, nil] プロジェクト単位の上書きです
+    #
+    # **上書きは、組み立ての時点で検めます。** 使うときに検めると、
+    # 避ける構図を持たないスタイル系統では検めが走らず、選択肢の外の値が
+    # 通ります（PR #158 のレビューより）。
+    def initialize(dictionary:, override: nil)
       @dictionary = dictionary
+      @override = override
+      ensure_override! unless override.nil?
     end
 
     # 人物が写る見込みかどうかを返します。
-    #
-    # @param industry [String] 業種です
-    # @param override [String, nil] プロジェクト単位の上書きです
     # @return [Boolean]
-    def expected?(industry, override: nil)
-      decide(industry, override)[:expected]
+    def expected?(industry)
+      decide(industry)[:expected]
     end
 
     # 見込みと、その出どころを返します。
     #
     # **どちらを使ったかを記録へ残すために使います。**
-    # @return [Hash] `:expected` と `:source` を持ちます
-    def decide(industry, override = nil)
-      return from_override(override) unless override.nil?
+    # @return [Hash] `:expected` ・ `:source` ・ `:value` を持ちます
+    def decide(industry)
+      return from_override unless override.nil?
 
       value = dictionary.defaults_for(industry)[PEOPLE_KEY]
       ensure_choice!(industry, value)
@@ -82,17 +87,19 @@ module Generation
 
     private
 
-    attr_reader :dictionary
+    attr_reader :override, :dictionary
+
+    def from_override
+      { expected: override == EXPECTED, source: FROM_PROJECT, value: override }
+    end
 
     # **上書きの値が選択肢の外なら、その場で失敗させます。**
     # 既定へ寄せると、書き間違えた上書きが黙って無視されます。
-    def from_override(override)
-      unless CHOICES.include?(override)
-        raise InvalidOverrideError,
-              "人物の見込みの上書きが選べない値です: #{override.inspect}" # 開発者向け
-      end
+    def ensure_override!
+      return if CHOICES.include?(override)
 
-      { expected: override == EXPECTED, source: FROM_PROJECT, value: override }
+      raise InvalidOverrideError,
+            "人物の見込みの上書きが選べない値です: #{override.class}" # 開発者向け
     end
 
     # **定義が無い場合も、選択肢の外の値も、その場で失敗させます。**

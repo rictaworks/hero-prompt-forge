@@ -529,9 +529,12 @@ RSpec.describe Generation::StyleSpec do
       end
     end
 
+    # **上書きは、利用者の入力ではなくプロジェクトの設定です。**
+    # 明示の引数で渡します（PR #158 のレビューより）。
     def overridden(style_family, industry:, people:)
-      spec.apply(Generation::Draft.new(input: { style_family: style_family,
-                                                industry: industry, people: people }))
+      described_class.new(dictionary: dictionary, people_override: people)
+                     .apply(Generation::Draft.new(input: { style_family: style_family,
+                                                           industry: industry }))
     end
 
     # EC でも、アパレル・コスメはモデル着用のヒーローが主流です。
@@ -566,11 +569,18 @@ RSpec.describe Generation::StyleSpec do
     end
 
     # **選択肢の外の値は、その場で失敗させます。**
+    # **組み立ての時点で検めます。** 使うときに検めると、避ける構図を持たない
+    # スタイル系統では検めが走らず、選択肢の外の値が通ります。
     ['maybe', '', 'Expected', 1].each do |value|
       it "上書きが「#{value.inspect}」なら失敗します" do
-        expect { overridden('photoreal', industry: 'saas', people: value) }
+        expect { described_class.new(dictionary: dictionary, people_override: value) }
           .to raise_error(Generation::PeopleExpectation::InvalidOverrideError)
       end
+    end
+
+    it '避ける構図を持たないスタイル系統でも、選択肢の外の値は失敗します' do
+      expect { described_class.new(dictionary: dictionary, people_override: 'maybe') }
+        .to raise_error(Generation::PeopleExpectation::InvalidOverrideError)
     end
   end
 end

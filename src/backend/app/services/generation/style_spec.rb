@@ -80,11 +80,17 @@ module Generation
     SKIPPED_BECAUSE_PEOPLE_UNLIKELY = :people_unlikely
     SKIPPED_BECAUSE_STYLE_HAS_NONE = :style_has_none
 
-    def initialize(dictionary:)
+    # @param dictionary [RuleDictionary] 規則辞書です
+    # @param people_override [String, nil] 人物の見込みの上書きです（issue #147）
+    #
+    # **上書きは、利用者の入力ではなくプロジェクトの設定です。**
+    # 下書きの入力（`Draft#input`）は利用者由来の器ですので、そこへ混ぜません
+    # （PR #158 のレビューより）。**明示の引数で受け取ります。**
+    def initialize(dictionary:, people_override: nil)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
       @rules = StyleRules.new(dictionary)
-      @people = PeopleExpectation.new(dictionary: dictionary)
+      @people = PeopleExpectation.new(dictionary: dictionary, override: people_override)
     end
 
     # スタイル系統の指示を足した下書きを返します。
@@ -138,22 +144,13 @@ module Generation
       compositions = rules.person_safety_for(style_family)
       return { compositions: [], reason: SKIPPED_BECAUSE_STYLE_HAS_NONE } if compositions.empty?
 
-      decided = people.decide(industry_of(draft), people_override(draft))
+      decided = people.decide(industry_of(draft))
       unless decided[:expected]
         return { compositions: [], reason: SKIPPED_BECAUSE_PEOPLE_UNLIKELY,
                  industry: industry_of(draft), people_source: decided[:source] }
       end
 
       { compositions: compositions.first(1), reason: nil, people_source: decided[:source] }
-    end
-
-    # プロジェクト単位の上書きです（issue #147）。
-    #
-    # **規則辞書は全利用者で共有される単一のマスタです。** 1 社のために編集すると、
-    # 全社の出力が変わります。**業種の中の個別事情は、プロジェクトの側で持ちます。**
-    # 上書きが無ければ、これまでどおり業種の既定値を使います。
-    def people_override(draft)
-      draft.input.is_a?(Hash) ? draft.input[:people] : nil
     end
 
     # **業種は必須の入力です。** 欠けたまま進むと、人物の見込みを引けません。
