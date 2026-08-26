@@ -14,12 +14,50 @@ class Project < ApplicationRecord
   # スタイル系統です。requirements.md 2 の4分類に対応します。
   STYLE_FAMILIES = %w[photoreal illustration three_d abstract].freeze
 
+  # ブランド設定のうち、人物が写る見込みの上書きの鍵です（issue #147）。
+  #
+  # **規則辞書は全利用者で共有される単一のマスタです。** 1 社のために編集すると、
+  # 全社の出力が変わります。**業種の中の個別事情は、ここで持ちます。**
+  #
+  #   EC でも、アパレル・コスメはモデル着用のヒーローが主流です
+  #   飲食でも、料理単体のヒーローと、シェフの手元のヒーローがあります
+  #   製造でも、製品だけを写したい場合があります
+  PEOPLE_KEY = 'people'
+
   belongs_to :user
 
   validates :industry, presence: true, inclusion: { in: INDUSTRIES }
   validates :style_family, presence: true, inclusion: { in: STYLE_FAMILIES }
   validates :name, length: { maximum: 100 }, allow_nil: true
+  validate :brand_settings_is_a_hash
+  validate :people_override_is_a_choice
 
   scope :for_user, ->(user) { where(user: user) }
   scope :recent_first, -> { order(created_at: :desc) }
+
+  # 人物が写る見込みの上書きです。**指定が無ければ `nil` です。**
+  # @return [String, nil]
+  def people_expectation
+    brand_settings.is_a?(Hash) ? brand_settings[PEOPLE_KEY] : nil
+  end
+
+  private
+
+  # **連想配列以外を保存させません。** 検証の中で例外が出ると、
+  # 「値が正しくない」ではなく「保存の仕組みが壊れた」ように見えます
+  # （PR #158 のレビューより）。
+  def brand_settings_is_a_hash
+    return if brand_settings.is_a?(Hash)
+
+    errors.add(:brand_settings, :invalid)
+  end
+
+  # **選択肢の外の値を保存させません。** 書き間違えた上書きが黙って無視されると、
+  # 利用者は「指定したのに反映されない」状態になります。
+  def people_override_is_a_choice
+    value = people_expectation
+    return if value.nil? || Generation::PeopleExpectation::CHOICES.include?(value)
+
+    errors.add(:brand_settings, :inclusion)
+  end
 end

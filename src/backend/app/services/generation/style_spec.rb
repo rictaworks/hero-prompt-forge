@@ -80,11 +80,17 @@ module Generation
     SKIPPED_BECAUSE_PEOPLE_UNLIKELY = :people_unlikely
     SKIPPED_BECAUSE_STYLE_HAS_NONE = :style_has_none
 
-    def initialize(dictionary:)
+    # @param dictionary [RuleDictionary] 規則辞書です
+    # @param people_override [String, nil] 人物の見込みの上書きです（issue #147）
+    #
+    # **上書きは、利用者の入力ではなくプロジェクトの設定です。**
+    # 下書きの入力（`Draft#input`）は利用者由来の器ですので、そこへ混ぜません
+    # （PR #158 のレビューより）。**明示の引数で受け取ります。**
+    def initialize(dictionary:, people_override: nil)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
 
       @rules = StyleRules.new(dictionary)
-      @people = PeopleExpectation.new(dictionary: dictionary)
+      @people = PeopleExpectation.new(dictionary: dictionary, override: people_override)
     end
 
     # スタイル系統の指示を足した下書きを返します。
@@ -138,12 +144,13 @@ module Generation
       compositions = rules.person_safety_for(style_family)
       return { compositions: [], reason: SKIPPED_BECAUSE_STYLE_HAS_NONE } if compositions.empty?
 
-      unless people.expected?(industry_of(draft))
+      decided = people.decide(industry_of(draft))
+      unless decided[:expected]
         return { compositions: [], reason: SKIPPED_BECAUSE_PEOPLE_UNLIKELY,
-                 industry: industry_of(draft) }
+                 industry: industry_of(draft), people_source: decided[:source] }
       end
 
-      { compositions: compositions.first(1), reason: nil }
+      { compositions: compositions.first(1), reason: nil, people_source: decided[:source] }
     end
 
     # **業種は必須の入力です。** 欠けたまま進むと、人物の見込みを引けません。
@@ -162,7 +169,8 @@ module Generation
                  style_family: style_family,
                  specifications: specifications.size,
                  person_safety: decision[:compositions].size,
-                 person_safety_skipped: decision[:reason]) do
+                 person_safety_skipped: decision[:reason],
+                 people_source: decision[:people_source]) do
         applied(draft, specifications, decision)
       end
     end
@@ -190,11 +198,21 @@ module Generation
       return applied_note(decision) if decision[:compositions].any?
 
       note = { kind: PERSON_SAFETY_SKIPPED_NOTE_KIND, reason: decision[:reason] }
-      decision[:industry] ? note.merge(industry: decision[:industry]) : note
+      note = note.merge(industry: decision[:industry]) if decision[:industry]
+      with_source(note, decision)
     end
 
     def applied_note(decision)
-      { kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] }
+      with_source({ kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] },
+                  decision)
+    end
+
+    # **どこから引いた見込みかを残します**（issue #147）。
+    # プロジェクトで上書きしたのか、業種の既定値なのかが分かります。
+    def with_source(note, decision)
+      return note if decision[:people_source].nil?
+
+      note.merge(people_source: decision[:people_source])
     end
 
     # **スタイル系統は必須の入力です。** 欠けたまま進むと、どの仕様を当てるか
