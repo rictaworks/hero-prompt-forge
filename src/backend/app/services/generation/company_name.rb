@@ -15,10 +15,12 @@ module Generation
   # その形では、「みのり」「ものづくり研究所」のように **「の」が語中にある名前**が
   # 最初の「の」で切れます（PR #157 のレビューで実測されました）。
   class CompanyName
-    # @param definition [Hash] 助詞と、会社そのものを指さない語の一覧です
+    # @param definition [Hash] 助詞と、語の一覧です
     def initialize(definition)
       @particle = definition.fetch(ProperNounRules::ATTRIBUTE_PARTICLE_KEY)
       @attribute_words = definition.fetch(ProperNounRules::ATTRIBUTE_WORDS_KEY)
+      @non_name_words = definition.fetch(ProperNounRules::NON_NAME_WORDS_KEY)
+      @particles = definition.fetch(ProperNounRules::PARTICLES_KEY)
     end
 
     # 末尾の「の◯◯」を落とした名前を返します。
@@ -37,12 +39,25 @@ module Generation
         trimmed = trimmed[0..-(particle.length + word.length + 1)]
       end
 
-      trimmed.empty? ? nil : trimmed
+      named?(trimmed) ? trimmed : nil
     end
 
     private
 
-    attr_reader :particle, :attribute_words
+    attr_reader :particle, :attribute_words, :non_name_words, :particles
+
+    # 会社名として扱える形かどうかを返します。
+    #
+    # **助詞かどうかを、手がかりの側で決めません**（PR #157 の 3 回目のレビューより）。
+    # 「へいわ」「よりみち」「からだ工房」「やまと」「このは」のように、
+    # **助詞と同じ字で始まる名前・終わる名前がふつうにあります。**
+    # 拾ったあとで、会社名でない形だけを落とします。
+    def named?(name)
+      return false if name.empty?
+      return false if particles.include?(name)
+
+      non_name_words.none? { |word| name.start_with?(word) || name.include?(word) }
+    end
 
     # 末尾に付いている、会社そのものを指さない語です。**無ければ空です。**
     def trailing_attribute(name)

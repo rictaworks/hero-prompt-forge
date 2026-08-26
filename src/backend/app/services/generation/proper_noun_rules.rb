@@ -16,6 +16,8 @@ module Generation
     ATTRIBUTE_WORD_FORMAT = /\A[ぁ-ゖァ-ヴー一-龥]{1,10}\z/
     ATTRIBUTE_WORDS_KEY = 'company_attribute_words'
     ATTRIBUTE_PARTICLE_KEY = 'company_attribute_particle'
+    NON_NAME_WORDS_KEY = 'company_non_name_words'
+    PARTICLES_KEY = 'company_particles'
 
     class << self
       # @return [Array<Hash>]
@@ -43,7 +45,20 @@ module Generation
         particle = loaded[ATTRIBUTE_PARTICLE_KEY]
         ensure_particle!(particle, path)
 
-        { ATTRIBUTE_PARTICLE_KEY => particle, ATTRIBUTE_WORDS_KEY => words }.freeze
+        { ATTRIBUTE_PARTICLE_KEY => particle,
+          ATTRIBUTE_WORDS_KEY => words,
+          NON_NAME_WORDS_KEY => list_of(loaded, NON_NAME_WORDS_KEY, path),
+          PARTICLES_KEY => list_of(loaded, PARTICLES_KEY, path) }.freeze
+      end
+
+      # **語の一覧を検めます。** 空の語や記号を含む語が混ざると、
+      # 会社名かどうかの判定が静かに壊れます。
+      def list_of(loaded, key, path)
+        words = loaded[key]
+        return words.freeze if words.is_a?(Array) && words.any? &&
+                               words.all? { |word| word.is_a?(String) && word.match?(ATTRIBUTE_WORD_FORMAT) }
+
+        raise InvalidDefinitionError, "語の一覧が読めません: #{key} (#{path})" # 開発者向け
       end
 
       # **名前と語をつなぐ助詞です。** 1 文字のかなだけを認めます。
