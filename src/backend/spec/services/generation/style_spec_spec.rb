@@ -259,6 +259,47 @@ RSpec.describe Generation::StyleSpec do
         expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
         expect(note[:industry]).to eq('ecommerce')
       end
+
+      it '理由が「業種の見込み」であることが分かります' do
+        note = without_people('photoreal').notes.first
+
+        expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_PEOPLE_UNLIKELY)
+      end
+    end
+
+    # **理由を分けます**（PR #145 のレビューより）。
+    # 業種が「写る見込み」でも、スタイル系統に定義が無ければ当てません。
+    # そのとき業種を理由にしたノートを残すと、読み手を誤らせます。
+    describe '避ける構図の定義が無いスタイル系統' do
+      it '構図を足しません' do
+        expect(applied('illustration').main_terms)
+          .not_to include('back view of the subject')
+      end
+
+      it '理由が「スタイル系統に定義が無い」ことが分かります' do
+        note = applied('illustration').notes.first
+
+        expect(note[:kind]).to eq(described_class::PERSON_SAFETY_SKIPPED_NOTE_KIND)
+        expect(note[:reason]).to eq(described_class::SKIPPED_BECAUSE_STYLE_HAS_NONE)
+      end
+
+      it '業種を理由にしません' do
+        note = applied('illustration').notes.first
+
+        expect(note).not_to have_key(:industry)
+      end
+
+      # **業種の見込みを引きません。** 規則辞書に見込みが無い場合でも、
+      # 定義の無い系統では止まりません。影響の範囲を実写系に抑えます。
+      it '規則辞書に見込みが無くても、定義の無い系統では止まりません' do
+        broken = RuleDictionary.create!(
+          version: 'vspec.people-none', style_spec_rules: style_spec_rules,
+          industry_defaults: { 'saas' => { 'tone' => 'trust' } }
+        )
+
+        expect { described_class.new(dictionary: broken).apply(draft_for('illustration')) }
+          .not_to raise_error
+      end
     end
 
     it '業種の見込みが選べない値なら失敗します' do

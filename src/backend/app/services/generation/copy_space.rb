@@ -28,6 +28,9 @@ module Generation
     # 下書きにアスペクト比が入っていない場合に投げます。
     class MissingAspectRatioError < StandardError; end
 
+    # すでにコピースペースを規定した下書きへ、重ねて当てようとした場合に投げます。
+    class AlreadyReservedError < StandardError; end
+
     # 定義が読めない、または内容が足りない場合に投げます。
     InvalidDefinitionError = CopySpaceRules::InvalidDefinitionError
 
@@ -38,9 +41,14 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :copy_space_reserved
 
+    # 余白の指定に必ず含まれる語です。素材が残っているかを見分けます。
+    # `config/copy_space_rules.yml` の `reserved` は、いずれもこの語を含みます。
+    RESERVED_MARK = 'copy space'
+
     # コピースペースの指示を足した下書きを返します。
     # @return [Draft]
     def apply(draft)
+      ensure_not_reserved!(draft)
       position = position_of(draft)
       aspect_ratio = aspect_ratio_of(draft)
       instructions = CopySpaceRules.instructions_for(position)
@@ -53,11 +61,30 @@ module Generation
     #
     # **出力の直前に確かめるための入口です。** 4.2 は「コピースペースを
     # 持たないヒーローイメージ用プロンプトは出力しない」と定めています。
+    #
+    # **ノートではなく、実際の素材を見ます。** ノートは後段で消えませんが、
+    # 素材は消えます。アンチAIルック規則の排除する語に当たれば、余白の指定が
+    # 丸ごと落ちます。**規則辞書は管理画面から人が編集するデータですので、
+    # 巻き込みは起こり得ます**（PR #145 のレビューで実測されました）。
+    #
+    # requirements.md 4.1 の 5 は、コピースペースの確保を最上位に置きます。
+    # **最上位の指定が下位の規則で落ちること自体を防ぐのは、矛盾解決
+    # （issue #43）と組み立ての段（issue #146）の受け持ちです。**
+    # ここは、落ちた事実を見逃さないための最後の関所です。
     def self.reserved?(draft)
-      draft.notes.any? { |note| note[:kind] == NOTE_KIND }
+      draft.main_terms.any? { |term| term.include?(RESERVED_MARK) }
     end
 
     private
+
+    # **2 回当てません。** 位置が違えば左右の余白指定が同居し、
+    # どちらへ文字を置く絵なのか決まらなくなります。
+    def ensure_not_reserved!(draft)
+      return unless draft.notes.any? { |note| note[:kind] == NOTE_KIND }
+
+      raise AlreadyReservedError,
+            'コピースペースはすでに規定されています。' # 開発者向け
+    end
 
     def traced(draft, position, aspect_ratio, instructions)
       Trace.step('generation.copy_space_applied',
@@ -74,6 +101,10 @@ module Generation
     # **コピースペース位置は必ず決まっています。** 入力の正規化が既定値
     # （左）で補うため、ここへ届かないのは組み立ての誤りです。既定へ寄せず、
     # その場で失敗させます。寄せると、指定と違う位置に余白ができます。
+    #
+    # **鍵は記号（Symbol）で受け取ります。** 入力の正規化が記号で返すためです。
+    # データベースの jsonb から読み直した形（鍵が文字列）をそのまま渡すと
+    # 失敗します。**組み立ての段（issue #146）で、鍵の形をそろえてください。**
     def position_of(draft)
       value = draft.input.is_a?(Hash) ? draft.input[:copy_space_position] : nil
       return value if value.is_a?(String) && !value.strip.empty?

@@ -58,8 +58,19 @@ module Generation
 
     # ノートに残す印です。文言ではなく記号で持ちます。
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
-    # 人物が写らない見込みのため、構図を当てなかったことを残す印です。
+    # 構図を当てなかったことを残す印です。**理由を添えます。**
     PERSON_SAFETY_SKIPPED_NOTE_KIND = :person_safety_skipped
+
+    # 当てなかった理由です。
+    #
+    #   people_unlikely : その業種では人物が写らない見込みです
+    #   style_has_none  : そのスタイル系統に、避ける構図の定義がありません
+    #
+    # **理由を分けます。** 一緒にすると、業種が「写る見込み」なのに
+    # 業種を理由にしたかのようなノートが残ります（PR #145 のレビューより）。
+    # アートディレクションノート（issue #51）は、これをそのまま利用者へ見せます。
+    SKIPPED_BECAUSE_PEOPLE_UNLIKELY = :people_unlikely
+    SKIPPED_BECAUSE_STYLE_HAS_NONE = :style_has_none
 
     def initialize(dictionary:)
       raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
@@ -76,7 +87,7 @@ module Generation
 
       traced(draft, style_family,
              rules.specifications_for(style_family),
-             chosen_safety(draft, style_family))
+             safety_decision(draft, style_family))
     end
 
     private
@@ -96,14 +107,24 @@ module Generation
             "別の版の規則は重ねられません: #{applied_version} -> #{version}" # 開発者向け
     end
 
-    # 人物が写る見込みのときだけ、避ける構図を 1 つ選びます。
+    # 避ける構図を当てるかどうかを決め、理由とともに返します。
     #
-    # **見込みが無ければ空を返します。** 人物のいないヒーローに人物を
-    # 呼び込まないためです。
-    def chosen_safety(draft, style_family)
-      return [] unless people.expected?(industry_of(draft))
+    # **スタイル系統の定義を先に見ます。** 定義が無い系統（イラスト・3D・抽象）で
+    # 業種の見込みを引くと、規則辞書に見込みが無いときに、実写系に限らず
+    # すべての生成が止まります。影響の範囲を、定義のある系統だけに抑えます
+    # （PR #145 のレビューより）。
+    #
+    # **人物のいないヒーローに人物を呼び込みません。**
+    def safety_decision(draft, style_family)
+      compositions = rules.person_safety_for(style_family)
+      return { compositions: [], reason: SKIPPED_BECAUSE_STYLE_HAS_NONE } if compositions.empty?
 
-      rules.person_safety_for(style_family).first(1)
+      unless people.expected?(industry_of(draft))
+        return { compositions: [], reason: SKIPPED_BECAUSE_PEOPLE_UNLIKELY,
+                 industry: industry_of(draft) }
+      end
+
+      { compositions: compositions.first(1), reason: nil }
     end
 
     # **業種は必須の入力です。** 欠けたまま進むと、人物の見込みを引けません。
@@ -116,33 +137,39 @@ module Generation
     end
 
     # 何を、どの版で、いくつ足したかを記録へ残します。
-    def traced(draft, style_family, specifications, safety)
+    def traced(draft, style_family, specifications, decision)
       Trace.step('generation.style_spec_applied',
                  dictionary_version: version,
                  style_family: style_family,
                  specifications: specifications.size,
-                 person_safety: safety.size) do
-        applied(draft, specifications, safety)
+                 person_safety: decision[:compositions].size,
+                 person_safety_skipped: decision[:reason]) do
+        applied(draft, specifications, decision)
       end
     end
 
     # **適用した版を下書きへ残します。** どの版の仕様化規則で作ったかを、
     # あとから追えるようにするためです（requirements.md 7.2）。
-    def applied(draft, specifications, safety)
+    def applied(draft, specifications, decision)
       draft.add(
-        main_terms: specifications + safety,
-        notes: [safety_note(draft, safety)],
+        main_terms: specifications + decision[:compositions],
+        notes: [safety_note(decision)],
         dictionary_version: version
       )
     end
 
     # **当てた場合も、当てなかった場合も、ノートへ残します。**
     # 当てなかった事実が残らないと、「なぜ人物の構図が入っていないのか」を
-    # あとから説明できません。
-    def safety_note(draft, safety)
-      return { kind: PERSON_SAFETY_NOTE_KIND, compositions: safety } if safety.any?
+    # あとから説明できません。**理由も添えます。**
+    def safety_note(decision)
+      return applied_note(decision) if decision[:compositions].any?
 
-      { kind: PERSON_SAFETY_SKIPPED_NOTE_KIND, industry: industry_of(draft) }
+      note = { kind: PERSON_SAFETY_SKIPPED_NOTE_KIND, reason: decision[:reason] }
+      decision[:industry] ? note.merge(industry: decision[:industry]) : note
+    end
+
+    def applied_note(decision)
+      { kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] }
     end
 
     # **スタイル系統は必須の入力です。** 欠けたまま進むと、どの仕様を当てるか

@@ -38,20 +38,44 @@ RSpec.describe Generation::CopySpace do
     it '確保していない下書きは、確保済みと見なしません' do
       expect(described_class.reserved?(draft_for)).to be(false)
     end
+
+    # **ノートではなく、実際の素材を見ます**（PR #145 のレビューより）。
+    # ノートは後段で消えませんが、素材は消えます。
+    it '余白の素材が後段で落ちたら、確保済みと見なしません' do
+      reserved = applied
+      without_terms = reserved.replace(
+        main_terms: reserved.main_terms.grep_v(/copy space/)
+      )
+
+      expect(described_class.reserved?(without_terms)).to be(false)
+    end
+
+    it 'ノートだけが残っていても、確保済みと見なしません' do
+      only_note = draft_for.add(notes: [{ kind: described_class::NOTE_KIND }])
+
+      expect(described_class.reserved?(only_note)).to be(false)
+    end
+
+    # **2 回当てません。** 位置が違えば左右の余白指定が同居します。
+    it '重ねて当てようとすると失敗します' do
+      once = applied
+
+      expect { copy_space.apply(once) }.to raise_error(described_class::AlreadyReservedError)
+    end
   end
 
   # **被写体と視線誘導が余白側と競合しない配置**（requirements.md 4.1 の 4）。
   describe '被写体と視線誘導' do
-    it '左に余白なら、被写体を右へ寄せます' do
+    it '左に余白なら、被写体を右上の交点へ置きます' do
       terms = applied(position: 'left').main_terms
 
-      expect(terms).to include(a_string_including('right third intersection'))
+      expect(terms).to include(a_string_including('upper right intersection'))
     end
 
-    it '右に余白なら、被写体を左へ寄せます' do
+    it '右に余白なら、被写体を左上の交点へ置きます' do
       terms = applied(position: 'right').main_terms
 
-      expect(terms).to include(a_string_including('left third intersection'))
+      expect(terms).to include(a_string_including('upper left intersection'))
     end
 
     it '下中央に余白なら、被写体を上へ寄せます' do
@@ -60,22 +84,26 @@ RSpec.describe Generation::CopySpace do
       expect(terms).to include(a_string_including('upper third line'))
     end
 
-    it '視線を余白側へ導きます' do
+    # **肯定形で書きます。** 生成モデルは打ち消しの解釈が弱く、
+    # 「余白へ入り込まない」は「入り込んだ絵」を呼び込みかねません。
+    it '被写体の収まる範囲を、肯定形で指定します' do
       terms = applied(position: 'left').main_terms
 
-      expect(terms).to include(a_string_including('oriented toward the left'))
+      expect(terms).to include(a_string_including('contained within the right two thirds'))
     end
 
-    it '視線誘導が余白へ入り込まないことを明示します' do
-      terms = applied(position: 'left').main_terms
+    # **下中央だけは、視線の考え方が変わります。**
+    # 下を向かせるとうつむいた絵になります。
+    it '下中央に余白なら、視線を水平から遠景へ向けます' do
+      terms = applied(position: 'bottom_center').main_terms
 
-      expect(terms).to include(a_string_including('without extending into it'))
+      expect(terms).to include(a_string_including('looking level toward the far distance'))
     end
 
     it '余白の帯を静かに保ちます' do
       terms = applied(position: 'left').main_terms
 
-      expect(terms).to include(a_string_including('free of competing detail'))
+      expect(terms).to include(a_string_including('even low contrast surface'))
     end
 
     it '三分割構図を指定します' do
@@ -105,10 +133,16 @@ RSpec.describe Generation::CopySpace do
       expect(terms).to all(satisfy { |term| term.exclude?(' and ') })
     end
 
+    # **行頭だけを見ると、文中の打ち消しを通します。**
+    # 直す前の検査は `without extending into it` を通していました
+    # （PR #145 のレビューより）。語の切れ目で、素材のどこにあっても見ます。
     it '打ち消しの言い回しを作りません' do
-      terms = applied.main_terms
+      negations = /(?<![a-z])(no|not|without|free of|avoid|never|except)(?![a-z])/
 
-      expect(terms).to all(satisfy { |term| !term.match?(/\A(no|not|without) /) })
+      Generation::InputChoices::COPY_SPACE_POSITIONS.each do |position|
+        expect(applied(position: position).main_terms)
+          .to all(satisfy { |term| !term.match?(negations) })
+      end
     end
 
     it '日本語の素材を作りません' do

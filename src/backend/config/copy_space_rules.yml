@@ -15,27 +15,37 @@
 #
 #   reserved   : 余白そのものの指定です
 #   subject    : 被写体を置く場所です。余白と重ならない側へ寄せます
-#   gaze       : 視線誘導です。**余白へ入り込まない形で余白側へ導きます**
+#   gaze       : 被写体の収まりと視線です。**肯定形で書きます**
 #   restraint  : 余白側を静かに保つ指定です。文字の可読性を守ります
 #
 # **1 件へ 2 つの性質を書きません。** アンチAIルック規則が片方の語に
 # 当たると、その指示が丸ごと落ちます（PR #135 のレビューより）。
+#
+# **打ち消しの言い回しを書きません。** 生成モデルは打ち消しの解釈が弱く、
+# `without extending into it` は「余白へ入り込んだ絵」を呼び込みかねません
+# （PR #145 のレビューより）。収めたい範囲を肯定形で書きます。
+#
+# **三分割の交点は、高さまで書きます。** 「右の交点」は上下に 2 つあり、
+# 位置が定まりません。
+#
+# **下中央に余白を空ける場合は、視線の考え方が変わります。** 下を向かせると
+# うつむいた絵になります。水平か遠景へ向けて、下三分の一を空けます。
 positions:
   left:
     reserved: clear copy space across the left third of the frame
-    subject: the main subject positioned on the right third intersection of a rule of thirds grid
-    gaze: the subject oriented toward the left side without extending into it
-    restraint: the left third kept free of competing detail
+    subject: the main subject placed at the upper right intersection of a rule of thirds grid
+    gaze: the subject contained within the right two thirds of the frame
+    restraint: the left third rendered as an even low contrast surface
   right:
     reserved: clear copy space across the right third of the frame
-    subject: the main subject positioned on the left third intersection of a rule of thirds grid
-    gaze: the subject oriented toward the right side without extending into it
-    restraint: the right third kept free of competing detail
+    subject: the main subject placed at the upper left intersection of a rule of thirds grid
+    gaze: the subject contained within the left two thirds of the frame
+    restraint: the right third rendered as an even low contrast surface
   bottom_center:
     reserved: clear copy space across the lower third of the frame
-    subject: the main subject positioned on the upper third line of a rule of thirds grid
-    gaze: the subject oriented toward the lower centre without extending into it
-    restraint: the lower third kept free of competing detail
+    subject: the main subject placed along the upper third line of a rule of thirds grid
+    gaze: the subject looking level toward the far distance
+    restraint: the lower third rendered as an even low contrast surface
 
 # アスペクト比ごとの構図の言い方です。
 #
