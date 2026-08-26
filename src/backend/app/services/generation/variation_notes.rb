@@ -14,10 +14,12 @@ module Generation
     # @param applied [Hash] スタイル仕様化が残した控えです
     # @param chosen [Array<String>] その案で選び直した指示です
     # @param dropped [Hash] 役割の名前から、外した素材への対応です
-    def initialize(applied:, chosen:, dropped:)
+    # @param person_safety [Array<String>] その案で当てる、人物を避ける構図です
+    def initialize(applied:, chosen:, dropped:, person_safety: [])
       @applied = applied
       @chosen = chosen
       @dropped = dropped
+      @person_safety = person_safety
     end
 
     # 書き直した控えを返します。
@@ -28,13 +30,18 @@ module Generation
 
     private
 
-    attr_reader :applied, :chosen, :dropped
+    attr_reader :applied, :chosen, :dropped, :person_safety
 
     def rewritten(note)
       return note.merge(specifications: kept_specifications) if specifications_note?(note)
       return nil if dropped_person_safety_note?(note)
+      return note.merge(compositions: person_safety) if person_safety_note?(note)
 
       note
+    end
+
+    def person_safety_note?(note)
+      note[:kind] == StyleSpec::PERSON_SAFETY_NOTE_KIND
     end
 
     def specifications_note?(note)

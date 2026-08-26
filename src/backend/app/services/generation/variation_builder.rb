@@ -151,7 +151,14 @@ module Generation
 
     # **控えを、実際の素材に合わせます。** 書き直しは VariationNotes が持ちます。
     def rewritten_notes(draft, applied, chosen, dropped)
-      VariationNotes.new(applied: applied, chosen: chosen, dropped: dropped).rewrite(draft.notes)
+      VariationNotes.new(applied: applied, chosen: chosen, dropped: dropped,
+                         person_safety: chosen_person_safety(draft, dropped))
+                    .rewrite(draft.notes)
+    end
+
+    # その案で当てる、人物を避ける構図です。**控えへ書き戻します。**
+    def chosen_person_safety(draft, dropped)
+      person_safety_replacements(draft, dropped).values
     end
 
     def style_family_of(draft)

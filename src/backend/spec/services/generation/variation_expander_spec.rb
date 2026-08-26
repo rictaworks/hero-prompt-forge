@@ -145,6 +145,14 @@ RSpec.describe Generation::VariationExpander do
     end
 
     # **控えを実際の素材に合わせます**（PR #155 のレビューより）。
+    it '選び直した構図を控えへ書き戻します' do
+      variations.first(2).each do |draft|
+        note = draft.notes.find { |item| item[:kind] == Generation::StyleSpec::PERSON_SAFETY_NOTE_KIND }
+
+        expect(draft.main_terms).to include(*note[:compositions])
+      end
+    end
+
     it '外した案では、当てた記録を残しません' do
       applied = variations.third.notes
                           .select { |item| item[:kind] == Generation::StyleSpec::PERSON_SAFETY_NOTE_KIND }
