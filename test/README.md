@@ -30,6 +30,19 @@ npm run test:hooks
 npm run test:hardcode
 ```
 
+## レビューのための一時的な作業ツリー
+
+reviewer が PR の内容を実際に動かして確かめる場合は、`/.review/` の下に
+`git worktree` を作ります。**dev コンテナから見える位置に作る必要があります。**
+
+```bash
+git worktree add .review/pr<PR番号> origin/<ブランチ名>
+docker compose exec dev bash -c 'cd /workspace/.review/pr<PR番号>/src/backend && bundle exec rspec'
+```
+
+`/.review/` は版管理から外しています。**実装側の作業ツリーでブランチを
+切り替えないでください。** 別の作業と衝突します。
+
 ## 実行
 
 ```bash
