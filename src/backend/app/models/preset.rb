@@ -12,11 +12,18 @@ class Preset < ApplicationRecord
     brand_tone brand_colors copy_space_position aspect_ratio
   ].freeze
 
+  # 入力条件の大きさの上限です（JSON にしたときの文字数）。
+  #
+  # **鍵を絞っても、値の大きさは絞れません**（PR #167 のレビューより）。
+  # サービス概要の上限（1000 文字）に、他の項目ぶんの余裕を足した値です。
+  MAX_CONDITIONS_LENGTH = 2000
+
   belongs_to :user
 
   validates :name, presence: true, length: { maximum: 50 },
                    uniqueness: { scope: :user_id }
   validate :conditions_must_be_allowed
+  validate :conditions_must_be_small_enough
 
   scope :for_user, ->(user) { where(user: user) }
   scope :by_name, -> { order(:name) }
@@ -30,5 +37,13 @@ class Preset < ApplicationRecord
     return if unknown.empty?
 
     errors.add(:input_conditions, :invalid)
+  end
+
+  # **大きさに上限を置きます。** 鍵を絞っても、値の大きさは絞れません。
+  def conditions_must_be_small_enough
+    return if input_conditions.blank?
+    return if input_conditions.to_json.length <= MAX_CONDITIONS_LENGTH
+
+    errors.add(:input_conditions, :too_long, count: MAX_CONDITIONS_LENGTH)
   end
 end

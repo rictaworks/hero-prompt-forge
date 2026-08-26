@@ -24,12 +24,31 @@ class Project < ApplicationRecord
   #   製造でも、製品だけを写したい場合があります
   PEOPLE_KEY = 'people'
 
+  # ブランド設定のうち、トーンとブランドカラーの鍵です。
+  # 列の説明（「トーン・カラー等」）に対応します。
+  TONE_KEY = 'tone'
+  COLORS_KEY = 'colors'
+
+  # ブランド設定に置ける鍵です。**ここに無い鍵は保存しません。**
+  #
+  # `name` が 100 文字、評価メモが 2000 文字と決まっているのに、
+  # **この列だけ無制限にしません**（PR #167 のレビューより）。
+  # 読まない値を預かり続けると、預かった側の負担だけが増えます。
+  ALLOWED_BRAND_SETTING_KEYS = [PEOPLE_KEY, TONE_KEY, COLORS_KEY].freeze
+
+  # ブランド設定の大きさの上限です（JSON にしたときの文字数）。
+  #
+  # **上限を置きます。** 置かないと、1 件で数十万文字を預かれます。
+  MAX_BRAND_SETTINGS_LENGTH = 2000
+
   belongs_to :user
 
   validates :industry, presence: true, inclusion: { in: INDUSTRIES }
   validates :style_family, presence: true, inclusion: { in: STYLE_FAMILIES }
   validates :name, length: { maximum: 100 }, allow_nil: true
   validate :brand_settings_is_a_hash
+  validate :brand_settings_keys_are_allowed
+  validate :brand_settings_is_small_enough
   validate :people_override_is_a_choice
 
   scope :for_user, ->(user) { where(user: user) }
@@ -50,6 +69,25 @@ class Project < ApplicationRecord
     return if brand_settings.is_a?(Hash)
 
     errors.add(:brand_settings, :invalid)
+  end
+
+  # **決まっていない鍵を保存させません。** 読まない値を預かり続けると、
+  # 預かった側の負担だけが増えます（PR #167 のレビューより）。
+  def brand_settings_keys_are_allowed
+    return unless brand_settings.is_a?(Hash)
+
+    unknown = brand_settings.keys.map(&:to_s) - ALLOWED_BRAND_SETTING_KEYS
+    return if unknown.empty?
+
+    errors.add(:brand_settings, :invalid)
+  end
+
+  # **大きさに上限を置きます。** 置かないと、1 件で数十万文字を預かれます。
+  def brand_settings_is_small_enough
+    return unless brand_settings.is_a?(Hash)
+    return if brand_settings.to_json.length <= MAX_BRAND_SETTINGS_LENGTH
+
+    errors.add(:brand_settings, :too_long, count: MAX_BRAND_SETTINGS_LENGTH)
   end
 
   # **選択肢の外の値を保存させません。** 書き間違えた上書きが黙って無視されると、

@@ -96,6 +96,36 @@ RSpec.describe Project do
 
       expect(project.reload.brand_settings['colors']).to eq(%w[#c0392b #c9a84c])
     end
+
+    # **決まっていない鍵を保存させません**（PR #167 のレビューより）。
+    # 読まない値を預かり続けると、預かった側の負担だけが増えます。
+    it '決まっていない鍵は保存できません' do
+      project = build_project(brand_settings: { 'people' => 'expected', 'evil' => true })
+
+      expect(project).not_to be_valid
+    end
+
+    it '決まっていない鍵の理由を添えます' do
+      project = build_project(brand_settings: { 'evil' => true })
+      project.valid?
+
+      expect(project.errors[:brand_settings]).to be_present
+    end
+
+    # **大きさに上限を置きます。** 置かないと、1 件で数十万文字を預かれます。
+    it '上限を越える大きさは保存できません' do
+      long = 'あ' * (described_class::MAX_BRAND_SETTINGS_LENGTH + 1)
+      project = build_project(brand_settings: { 'tone' => long })
+
+      expect(project).not_to be_valid
+    end
+
+    it '上限までなら保存できます' do
+      fitting = 'あ' * 100
+      project = build_project(brand_settings: { 'tone' => fitting })
+
+      expect(project).to be_valid
+    end
   end
 
   # **業種の中の個別事情を、プロジェクトの側で持ちます**（issue #147）。

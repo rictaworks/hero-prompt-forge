@@ -16,9 +16,22 @@ Rails.application.routes.draw do
   # 版を付けて、画面と足並みを揃えて変えられるようにします。
   namespace :api do
     namespace :v1 do
+      # プロジェクトです（requirements.md 4.1）。
+      # **消す経路を作りません。** 生成履歴が結び付いています。
+      resources :projects, only: %i[index create update]
+
+      # プリセットです（requirements.md 4.5）。
+      resources :presets, only: %i[index show create update]
+
       # 生成リクエストです（requirements.md 4.1、12.1）。
       # **作成と取り出しだけです。** 途中で書き換える経路を作りません。
-      resources :prompt_requests, only: %i[create show]
+      # `index` は生成履歴です。
+      resources :prompt_requests, only: %i[index create show]
+
+      # 評価メモです（requirements.md 4.6）。**案 1 つにつき 1 件です。**
+      resources :prompt_outputs, only: [] do
+        resource :evaluation_note, only: %i[show create update]
+      end
     end
   end
 
