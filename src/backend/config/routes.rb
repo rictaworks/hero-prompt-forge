@@ -12,6 +12,16 @@ Rails.application.routes.draw do
   # 含めて答えます。** 認証を求めません。外形監視サービスが呼びます。
   get 'health', to: 'health#show'
 
+  # 一般の利用者の API です（SPEC/api/README.md）。**基底パスは `/api/v1` です。**
+  # 版を付けて、画面と足並みを揃えて変えられるようにします。
+  namespace :api do
+    namespace :v1 do
+      # 生成リクエストです（requirements.md 4.1、12.1）。
+      # **作成と取り出しだけです。** 途中で書き換える経路を作りません。
+      resources :prompt_requests, only: %i[create show]
+    end
+  end
+
   # 開発者用の管理画面です（requirements.md 4.3、5.2）。BASIC 認証が掛かります。
   # **一般の利用者の画面（Next.js）とは入口を分けます。**
   namespace :admin do

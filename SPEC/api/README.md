@@ -61,8 +61,96 @@
 
 ## 実装済みのエンドポイント
 
-現時点で実装済みのものはありません。エンドポイントを実装した issue で、この表へ追記します。
+エンドポイントを実装した issue で、この表へ追記します。
 
 | 種別 | パス | 概要 | 仕様 |
 |---|---|---|---|
-| （なし） | — | — | — |
+| `POST` | `/api/v1/prompt_requests` | 生成リクエストを受け付けます | 下記 |
+| `GET` | `/api/v1/prompt_requests/:id` | 状態と、完了していれば 3 案を返します | 下記 |
+
+### `POST /api/v1/prompt_requests`
+
+生成リクエストを受け付け、**ジョブを投入して 201 を返します。** 生成そのものは裏で走ります。
+
+**要求**
+
+| 項目 | 必須 | 内容 |
+|---|---|---|
+| `project_id` | ○ | プロジェクトの識別子です。**他人のものは `404` です** |
+| `inputs.industry` | ○ | 業種です |
+| `inputs.style_family` | ○ | スタイル系統です |
+| `inputs.target_model` | ○ | 生成モデルです |
+| `inputs.brand_tone` | − | トーンです。省くと業種の標準を使います |
+| `inputs.service_summary` | − | サービス概要です。1000 文字までです |
+| `inputs.brand_colors` | − | ブランドカラーです。`#RRGGBB` を 2 つまでです |
+| `inputs.copy_space_position` | − | 文字を置く余白の位置です。既定は `left` です |
+| `inputs.aspect_ratio` | − | 画角です。既定は `16:9` です |
+
+**応答（`201`）**
+
+```json
+{
+  "id": 12,
+  "status": "queued",
+  "degraded": false,
+  "target_model": "midjourney",
+  "dictionary_version": null,
+  "created_at": "2026-08-27T10:30:00+09:00",
+  "updated_at": "2026-08-27T10:30:00+09:00"
+}
+```
+
+**失敗**
+
+| コード | `code` | 場面 |
+|---|---|---|
+| `400` | `invalid_input` | 入力に誤りがあります。`details.fields` に項目と理由を添えます |
+| `401` | `unauthorized` | 未認証です |
+| `403` | `forbidden` | プラン値が有効ではありません |
+| `404` | `not_found` | プロジェクトが無い、または他人のものです |
+| `422` | `forbidden_input` | 禁止入力です。**クォータを消費しません。** `details.reasons` に種別と直し方の鍵を添えます |
+| `429` | `quota_exhausted` | 本日の枠を使い切っています。**`details.reset_at` に次回のリセット時刻（JST 03:00）を添えます** |
+
+### `GET /api/v1/prompt_requests/:id`
+
+**応答（`200`）**
+
+`status` は requirements.md 12.1 の名前をそのまま返します。
+
+| 項目 | 返す場面 | 内容 |
+|---|---|---|
+| `status` | 常に | `draft` / `queued` / `generating` / `completed` / `degraded_completed` / `failed` / `rejected` / `archived` |
+| `degraded` | 常に | **縮退で作った場合に `true` です** |
+| `outputs` | `completed` ・ `degraded_completed` のみ | 3 案です。案ごとにも `degraded` が付きます |
+| `failure` | `rejected` ・ `failed` のみ | 利用者へ見せる文言と、次に行う操作です |
+
+```json
+{
+  "id": 12,
+  "status": "degraded_completed",
+  "degraded": true,
+  "target_model": "midjourney",
+  "dictionary_version": "v1.0.0",
+  "created_at": "2026-08-27T10:30:00+09:00",
+  "updated_at": "2026-08-27T10:30:42+09:00",
+  "outputs": [
+    {
+      "variation_no": 1,
+      "composition_type": "subject_led",
+      "main_prompt": "...",
+      "negative_prompt": "...",
+      "parameters": { "aspect_ratio": "16:9" },
+      "art_direction_note": { "checkpoints": [] },
+      "degraded": true
+    }
+  ]
+}
+```
+
+**失敗**
+
+| コード | `code` | 場面 |
+|---|---|---|
+| `401` | `unauthorized` | 未認証です |
+| `403` | `forbidden` | プラン値が有効ではありません |
+| `404` | `not_found` | 無い、または他人のリクエストです |
