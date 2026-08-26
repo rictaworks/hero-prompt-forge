@@ -1,0 +1,71 @@
+# 矛盾の解決と統合の規則です（requirements.md 4.1 の 5）。
+#
+# 入力どうしが衝突したときは、次の優先順位で統合します。
+#
+#   ① コピースペースの確保 ＞ ② ブランドカラー ＞ ③ スタイル系統 ＞ ④ トーン装飾
+#
+# **出力を止めません。** 矛盾する入力を受けても、統合した案を返します。
+# **ただし、統合した内容をアートディレクションノートへ必ず残します。**
+#
+# **値は、そのままプロンプトへ入れられる英文です。**
+# `%<color>s` には色の名前が入ります。
+
+# ブランドカラーの統合です。
+#
+# **画面全体の支配色にしません。アクセントとして自然に統合します。**
+# 支配色にすると、業種の雰囲気も撮影の指示も、その色に塗りつぶされます。
+# **冠詞を含む言い回しを避けます。** 色の名前は `orange` ・ `deep green` の
+# ように、母音で始まるものと子音で始まるものが混ざります。`a %<color>s` と
+# 書くと `a orange` になります（PR #151 のレビューで実測されました）。
+brand_color:
+  # 通常の統合です。
+  accent: "%<color>s used as the accent on one object in the scene"
+  # 2 色目です。1 色目より弱く扱います。
+  secondary_accent: "%<color>s appearing as a small supporting detail"
+  # **アンチAIルック規則に当たった場合です。**
+  # 落とさずに、示唆の強さまで弱めます（PR #135 の申し送り）。
+  weakened: "%<color>s present only as a barely visible hint"
+
+# ブランドカラーが余白へ入り込まないための指定です。
+#
+# **優先順位の ① は余白の確保、② がブランドカラーです。** アクセントを置く
+# オブジェクトが余白側へ来ると、二番目の指定が最上位の指定を侵します。
+# コピースペースを確保している下書きにだけ足します。
+brand_color_restraint: "the brand accent placed away from the reserved copy area"
+
+# スタイル系統が持つ配色の指定と、ブランドカラーがぶつかったときの解決です。
+#
+# **優先順位の ② がブランドカラー、③ がスタイル系統です。** スタイル系統の
+# 配色指定は事実上の支配色の指定であり、「アクセントとして統合する」という
+# ② の扱いと食い違います。**捨てずに弱めます**（requirements.md 4.1 の 5）。
+#
+# **当てるのは、スタイル仕様化規則が持つ配色指定そのものです。**
+# 語の一部が含まれるかどうかで当てると、利用者由来の素材まで丸ごと置き換えます
+# （PR #151 の 2 回目のレビューで実測されました）。
+#
+# `items` は、規則辞書のスタイル仕様化規則の項目名です。
+# その項目の値と一致した素材だけを `weakened` へ置き換えます。
+style_palette_conflict:
+  items:
+    - palette
+  weakened: "a restrained palette led by the brand accent"
+
+# トーン装飾です。**いちばん弱い指定です。**
+#
+# 余白・ブランドカラー・スタイル系統と競合した場合は、この指定を弱めます。
+# **示唆の言い方で書きます。** 断定で書くと、上位の指定を押しのけます。
+tones:
+  trust: "an overall impression of calm reliability"
+  advanced: "an overall impression of quiet precision"
+  warmth: "an overall impression of gentle warmth"
+  premium: "an overall impression of restrained luxury"
+  friendly: "an overall impression of open approachability"
+  minimal: "an overall impression of spare simplicity"
+
+# トーン装飾が余白と競合しないための指定です。
+#
+# **トーン装飾は画面全体に掛かります。** 余白の帯まで飾ると、文字が読めません。
+# **`left` と書きません。** 同じプロンプトに `clear copy space across the right
+# third of the frame` が入ると、`left` が位置の「左」と読まれます
+# （PR #151 のレビューより）。
+tone_restraint: "the reserved copy area kept plain"

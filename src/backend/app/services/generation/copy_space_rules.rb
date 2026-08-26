@@ -84,7 +84,7 @@ module Generation
         ensure_positions!(positions)
         ensure_ratios!(ratios)
 
-        { POSITIONS_KEY => positions.freeze, ASPECT_RATIOS_KEY => ratios.freeze }.freeze
+        DeepFreeze.call({ POSITIONS_KEY => positions, ASPECT_RATIOS_KEY => ratios })
       end
 
       def read_definition

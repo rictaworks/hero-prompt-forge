@@ -30,6 +30,9 @@ module Generation
     # 別の版の規則を、同じ下書きへ重ねて当てようとした場合に投げます。
     class VersionMismatchError < StandardError; end
 
+    # 統合済みの下書きへ規則を当てようとした場合に投げます。
+    class AlreadyIntegratedError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     REMOVED_NOTE_KIND = :anti_ai_removed
 
@@ -50,6 +53,7 @@ module Generation
     # @return [Draft]
     def apply(draft)
       ensure_same_version!(draft)
+      ensure_not_integrated!(draft)
       kept, removed = partition(draft.main_terms)
 
       Trace.step('generation.anti_ai_rules_applied',
@@ -62,6 +66,23 @@ module Generation
     delegate :avoided_compositions, to: :rules
 
     private
+
+    # 工程の順序を守らせる関所です。
+    #
+    # **矛盾解決のあとに規則を当てません。** 矛盾解決は、規則に当たった
+    # ブランドカラーを「落とさずに弱めて」残します。弱めた素材は、当たった語
+    # （`teal` など）をそのまま含みます。**そのあとに規則を当てると、
+    # 弱めた素材ごと落ちます。** ノートは「弱めて残しました」と残るため、
+    # アートディレクションノート（issue #51）の説明と実物が食い違います。
+    #
+    # 順序を呼び出す側の作法だけに委ねると、組み立ての段（issue #146）で
+    # 黙って壊れます（PR #151 のレビューで実測されました）。
+    def ensure_not_integrated!(draft)
+      return unless ConflictResolver.integrated?(draft)
+
+      raise AlreadyIntegratedError,
+            'すでに矛盾解決を適用した下書きへは、規則を当てられません。' # 開発者向け
+    end
 
     attr_reader :version, :rules
 

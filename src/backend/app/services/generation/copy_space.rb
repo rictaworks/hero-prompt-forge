@@ -31,6 +31,9 @@ module Generation
     # すでにコピースペースを規定した下書きへ、重ねて当てようとした場合に投げます。
     class AlreadyReservedError < StandardError; end
 
+    # 統合済みの下書きへ規定しようとした場合に投げます。
+    class AlreadyIntegratedError < StandardError; end
+
     # 定義が読めない、または内容が足りない場合に投げます。
     InvalidDefinitionError = CopySpaceRules::InvalidDefinitionError
 
@@ -48,6 +51,7 @@ module Generation
     # コピースペースの指示を足した下書きを返します。
     # @return [Draft]
     def apply(draft)
+      ensure_not_integrated!(draft)
       ensure_not_reserved!(draft)
       position = position_of(draft)
       aspect_ratio = aspect_ratio_of(draft)
@@ -76,6 +80,16 @@ module Generation
     end
 
     private
+
+    # **矛盾解決のあとに当てません。** 統合はこの段より後に走ります。
+    # 順序を呼び出す側の作法だけに委ねると、組み立ての段で黙って壊れます
+    # （PR #151 の 2 回目のレビューより）。
+    def ensure_not_integrated!(draft)
+      return unless ConflictResolver.integrated?(draft)
+
+      raise AlreadyIntegratedError,
+            'すでに矛盾解決を適用した下書きへは、コピースペースを規定できません。' # 開発者向け
+    end
 
     # **2 回当てません。** 位置が違えば左右の余白指定が同居し、
     # どちらへ文字を置く絵なのか決まらなくなります。
