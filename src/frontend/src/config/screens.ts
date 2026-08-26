@@ -27,7 +27,7 @@ export type ScreenKey =
 
 export const SCREENS: readonly Screen[] = [
   { no: "01", key: "landing", path: "/" },
-  { no: "02", key: "projects", path: null },
+  { no: "02", key: "projects", path: "/projects" },
   { no: "03", key: "newRequest", path: null },
   { no: "04", key: "generating", path: null },
   { no: "05", key: "result", path: null },

@@ -25,6 +25,8 @@ describe("strings", () => {
       "app.wordmark",
       "nav.",
       "errors.unexpected.traceLabel",
+      // 選択肢の呼び名です。**文ではありません。**
+      "choices.",
       // モックの見出しです（`app-ui/index.html`）。**体言止めです。**
       // 句点で終わりますが、述語を持ちませんので `labels` へ置けません。
       // **モックを書き換えませんので、ここで明示して外します。**
