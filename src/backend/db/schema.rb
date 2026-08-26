@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -72,6 +72,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_200000) do
     t.index ["project_id", "created_at"], name: "index_prompt_requests_on_project_id_and_created_at"
     t.index ["project_id"], name: "index_prompt_requests_on_project_id"
     t.index ["status"], name: "index_prompt_requests_on_status"
+  end
+
+  create_table "quota_consumptions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "prompt_request_id", comment: "予約の対象。予約時点では未作成のため後から結び付けます"
+    t.date "quota_day", null: false, comment: "JST 03:00 を境界とする日付"
+    t.boolean "reset_by_admin", default: false, null: false, comment: "管理者による手動リセットか"
+    t.string "status", default: "reserved", null: false, comment: "reserved / confirmed / refunded"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["prompt_request_id"], name: "index_quota_consumptions_on_prompt_request_id"
+    t.index ["quota_day", "status"], name: "index_quota_consumptions_on_quota_day_and_status"
+    t.index ["user_id", "quota_day"], name: "index_quota_consumptions_on_user_id_and_quota_day", unique: true
+    t.index ["user_id"], name: "index_quota_consumptions_on_user_id"
   end
 
   create_table "rule_dictionaries", force: :cascade do |t|
@@ -275,6 +289,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_200000) do
   add_foreign_key "projects", "users"
   add_foreign_key "prompt_outputs", "prompt_requests"
   add_foreign_key "prompt_requests", "projects"
+  add_foreign_key "quota_consumptions", "prompt_requests"
+  add_foreign_key "quota_consumptions", "users"
   add_foreign_key "sessions", "users"
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
