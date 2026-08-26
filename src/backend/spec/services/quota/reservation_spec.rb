@@ -240,6 +240,134 @@ RSpec.describe Quota::Reservation do
     end
   end
 
+  # 決着が呼ばれないまま予約が残った状態で、別の日に同じ生成リクエストを
+  # 取り直す場合です。一意索引（予約中 × 生成リクエスト）が保存を止めます。
+  #
+  # **索引が止めること自体は正しい判断です。問題は出方でした。**
+  # データベースの例外がそのまま外へ出ると、呼び出す側（issue #55 の API）が
+  # 自前の例外だけを捕まえる作りのときに 500 になり、索引名と鍵の値も漏れます。
+  describe '決着が漏れた予約が別の日に残っている場合' do
+    let(:next_day) { Time.find_zone!('Asia/Tokyo').parse('2026-08-26 12:00:00') }
+
+    before do
+      # 決着を呼ばないまま、前日の予約を残します。
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+    end
+
+    it '枠は残っているように見えます' do
+      expect(described_class.remaining_for?(user, now: next_day)).to be(true)
+    end
+
+    it 'この持ち場の例外になります' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError)
+    end
+
+    it '残っているクォータ日が例外から分かります' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError) { |error|
+          expect(error.quota_day).to eq(Date.new(2026, 8, 25))
+          expect(error.prompt_request_id).to eq(prompt_request.id)
+        }
+    end
+
+    it '索引名と鍵の値を外へ出しません' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError) { |error|
+          expect(error.message).not_to include('index_quota_consumptions')
+          expect(error.message).not_to include('duplicate key')
+        }
+    end
+
+    # **呼び出す側がトランザクションで包む形は、issue #55 で実際に使います。**
+    # 保存点を作らないと、一意性の違反で外側のトランザクション全体が中断状態に
+    # なり、続く問い合わせが `PG::InFailedSqlTransaction` で拒まれます。
+    # 読み替えそのものが働かなくなります。
+    it '呼び出す側がトランザクションで包んでも、読み替えが働きます' do
+      expect do
+        ActiveRecord::Base.transaction do
+          described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day)
+        end
+      end.to raise_error(described_class::DanglingReservationError)
+    end
+
+    it '返還すれば、翌日に取り直せます' do
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('failed')
+      described_class.settle!(prompt_request)
+
+      consumption = described_class.reserve!(user: user, prompt_request: prompt_request,
+                                             now: next_day)
+
+      expect(consumption.quota_day).to eq(Date.new(2026, 8, 26))
+    end
+  end
+
+  # 上限到達の読み替えが、呼び出す側のトランザクションの中でも働くことです。
+  describe '上限到達の読み替え' do
+    it '呼び出す側がトランザクションで包んでも働きます' do
+      described_class.reserve!(user: user, now: now)
+
+      expect do
+        ActiveRecord::Base.transaction do
+          described_class.reserve!(user: user, now: now)
+        end
+      end.to raise_error(described_class::ExhaustedError)
+    end
+
+    it '包まれた中でも、次回のリセット時刻を添えます' do
+      described_class.reserve!(user: user, now: now)
+
+      expect do
+        ActiveRecord::Base.transaction do
+          described_class.reserve!(user: user, now: now)
+        end
+      end.to raise_error(described_class::ExhaustedError) { |error|
+        expect(error.reset_at).to eq(Quota::QuotaDay.reset_at(Date.new(2026, 8, 25)))
+      }
+    end
+  end
+
+  # **黙って新しい方を選びません。**
+  #
+  # 予約中の記録は、一意索引（予約中 × 生成リクエスト）によって 1 件までです。
+  # そのため、この状態はいまのデータベースでは作れません。**索引が守っている
+  # 事実と、索引が外れたときに静かに間違えない事実の、両方を固定します。**
+  describe '予約中の記録が複数ある場合' do
+    before do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('completed')
+    end
+
+    it 'データベースが 2 件目の予約中を受け付けません' do
+      other = User.create!(x_user_id: '2222222222', display_name: 'しろ')
+
+      # **モデルの検証をあえて通しません。** データベースの索引が止めることを
+      # 確かめる例のためです。検証で止めてしまうと、索引の効きを見られません。
+      expect do
+        QuotaConsumption.insert_all!( # rubocop:disable Rails/SkipsModelValidations
+          [{ user_id: other.id, quota_day: Date.new(2026, 8, 26),
+             prompt_request_id: prompt_request.id, status: 'reserved',
+             created_at: Time.current, updated_at: Time.current }]
+        )
+      end.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+
+    it '万一 2 件見つかったら、決着を求められても失敗します' do
+      found = QuotaConsumption.where(prompt_request_id: prompt_request.id, status: 'reserved')
+      relation = instance_double(ActiveRecord::Relation, to_a: found.to_a * 2)
+      allow(QuotaConsumption).to receive(:where)
+        .with(prompt_request_id: prompt_request.id, status: 'reserved').and_return(relation)
+      allow(relation).to receive(:order).with(quota_day: :desc).and_return(relation)
+
+      expect { described_class.settle!(prompt_request) }
+        .to raise_error(described_class::AmbiguousReservationError)
+    end
+  end
+
   describe '.remaining_for?' do
     it '使っていなければ残っています' do
       expect(described_class.remaining_for?(user, now: now)).to be(true)

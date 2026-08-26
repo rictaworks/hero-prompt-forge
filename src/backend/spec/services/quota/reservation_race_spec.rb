@@ -4,17 +4,33 @@ require 'rails_helper'
 
 # 返還済みの枠を、別々の接続から同時に取り直した場合の確かめです。
 # 接続をまたぐため、テストごとのトランザクションを使いません。
+#
+# **関門を置いて、足並みをそろえてから取り直します。**
+# スレッドの中で生成リクエストを作ると、接続の借り出しと書き込みの往復に
+# 時間がかかり、競合の窓に入りません。**窓に入らないテストは、錠を外しても
+# 赤くなりません。** 将来だれかが `with_lock` を外しても、CI が気づけない
+# 状態になります（issue #132）。
+#
+# そのため、次の 2 つを守ります。
+#
+#   1. **生成リクエストは、スレッドの外で人数分だけ先に作ります。**
+#      スレッドの中の処理を `reserve!` だけにします
+#   2. **関門を置きます。** 各スレッドは接続を借りて 1 度だけ空の問い合わせを
+#      投げ（接続を温めます）、印を積んで待機します。本体側が人数分の印を
+#      受け取ってから関門を開き、全スレッドを同時に `reserve!` へ入れます
+#
+# この形であれば、錠を外した実装では 4 件とも成立し（確実に赤）、
+# 錠のある実装では 1 件だけ成立します（確実に緑）。
 RSpec.describe Quota::Reservation do
   self.use_transactional_tests = false
 
-  let(:user) { User.create!(x_user_id: '7777777777', display_name: 'くろ') }
-  let(:project) { Project.create!(user: user, industry: 'saas', style_family: 'photoreal') }
   # クォータ日 2026-08-25 のまん中です。
   let(:now) { Time.find_zone!('Asia/Tokyo').parse('2026-08-25 12:00:00') }
-
-  before do
-    QuotaConsumption.create!(user: user, quota_day: Quota::QuotaDay.of(now), status: 'refunded')
-  end
+  let(:racers) { 4 }
+  let!(:user) { User.create!(x_user_id: '7777777777', display_name: 'くろ') }
+  # **`let!` にします。** `let` のままだと最初の評価がスレッドの中で起こり、
+  # 足並みがさらに崩れます。
+  let!(:project) { Project.create!(user: user, industry: 'saas', style_family: 'photoreal') }
 
   after do
     QuotaConsumption.where(user_id: user.id).find_each(&:destroy!)
@@ -23,35 +39,84 @@ RSpec.describe Quota::Reservation do
     user.destroy!
   end
 
-  # 別々の接続から1件ずつ取り直します。
-  def try_reserve(results)
-    ActiveRecord::Base.connection_pool.with_connection do
-      request = PromptRequest.create!(project: project, target_model: 'midjourney')
-      described_class.reserve!(user: user, prompt_request: request, now: now)
-      results << :accepted
-    rescue described_class::ExhaustedError
-      results << :blocked
+  # 生成リクエストを、スレッドの外で人数分だけ先に作ります。
+  def prepared_requests
+    Array.new(racers) { PromptRequest.create!(project: project, target_model: 'midjourney') }
+  end
+
+  # 関門の前で待ち、開いたら一斉に取り直します。
+  def racing_thread(request, results, ready, gate)
+    Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do |connection|
+        connection.execute('select 1') # 接続を温めます
+        ready << true
+        gate.pop
+        results << outcome_of(request)
+      end
     end
   end
 
+  def outcome_of(request)
+    described_class.reserve!(user: user, prompt_request: request, now: now)
+    :accepted
+  rescue described_class::ExhaustedError
+    :blocked
+  end
+
   # 同時に取り直し、結果を集めます。
-  def race(count)
+  def race
     results = Queue.new
-    Array.new(count) { Thread.new { try_reserve(results) } }.each(&:join)
+    run_racers(results)
 
     Array.new(results.size) { results.pop }
   end
 
-  it '予約が成立するのは1件だけです' do
-    outcomes = race(4)
+  # 関門の前に全員をそろえてから、いっせいに開きます。
+  def run_racers(results)
+    ready = Queue.new
+    gate = Queue.new
+    threads = prepared_requests.map { |request| racing_thread(request, results, ready, gate) }
 
-    expect(outcomes.count(:accepted)).to eq(1)
-    expect(outcomes.count(:blocked)).to eq(3)
+    racers.times { ready.pop }
+    racers.times { gate << true }
+    threads.each(&:join)
   end
 
-  it '枠の記録は1件のままです' do
-    race(4)
+  describe '返還済みの枠を同時に取り直したとき' do
+    before do
+      QuotaConsumption.create!(user: user, quota_day: Quota::QuotaDay.of(now), status: 'refunded')
+    end
 
-    expect(QuotaConsumption.where(user_id: user.id).count).to eq(1)
+    it '予約が成立するのは1件だけです' do
+      outcomes = race
+
+      expect(outcomes.count(:accepted)).to eq(1)
+      expect(outcomes.count(:blocked)).to eq(racers - 1)
+    end
+
+    it '枠の記録は1件のままです' do
+      race
+
+      expect(QuotaConsumption.where(user_id: user.id).count).to eq(1)
+    end
+  end
+
+  # **記録がまだ無い状態から同時に予約します。**
+  # 先を越された側は、検証をすり抜けてデータベースの一意制約に当たります。
+  # **上限到達の読み替えが、実際の一意性の違反に対して働くことを確かめます。**
+  # 読み替えが働かないと、利用者へ理由の分からない失敗が返ります。
+  describe '記録が無い状態から同時に予約したとき' do
+    it '予約が成立するのは1件だけです' do
+      outcomes = race
+
+      expect(outcomes.count(:accepted)).to eq(1)
+      expect(outcomes.count(:blocked)).to eq(racers - 1)
+    end
+
+    it '枠の記録は1件だけできます' do
+      race
+
+      expect(QuotaConsumption.where(user_id: user.id).count).to eq(1)
+    end
   end
 end
