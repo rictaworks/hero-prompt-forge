@@ -47,3 +47,20 @@ singular_words:
   - news
   - series
   - species
+  - chaos
+  - cosmos
+  - sans
+  - pathos
+  - kudos
+
+# **末尾の規則では単数形へ戻せない複数形です。**
+#
+# `lenses` から `es` を落とすと `lens` ですが、`houses` から落とすと `hous` に
+# なります。どちらも `ses` で終わるため、語尾の規則では見分けられません。
+# **見分けられない語だけを、ここへ書きます。**
+plural_forms:
+  lenses: lens
+  glasses: glass
+  focuses: focus
+  irises: iris
+  analyses: analysis

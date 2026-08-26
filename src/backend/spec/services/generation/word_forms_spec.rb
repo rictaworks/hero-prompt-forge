@@ -21,7 +21,7 @@ RSpec.describe Generation::WordForms do
 
     describe '複数形でない語は触りません' do
       # 削ると別の語と同じ形になる語です。
-      %w[lens glass grass gloss bokeh].each do |word|
+      %w[lens glass grass gloss bokeh chaos cosmos sans news focus analysis canvas].each do |word|
         it "「#{word}」をそのままにします" do
           expect(described_class.canonical(word)).to eq(word)
         end
@@ -38,6 +38,24 @@ RSpec.describe Generation::WordForms do
         it "「#{given}」を「#{expected}」にします" do
           expect(described_class.canonical(given)).to eq(expected)
         end
+      end
+    end
+
+    # **語尾の規則では見分けられない複数形です**（PR #144 のレビューより）。
+    describe '対応表で単数形へ戻す複数形' do
+      {
+        'lenses' => 'lens',
+        'glasses' => 'glass',
+        'focuses' => 'focus',
+        'analyses' => 'analysis'
+      }.each do |given, expected|
+        it "「#{given}」を「#{expected}」にします" do
+          expect(described_class.canonical(given)).to eq(expected)
+        end
+      end
+
+      it '対応表に無い語は、語尾の規則で寄せます' do
+        expect(described_class.canonical('houses')).to eq('house')
       end
     end
 
@@ -70,6 +88,85 @@ RSpec.describe Generation::WordForms do
 
   describe '対応表の読み込み' do
     after { described_class.reset! }
+
+    # **対応表は人が編集するデータです。中身を検めます。**
+    describe '定義の不備' do
+      def with_definition(loaded)
+        allow(YAML).to receive(:safe_load_file).and_return(loaded)
+        described_class.reset!
+      end
+
+      def sound_definition
+        {
+          'spelling_variants' => { 'colour' => 'color' },
+          'singular_words' => ['lens'],
+          'plural_forms' => { 'lenses' => 'lens' }
+        }
+      end
+
+      it '定義が読めなければ失敗します' do
+        with_definition('壊れています')
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it 'つづりの対応表が無ければ失敗します' do
+        with_definition(sound_definition.merge('spelling_variants' => nil))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it 'つづりの対応表が空なら失敗します' do
+        with_definition(sound_definition.merge('spelling_variants' => {}))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '複数形の対応表が無ければ失敗します' do
+        with_definition(sound_definition.merge('plural_forms' => nil))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '対応表の値が文字列でなければ失敗します' do
+        with_definition(sound_definition.merge('spelling_variants' => { 'colour' => 24 }))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '同じ語へ寄せる行があれば失敗します' do
+        with_definition(sound_definition.merge('spelling_variants' => { 'colour' => 'colour' }))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '英字以外の語が混ざっていれば失敗します' do
+        with_definition(sound_definition.merge('spelling_variants' => { '色' => 'color' }))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '複数形でない語の一覧が一覧でなければ失敗します' do
+        with_definition(sound_definition.merge('singular_words' => 'lens'))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+
+      it '複数形でない語に英字以外が混ざっていれば失敗します' do
+        with_definition(sound_definition.merge('singular_words' => ['レンズ']))
+
+        expect { described_class.canonical('colour') }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
+    end
 
     it '対応表を読めます' do
       expect(described_class.spelling_variants).to include('colour' => 'color')

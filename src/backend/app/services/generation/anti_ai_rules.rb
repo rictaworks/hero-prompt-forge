@@ -42,8 +42,13 @@ module Generation
     # 表記のゆれを取り除く際に、空白として扱う記号です。
     WORD_SEPARATORS = /[-_　\s]+/
 
-    # 英数字だけでできた語です。この形の語は、語の切れ目で照合します。
-    ASCII_TERM = /\A[a-z0-9 ]+\z/
+    # 英字の並びでできた語です。この形の語は、語の切れ目で照合します。
+    #
+    # **記号を含む語も対象にします。** 英数字と空白だけに限ると、
+    # `art's` や `a/b` のように語の内側へ記号を持つ語が部分一致へ落ち、
+    # `smart's clean layout` が丸ごと消えます（PR #144 のレビューより）。
+    # 日本語には語の切れ目がないため、この形に当てはまりません。
+    ASCII_TERM = /\A[ -~]+\z/
 
     def initialize(dictionary)
       @version = dictionary.version

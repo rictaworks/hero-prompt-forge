@@ -23,6 +23,7 @@ module Generation
     DEFINITION_PATH = 'config/word_forms.yml'
     SPELLING_VARIANTS_KEY = 'spelling_variants'
     SINGULAR_WORDS_KEY = 'singular_words'
+    PLURAL_FORMS_KEY = 'plural_forms'
 
     # `s` で終わりますが複数形ではない語尾です。
     # `focus` ・ `analysis` ・ `canvas` ・ `glass` の末尾を落としません。
@@ -58,6 +59,11 @@ module Generation
         definition[SINGULAR_WORDS_KEY]
       end
 
+      # 末尾の規則では単数形へ戻せない複数形です。
+      def plural_forms
+        definition[PLURAL_FORMS_KEY]
+      end
+
       # テストから読み直せるようにします。**本番の経路では使いません。**
       def reset!
         @definition = nil
@@ -75,12 +81,18 @@ module Generation
 
       # 複数形を単数形へ寄せます。
       #
+      # **対応表を先に引きます。** 語尾の規則では見分けられない語があるためです
+      # （`lenses` は `lens`、`houses` は `house` です。どちらも `ses` で
+      # 終わります）。
+      #
       # **短い語は触りません。** `is` や `as` のような語まで削ると、
       # 別の語と同じ形になります。
       # **`ss` ・ `us` ・ `is` ・ `as` で終わる語も触りません。**
       # `glass` ・ `focus` ・ `analysis` ・ `canvas` は複数形ではありません。
       # それ以外の例外（`lens` など）は設定ファイルに書きます。
       def singular_of(word)
+        known = plural_forms[word]
+        return known if known
         return word unless plural?(word)
         return "#{word[0..-4]}y" if word.end_with?('ies')
         return word[0..-3] if word.match?(PLURAL_ES)
@@ -105,11 +117,14 @@ module Generation
         loaded = read_definition
         variants = loaded[SPELLING_VARIANTS_KEY]
         singulars = loaded[SINGULAR_WORDS_KEY]
-        ensure_variants!(variants)
+        plurals = loaded[PLURAL_FORMS_KEY]
+        ensure_variants!(variants, SPELLING_VARIANTS_KEY)
+        ensure_variants!(plurals, PLURAL_FORMS_KEY)
         ensure_singulars!(singulars)
 
         { SPELLING_VARIANTS_KEY => variants.freeze,
-          SINGULAR_WORDS_KEY => singulars.freeze }.freeze
+          SINGULAR_WORDS_KEY => singulars.freeze,
+          PLURAL_FORMS_KEY => plurals.freeze }.freeze
       end
 
       def read_definition
@@ -125,10 +140,10 @@ module Generation
 
       # **中身を検めます。** 対応表は人が編集するデータです。
       # 空の語や文字列でない値が混ざると、照合が静かに壊れます。
-      def ensure_variants!(variants)
+      def ensure_variants!(variants, key)
         unless variants.is_a?(Hash) && variants.any?
           raise InvalidDefinitionError,
-                "語の形の対応表がありません: #{DEFINITION_PATH}" # 開発者向け
+                "語の形の対応表がありません: #{key} (#{DEFINITION_PATH})" # 開発者向け
         end
 
         variants.each do |from, to|

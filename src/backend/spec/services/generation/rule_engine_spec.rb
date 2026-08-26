@@ -178,6 +178,31 @@ RSpec.describe Generation::RuleEngine do
       expect(marks_engine.apply(draft).main_terms).to eq(['smart, clean layout'])
     end
 
+    # **語の内側に記号がある語も、語の切れ目で見ます**（PR #144 のレビューより）。
+    it '語の内側に記号がある語でも、別の語を巻き込みません' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.inner-marks',
+        anti_ai_rules: { 'forbidden_terms' => ["art's"],
+                         'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ["smart's clean layout"])
+
+      expect(marks_engine.apply(draft).main_terms).to eq(["smart's clean layout"])
+    end
+
+    it '語の内側に記号がある語そのものは取り除きます' do
+      dictionary = RuleDictionary.create!(
+        version: 'vspec.inner-marks2',
+        anti_ai_rules: { 'forbidden_terms' => ["art's"],
+                         'negative_prompt_terms' => ['deformed hands'] }
+      )
+      marks_engine = described_class.new(dictionary: dictionary)
+      draft = marks_engine.start(input).add(main_terms: ["an art's studio"])
+
+      expect(marks_engine.apply(draft).main_terms).to be_empty
+    end
+
     it '記号を含む語そのものは取り除きます' do
       dictionary = RuleDictionary.create!(
         version: 'vspec.marks2',
