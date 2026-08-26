@@ -1,0 +1,134 @@
+# 規則辞書の初期の内容です。
+#
+# 内容は requirements.md 4.1・4.2 に基づきます。
+# `db/seeds.rb` がこのファイルを読み込んで、最初の版を作ります。
+#
+# **設定ファイルへ置いている理由です。** 初期データは、この製品の中核となる
+# 価値（AI っぽさを設計段階で外すこと）を担います。実装の中に埋め込むと、
+# 中身が仕様どおりかをテストから確かめられません。
+#
+# **値は、そのままプロンプトへ入れられる英文で書きます。** 記号や数値だけを
+# 書くと、生成モデルへ「back_view」「24」といった意味をなさない語がそのまま
+# 渡ります。実装は、文字列でない値をその場で失敗させます。
+version: v2026.08.1
+
+# AI が作った画像にありがちな表現を抑える規則です（requirements.md 4.2）。
+anti_ai_rules:
+  # メインプロンプトから排除する語です。
+  #
+  # **短い語を足さないでください。** 照合は語の切れ目で行いますが、
+  # `teal` のような一般的な語は、利用者が指定したブランドカラーにも当たります。
+  # 語は具体的に書きます（`glowing particles` ではなく用途まで含めた形が安全です）。
+  forbidden_terms:
+    - purple to teal gradient
+    - neon gradient background
+    - floating 3d shapes
+    - abstract floating objects
+    - hyper saturated
+    - oversaturated colors
+    - lens flare everywhere
+    - glowing particles
+  # 排除する語に対応して必ず注入する語です。
+  negative_prompt_terms:
+    - purple teal gradient
+    - neon gradient
+    - floating 3d objects
+    - meaningless props
+    - oversaturation
+    - excessive bokeh
+    - deformed hands
+    - extra fingers
+    - distorted face
+    - text artifacts
+    - watermark
+  # 既定で避ける構図です。利用者が明示した場合のみ許します。
+  avoided_compositions:
+    - large frontal face close-up
+
+# スタイル系統ごとの仕様化規則です（requirements.md 4.1 の 3）。
+#
+# `required` に挙げた項目は、すべて値を持つ必要があります。欠けていると、
+# 撮影指示を欠いたプロンプトが出ます（4.2 が禁じています）。
+# 選べる値を一覧で書く場合、**先頭が既定**です。並び順が優先順です。
+style_spec_rules:
+  photoreal:
+    required:
+      - lens_mm
+      - key_light
+      - fill_light
+      - rim_light
+      - depth_of_field
+    lens_mm:
+      - 35mm lens
+      - 24mm wide angle lens
+      - 50mm lens
+      - 85mm portrait lens
+    lighting:
+      key_light: soft key light from a north-facing window
+      fill_light: bounced fill from a white wall
+      rim_light: subtle rim light separating the subject
+    depth_of_field: shallow depth of field on the subject plane
+    # 顔と手指は破綻しやすいため、構図で避けます（requirements.md 4.2）。
+    person_safety:
+      - the subject seen from behind
+      - hands cropped out of the frame
+      - a distant figure within the scene
+  illustration:
+    required:
+      - line_quality
+      - shading
+      - palette
+    line_quality: clean tapered linework
+    shading: flat shading with limited gradients
+    palette: restrained palette of three to four colors
+  three_d:
+    required:
+      - material
+      - rendering
+      - lighting
+    material: physically based materials with visible surface grain
+    rendering: path traced rendering, neutral tone mapping
+    lighting: single dominant light source with soft shadows
+  abstract:
+    required:
+      - geometry
+      - motion
+      - palette
+    geometry: geometry derived from the brand mark
+    motion: implied motion along a single axis
+    palette: two brand colors plus one neutral
+
+# 業種ごとの既定値です（requirements.md 4.1 の 1）。
+#
+# トーンの指定が無い場合に、業種の標準を使います。
+industry_defaults:
+  saas:
+    tone: trust
+    style_family: photoreal
+  restaurant:
+    tone: warmth
+    style_family: photoreal
+  medical:
+    tone: trust
+    style_family: photoreal
+  education:
+    tone: friendly
+    style_family: illustration
+  real_estate:
+    tone: trust
+    style_family: photoreal
+  manufacturing:
+    tone: advanced
+    style_family: photoreal
+  professional_services:
+    tone: trust
+    style_family: photoreal
+  ecommerce:
+    tone: friendly
+    style_family: photoreal
+  beauty:
+    tone: premium
+    style_family: photoreal
+  other:
+    tone: minimal
+    style_family: photoreal

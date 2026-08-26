@@ -14,6 +14,10 @@ module Generation
   #   <項目名>        : その項目の指示です。文字列、または選べる値の一覧です
   #   person_safety  : 人物を含む場合に、顔や手指の破綻を避ける構図です
   #
+  # **値は、そのままプロンプトへ入れられる英文でなければなりません。**
+  # 記号や数値を書くと、生成モデルへ「back_view」「24」といった意味をなさない語が
+  # そのまま渡ります。文字列でない値は、その場で失敗させます。
+  #
   # **選べる値が一覧で書かれている場合は、先頭を既定として使います。**
   # 並び順が既定の優先順です。3 案への展開（issue #50）で別の値を使う場合は、
   # そちらが選び直します。
@@ -51,7 +55,10 @@ module Generation
     # 人物を含む場合に、顔や手指の破綻を避ける構図です。
     # **複製して返します。** そのまま返すと、呼び出す側から規則の中身を書き換えられます。
     def person_safety_for(style_family)
-      Array(rule_for(style_family)[PERSON_SAFETY_KEY]).dup
+      compositions = Array(rule_for(style_family)[PERSON_SAFETY_KEY])
+      ensure_compositions!(style_family, compositions)
+
+      compositions.dup
     end
 
     # 定義されているスタイル系統です。
@@ -60,6 +67,14 @@ module Generation
     end
 
     private
+
+    # 避ける構図も、そのままプロンプトへ入れられる英文でなければなりません。
+    def ensure_compositions!(style_family, compositions)
+      return if compositions.all? { |item| item.is_a?(String) && !item.strip.empty? }
+
+      raise InvalidDictionaryError,
+            "避ける構図が文字列ではありません: #{style_family} (#{@version})" # 開発者向け
+    end
 
     def rule_for(style_family)
       @rules.fetch(style_family) do
@@ -76,7 +91,7 @@ module Generation
       value = rule[item] || nested_value(rule, item)
       ensure_specification!(style_family, item, value)
 
-      value.is_a?(Array) ? value.first.to_s : value.to_s
+      value.is_a?(Array) ? value.first : value
     end
 
     def nested_value(rule, item)
@@ -85,24 +100,33 @@ module Generation
 
     # **必須の項目が欠けていたら、その場で失敗させます。**
     # 欠けたまま通すと、撮影指示を欠いたプロンプトが出ます。
+    #
+    # **文字列でない値も失敗させます。** 数値や記号を黙って文字列へ直すと、
+    # 「24」「back_view」といった意味をなさない語がプロンプトへ入ります。
     def ensure_specification!(style_family, item, value)
       if value.nil?
         raise InvalidDictionaryError,
               "必須の項目がありません: #{style_family}.#{item} (#{@version})" # 開発者向け
       end
 
-      return unless blank_specification?(value)
-
-      raise InvalidDictionaryError,
-            "必須の項目が空です: #{style_family}.#{item} (#{@version})" # 開発者向け
+      chosen = value.is_a?(Array) ? value.first : value
+      ensure_prompt_text!(style_family, item, value, chosen)
     end
 
-    def blank_specification?(value)
-      case value
-      when Array then value.empty? || value.first.to_s.strip.empty?
-      when String then value.strip.empty?
-      else value.to_s.strip.empty?
-      end
+    def ensure_prompt_text!(style_family, item, value, chosen)
+      reason = prompt_text_problem(value, chosen)
+      return if reason.nil?
+
+      raise InvalidDictionaryError,
+            "必須の項目が#{reason}: #{style_family}.#{item} (#{@version})" # 開発者向け
+    end
+
+    def prompt_text_problem(value, chosen)
+      return '一覧として空です' if value.is_a?(Array) && value.empty? # 開発者向け
+      return "文字列ではありません（#{chosen.class}）" unless chosen.is_a?(String) # 開発者向け
+      return '空です' if chosen.strip.empty? # 開発者向け
+
+      nil
     end
 
     def ensure_rules!
