@@ -23,16 +23,48 @@ RSpec.describe '検証で使う文言' do
   #
   # 自前の検証（`validate :method`）は `validators` に現れません。
   # そちらは `custom_keys` で扱います。
+  # 条件によらず 1 つの文言だけを使う検証です。
+  def fixed_keys
+    { ActiveRecord::Validations::PresenceValidator => %i[blank],
+      ActiveRecord::Validations::UniquenessValidator => %i[taken],
+      ActiveModel::Validations::InclusionValidator => %i[inclusion],
+      ActiveModel::Validations::ExclusionValidator => %i[exclusion],
+      ActiveModel::Validations::FormatValidator => %i[invalid] }
+  end
+
+  # 指定した条件によって、使う文言が変わる検証です。
+  def varying_keys
+    { ActiveModel::Validations::LengthValidator => method(:length_keys),
+      ActiveModel::Validations::NumericalityValidator => method(:numericality_keys) }
+  end
+
+  # **継承した検証も引けるようにします。**
+  # `ActiveRecord::Validations::LengthValidator` は
+  # `ActiveModel::Validations::LengthValidator` を継承しています。
+  def matched(table, validator)
+    _, value = table.find { |klass, _| validator.is_a?(klass) }
+    value
+  end
+
   def keys_for(validator)
-    case validator
-    when ActiveRecord::Validations::PresenceValidator then %i[blank]
-    when ActiveRecord::Validations::UniquenessValidator then %i[taken]
-    when ActiveModel::Validations::InclusionValidator then %i[inclusion]
-    when ActiveModel::Validations::ExclusionValidator then %i[exclusion]
-    when ActiveModel::Validations::FormatValidator then %i[invalid]
-    when ActiveModel::Validations::LengthValidator then length_keys(validator)
-    else raise UnknownValidatorError, "対応表に無い検証です: #{validator.class}" # 開発者向け
-    end
+    fixed = matched(fixed_keys, validator)
+    return fixed if fixed
+
+    varying = matched(varying_keys, validator)
+    return varying.call(validator) if varying
+
+    raise UnknownValidatorError, "対応表に無い検証です: #{validator.class}" # 開発者向け
+  end
+
+  # 数値の検証は、指定した条件によって使う文言が変わります。
+  def numericality_keys(validator)
+    { only_integer: :not_an_integer,
+      greater_than_or_equal_to: :greater_than_or_equal_to,
+      greater_than: :greater_than,
+      less_than_or_equal_to: :less_than_or_equal_to,
+      less_than: :less_than }
+      .filter_map { |option, key| key if validator.options.key?(option) }
+      .push(:not_a_number)
   end
 
   # 長さの検証は、指定した条件によって使う文言が変わります。

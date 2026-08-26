@@ -24,6 +24,12 @@ ja:
         invalid: "の形式が正しくありません。"
         # 長さの上限を超えた場合の文言です（length の maximum）。
         too_long: "は%{count}文字以内で入力してください。"
+        # 数値でない場合の文言です（numericality）。
+        not_a_number: "は数値で入力してください。"
+        # 整数でない場合の文言です（numericality の only_integer）。
+        not_an_integer: "は整数で入力してください。"
+        # 下限を下回った場合の文言です（numericality の greater_than_or_equal_to）。
+        greater_than_or_equal_to: "は%{count}以上で入力してください。"
   # アートディレクションノートの文言です（requirements.md 4.1 の 9）。
   #
   # **生成後に人間が確認すべき観点を、案ごとに添えます。**

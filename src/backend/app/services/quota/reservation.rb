@@ -36,6 +36,9 @@ module Quota
         return create!(user, quota_day, prompt_request) if consumption.nil?
 
         claim!(consumption, prompt_request, quota_day)
+      rescue ExhaustedError => e
+        record_exhausted(now)
+        raise e
       end
 
       # 生成リクエストの結果に合わせて、確定または返還します。
@@ -43,14 +46,11 @@ module Quota
       # 決着できるのは予約中の記録だけです。返還済み・確定済みは履歴として残るため、
       # 生成リクエストの識別子だけで引くと、日をまたぐ再実行で前日の記録に当たります。
       # @return [QuotaConsumption]
-      def settle!(prompt_request)
-        consumption = reserved_for(prompt_request)
-        if consumption.nil?
-          raise MissingReservationError,
-                "予約中の記録がありません: prompt_request=#{prompt_request.id}" # 開発者向け
-        end
-
-        consumption.transition_to!(next_status_for(prompt_request))
+      def settle!(prompt_request, now: Time.current)
+        consumption = Settlement.reserved_for!(prompt_request)
+        next_status = Settlement.next_status_for(prompt_request)
+        consumption.transition_to!(next_status)
+        record_reclaimed(now) if next_status == 'refunded'
         consumption
       end
 
@@ -163,35 +163,31 @@ module Quota
         { prompt_request: prompt_request }
       end
 
-      # 予約中の記録を引きます。
+      # 上限到達の発生数を残します（requirements.md 7.1）。
       #
-      # **2 件以上あれば失敗させます。黙って新しい方を選びません。**
-      # どれを決着させるかを選び方で決めると、選び方を変えたときに結果が
-      # 変わります。一意索引（予約中 × 生成リクエスト）が防いでいますが、
-      # 索引を外したときに静かに間違えないようにします。
-      def reserved_for(prompt_request)
-        found = QuotaConsumption.where(prompt_request_id: prompt_request.id,
-                                       status: 'reserved')
-                                .order(quota_day: :desc)
-                                .to_a
-        ensure_single!(found, prompt_request)
-
-        found.first
+      # **枠を取る処理の外で記録します。** 中で記録すると、上限到達で
+      # 巻き戻るときに、記録まで一緒に巻き戻ります。
+      #
+      # **`Metrics::SideChannel` を通します。** 直に呼ぶと、記録が失敗したときに
+      # 上限到達のお知らせが失われます（PR #164 のレビューで実測されました）。
+      #
+      # **利用者の識別子を渡しません。** 残すのは軸の名前と日と件数だけです。
+      #
+      # **この持ち場を、呼び出す側のトランザクションで包まないでください。**
+      # 包むと、断った事実の記録まで一緒に巻き戻ります。**それだけでなく、
+      # 本業の変更まで巻き戻り、しかも呼び出す側は成功を受け取ります**
+      # （PR #164 の 2 回目のレビューで実測されました）。
+      def record_exhausted(now)
+        Metrics::SideChannel.record(MetricEvent::QUOTA_EXHAUSTED, now: now)
       end
 
-      def ensure_single!(found, prompt_request)
-        return if found.size <= 1
-
-        raise AmbiguousReservationError,
-              "予約中の記録が#{found.size}件あります: prompt_request=#{prompt_request.id}" # 開発者向け
-      end
-
-      def next_status_for(prompt_request)
-        return 'confirmed' if prompt_request.delivered?
-        return 'refunded' if prompt_request.status == 'failed'
-
-        raise NotSettleableError,
-              "決着していません: #{prompt_request.status}" # 開発者向け
+      # クォータ返還の発生数を残します（requirements.md 7.1）。
+      #
+      # **決着したあとに記録します。** 直に呼ぶと、記録が失敗したときに、
+      # 枠は返っているのに呼び出す側が失敗を受け取ります。やり直すと
+      # 予約中の記録がもう無く、**やり直しの効かない状態が残ります。**
+      def record_reclaimed(now)
+        Metrics::SideChannel.record(MetricEvent::QUOTA_RECLAIMED, now: now)
       end
 
       def exhausted(quota_day)
