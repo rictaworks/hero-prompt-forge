@@ -52,11 +52,15 @@ module Generation
     # 「へいわ」「よりみち」「からだ工房」「やまと」「このは」のように、
     # **助詞と同じ字で始まる名前・終わる名前がふつうにあります。**
     # 拾ったあとで、会社名でない形だけを落とします。
+    #
+    # **語がどこにあっても落とします。** 「弊社は」は先頭に、
+    # 「合同会社から」は先頭に、「から株式会社」は途中にあります。
+    # **場所で分けても、落とす・落とさないの答えは変わりません。**
     def named?(name)
       return false if name.empty?
       return false if particles.include?(name)
 
-      non_name_words.none? { |word| name.start_with?(word) || name.include?(word) }
+      non_name_words.none? { |word| name.include?(word) }
     end
 
     # 末尾に付いている、会社そのものを指さない語です。**無ければ空です。**

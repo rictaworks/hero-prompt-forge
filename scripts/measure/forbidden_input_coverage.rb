@@ -117,6 +117,28 @@ class ForbiddenInputCoverage
     ]
   end
 
+  # **いま誤って止めてしまう文です**（PR #157 の 5 回目のレビューより）。
+  #
+  # いずれも「載せません」という意味の文ですが、**打ち消しが意図の語から
+  # 遠い**ため、窓が届きません。窓を広げると、別の対象に掛かる語まで
+  # 打ち消しとして拾います（4 回にわたって実測しました）。
+  #
+  # **数として書き残します。** 減らせたら、この一覧から `negations` へ移してください。
+  def shortfall
+    [
+      '他社のロゴは掲載しない方針です。',
+      '他社のロゴを載せた実績はございません。',
+      '他社のロゴを載せる案はございません。',
+      '他社のロゴを使用する許可は取っておりません。',
+      '他社のロゴを掲載する権限がございません。',
+      '他社のロゴを載せるご要望にはお応えできません。',
+      '他社のロゴを使用する場合でも無断では載せません。',
+      '他社のロゴを掲載する予定は現時点ではございません。',
+      '他社のロゴを載せることのないようにしてください。',
+      '他社のロゴを載せる場合は許諾が必要ですので載せません。'
+    ]
+  end
+
   def report
     detector = Generation::ForbiddenDetector.new
     missed = blocked.reject { |text| detector.call(service_summary: text).forbidden? }
@@ -126,6 +148,15 @@ class ForbiddenInputCoverage
     missed.each { |text| puts "  取りこぼし: #{text}" }
     puts "通すべき #{passed.size} 件 : 誤検出 #{false_positive.size} 件"
     false_positive.each { |text| puts "  誤検出: #{text}" }
+    report_shortfall(detector)
+  end
+
+  # **いま誤って止めてしまう文の数を残します。**
+  def report_shortfall(detector)
+    solved = shortfall.reject { |text| detector.call(service_summary: text).forbidden? }
+
+    puts "いま誤って止める #{shortfall.size} 件 : 解けたもの #{solved.size} 件"
+    solved.each { |text| puts "  解けました（passed へ移してください）: #{text}" }
   end
 end
 
