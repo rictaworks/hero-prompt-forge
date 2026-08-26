@@ -1,0 +1,49 @@
+# 語の形をそろえるための対応表です（requirements.md 4.2、issue #136）。
+#
+# アンチAIルック規則は、規則辞書の語と素材を照合します。**同じ意味の語でも、
+# 書き方が違うだけで取りこぼします。** 単数と複数、英国式と米国式のつづりは、
+# 語彙の問題ではなく書き方の問題ですので、照合の側で吸収します。
+#
+# 語順の違いと言い換え（`violet to teal gradient` など）は、語彙の問題です。
+# **ここでは扱いません。** 規則辞書の側で語を足します（issue #65）。
+#
+# **照合の両側へ同じ手当てをします。** 規則辞書の語も、素材も、同じ形に
+# そろえてから照らし合わせます。片側だけに当てると、当たるはずの語が
+# 当たらなくなります。
+
+# 英国式のつづりを、米国式へ寄せます。
+#
+# **単数形で書きます。** 複数形は、先に単数へそろえてから引きます
+# （`colours` -> `colour` -> `color`）。
+#
+# 足す場合は、生成モデルへ渡す指示に出てくる語に限ってください。
+# 一般の語をむやみに足すと、意図しない語まで同じ形へ寄ります。
+spelling_variants:
+  colour: color
+  watercolour: watercolor
+  grey: gray
+  centre: center
+  fibre: fiber
+  metre: meter
+  theatre: theater
+  catalogue: catalog
+  dialogue: dialog
+  aluminium: aluminum
+  jewellery: jewelry
+  mould: mold
+  artefact: artifact
+  favourite: favorite
+  realise: realize
+  organise: organize
+
+# `s` で終わりますが、複数形ではない語です。
+#
+# **末尾の `s` を落とすと別の語になります。** `lens` を `len` にすると、
+# 「レンズ」の指示が別の語として扱われます。`us` ・ `is` ・ `as` ・ `ss` で
+# 終わる語（`focus` ・ `analysis` ・ `canvas` ・ `glass` など）は、
+# 実装の側で落とさない決まりですので、ここへは書きません。
+singular_words:
+  - lens
+  - news
+  - series
+  - species
