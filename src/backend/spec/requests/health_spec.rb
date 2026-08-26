@@ -68,6 +68,46 @@ RSpec.describe 'ヘルスチェック' do # rubocop:disable RSpec/DescribeClass
     end
   end
 
+  # **本番では、平文の要求を TLS へ転送します。**
+  # BASIC 認証の資格情報は、TLS が無ければそのまま読み取れる形で流れます。
+  #
+  # **死活監視だけは、平文でも答えます。** 外形監視サービスが転送に追従
+  # できない場合に、稼働しているのに落ちていると判定されるためです。
+  describe '本番での TLS の扱い' do
+    # **本番の設定を実際に読み込んで確かめます。**
+    # いまの環境（テスト）の設定を見ても、本番の姿は分かりません。
+    def production_settings
+      configuration = Rails::Application::Configuration.new(Rails.root)
+      configuration.instance_eval(
+        Rails.root.join('config/environments/production.rb').read
+                  .sub('Rails.application.configure do', 'config = self;').sub(/end\s*\z/, '')
+      )
+      configuration
+    end
+
+    it '平文の要求を TLS へ転送します' do
+      expect(production_settings.force_ssl).to be(true)
+    end
+
+    # **`assume_ssl` を有効にすると、転送が一度も起きません**
+    # （PR #150 のレビューで実測されました）。
+    it 'すべての要求を TLS の上のものとして扱いません' do
+      expect(production_settings.assume_ssl).to be(false)
+    end
+
+    it '死活監視を転送の対象から外します' do
+      excluded = production_settings.ssl_options.dig(:redirect, :exclude)
+
+      expect(excluded.call(instance_double(ActionDispatch::Request, path: '/health'))).to be(true)
+    end
+
+    it '管理画面は転送の対象にします' do
+      excluded = production_settings.ssl_options.dig(:redirect, :exclude)
+
+      expect(excluded.call(instance_double(ActionDispatch::Request, path: '/admin'))).to be(false)
+    end
+  end
+
   # **待ち受ける番号は、環境が決めます。**
   # Railway は `PORT` を注入します。アプリはその値で待ち受けます。
   #
