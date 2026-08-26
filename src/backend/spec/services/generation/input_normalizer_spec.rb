@@ -169,6 +169,125 @@ RSpec.describe Generation::InputNormalizer do
     end
   end
 
+  describe '型が違う入力' do
+    it 'サービス概要が文字列でなければ、項目を添えて失敗します' do
+      expect { normalizer.call(given(service_summary: 123)) }
+        .to raise_error(described_class::InvalidInputError) { |error|
+          expect(error.errors).to include(field: :service_summary, reason: :invalid_type)
+        }
+    end
+
+    it 'ブランドカラーが配列でなければ、項目を添えて失敗します' do
+      expect { normalizer.call(given(brand_colors: { '0' => '#111111' })) }
+        .to raise_error(described_class::InvalidInputError) { |error|
+          expect(error.errors).to include(field: :brand_colors, reason: :invalid_type)
+        }
+    end
+
+    it 'ブランドカラーの中身が文字列でなければ、項目を添えて失敗します' do
+      expect { normalizer.call(given(brand_colors: [123_456])) }
+        .to raise_error(described_class::InvalidInputError) { |error|
+          expect(error.errors).to include(field: :brand_colors, reason: :invalid_type)
+        }
+    end
+
+    it '業種が文字列でなければ、項目を添えて失敗します' do
+      expect { normalizer.call(given(industry: 1)) }
+        .to raise_error(described_class::InvalidInputError) { |error|
+          expect(error.errors).to include(field: :industry, reason: :invalid_type)
+        }
+    end
+
+    it '入力そのものが読み取れない形なら失敗します' do
+      expect { normalizer.call(nil) }
+        .to raise_error(described_class::InvalidInputError)
+    end
+
+    it '型の誤りでも素の NoMethodError にしません' do
+      expect { normalizer.call(given(service_summary: 123)) }
+        .to raise_error(described_class::InvalidInputError)
+    end
+  end
+
+  describe '規則辞書の不備' do
+    it '辞書が無ければ組み立てられません' do
+      expect { described_class.new(dictionary: nil) }
+        .to raise_error(described_class::MissingDictionaryError)
+    end
+
+    it '辞書の標準トーンが選択肢の外なら失敗します' do
+      broken = RuleDictionary.create!(
+        version: 'vspec.broken',
+        industry_defaults: { 'saas' => { 'tone' => 'mysterious' } }
+      )
+
+      expect { described_class.new(dictionary: broken).call(given) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '利用者の入力の誤りを、辞書の不備より先に返します' do
+      empty = RuleDictionary.create!(version: 'vspec.empty2', industry_defaults: {})
+
+      expect { described_class.new(dictionary: empty).call(given(style_family: 'watercolor')) }
+        .to raise_error(described_class::InvalidInputError)
+    end
+  end
+
+  describe '一覧の持ち主' do
+    it '業種の一覧をプロジェクトと共有します' do
+      expect(described_class::INDUSTRIES).to equal(Project::INDUSTRIES)
+    end
+
+    it 'スタイル系統の一覧をプロジェクトと共有します' do
+      expect(described_class::STYLE_FAMILIES).to equal(Project::STYLE_FAMILIES)
+    end
+
+    it '生成モデルの一覧を生成リクエストと共有します' do
+      expect(described_class::TARGET_MODELS).to equal(PromptRequest::TARGET_MODELS)
+    end
+  end
+
+  describe '選択肢の総当たり' do
+    it 'すべての生成モデルを受け取れます' do
+      described_class::TARGET_MODELS.each do |model|
+        expect(normalizer.call(given(target_model: model))[:target_model]).to eq(model)
+      end
+    end
+
+    it 'すべてのコピースペース位置を受け取れます' do
+      described_class::COPY_SPACE_POSITIONS.each do |position|
+        expect(normalizer.call(given(copy_space_position: position))[:copy_space_position])
+          .to eq(position)
+      end
+    end
+
+    it 'すべてのアスペクト比を受け取れます' do
+      described_class::ASPECT_RATIOS.each do |ratio|
+        expect(normalizer.call(given(aspect_ratio: ratio))[:aspect_ratio]).to eq(ratio)
+      end
+    end
+
+    it 'すべてのスタイル系統を受け取れます' do
+      described_class::STYLE_FAMILIES.each do |family|
+        expect(normalizer.call(given(style_family: family))[:style_family]).to eq(family)
+      end
+    end
+  end
+
+  describe '同じ色の重ねがけ' do
+    it '同じ色を2つ指定すると失敗します' do
+      expect { normalizer.call(given(brand_colors: %w[#111111 #111111])) }
+        .to raise_error(described_class::InvalidInputError) { |error|
+          expect(error.errors).to include(field: :brand_colors, reason: :duplicated)
+        }
+    end
+
+    it '大文字小文字が違うだけの重ねがけも失敗します' do
+      expect { normalizer.call(given(brand_colors: %w[#aabbcc #AABBCC])) }
+        .to raise_error(described_class::InvalidInputError)
+    end
+  end
+
   describe '受け取る形' do
     it '文字列の鍵でも受け取れます' do
       expect(normalizer.call('industry' => 'saas', 'style_family' => 'photoreal',

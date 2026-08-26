@@ -9,6 +9,8 @@ module Generation
   # **推測で補いません。** 選べない値を受け取ったら、その場で失敗させます。
   # 曖昧なまま先へ進めると、規則の適用も出力も静かにずれます。
   class InputNormalizer
+    include InputChoices
+
     # 入力に誤りがある場合に投げます。誤りは項目ごとにまとめて持ちます。
     # 文言はこの層で作りません。呼び出す側が項目と理由から組み立てます。
     class InvalidInputError < StandardError
@@ -20,28 +22,15 @@ module Generation
       end
     end
 
-    # 選べる値です。requirements.md 4.1 の選択肢に対応します。
-    INDUSTRIES = %w[
-      saas restaurant medical education real_estate
-      manufacturing professional_services ecommerce beauty other
-    ].freeze
-    STYLE_FAMILIES = %w[photoreal illustration three_d abstract].freeze
-    TARGET_MODELS = PromptRequest::TARGET_MODELS
-    BRAND_TONES = %w[trust advanced warmth premium friendly minimal].freeze
-    COPY_SPACE_POSITIONS = %w[left right bottom_center].freeze
-    ASPECT_RATIOS = ['16:9', '21:9', '3:2'].freeze
+    # 規則辞書が渡されていない場合に投げます。
+    class MissingDictionaryError < StandardError; end
 
-    # 既定値です。
-    DEFAULT_COPY_SPACE_POSITION = 'left'
-    DEFAULT_ASPECT_RATIO = '16:9'
-
-    # 上限です。
-    MAX_BRAND_COLORS = 2
-    MAX_SERVICE_SUMMARY_LENGTH = 1000
-
-    BRAND_COLOR_FORMAT = /\A#[0-9a-fA-F]{6}\z/
+    # 規則辞書の内容が選択肢から外れている場合に投げます。
+    class InvalidDictionaryError < StandardError; end
 
     def initialize(dictionary:)
+      raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
+
       @dictionary = dictionary
       @errors = []
     end
@@ -49,13 +38,16 @@ module Generation
     # 正規化した入力を返します。誤りがあれば InvalidInputError です。
     # @return [Hash]
     def call(raw)
-      input = symbolize(raw)
+      input = take_known(raw)
       @errors = []
 
       normalized = required_part(input).merge(optional_part(input))
-      normalized[:brand_tone] = brand_tone(input, normalized[:industry])
+      normalized[:brand_tone] = requested_tone(input)
+      # 入力の誤りを先に返します。あとにすると、規則辞書の不備が
+      # 利用者の入力の誤りを隠します。
       raise InvalidInputError, @errors if @errors.any?
 
+      normalized[:brand_tone] ||= default_tone(normalized[:industry])
       normalized
     end
 
@@ -83,15 +75,29 @@ module Generation
 
     attr_reader :dictionary
 
-    def symbolize(raw)
-      raw.to_h { |key, value| [key.to_sym, value] }
+    # 想定した項目だけを取り出します。**先に絞ってから記号へ直します。**
+    # 届いたすべての鍵を先に直すと、鍵の型が想定外だった場合に、項目名を
+    # 添えられない失敗になります。
+    def take_known(raw)
+      raise InvalidInputError, [{ field: :root, reason: :invalid_type }] unless raw.respond_to?(:[])
+
+      KNOWN_FIELDS.index_with { |field| raw[field].nil? ? raw[field.to_s] : raw[field] }
     end
 
-    def presence(value)
-      return nil if value.nil?
-      return nil if value.respond_to?(:strip) && value.strip.empty?
+    # 文字列として扱える値かどうかを確かめます。
+    def string_like?(value)
+      value.is_a?(String)
+    end
 
-      value.respond_to?(:strip) ? value.strip : value
+    # 文字列として受け取る項目の値を整えます。文字列でなければ、項目名を
+    # 添えた誤りとして集めます。推測して文字列へ直しません。
+    def presence(input, field)
+      value = input[field]
+      return nil if value.nil?
+      return add_error(field, :invalid_type) unless string_like?(value)
+
+      stripped = value.strip
+      stripped.empty? ? nil : stripped
     end
 
     def add_error(field, reason)
@@ -100,7 +106,10 @@ module Generation
     end
 
     def required_choice(input, field, choices)
-      value = presence(input[field])
+      return nil if error_for?(field)
+
+      value = presence(input, field)
+      return nil if error_for?(field)
       return add_error(field, :missing) if value.nil?
       return add_error(field, :unknown_value) unless choices.include?(value)
 
@@ -108,47 +117,60 @@ module Generation
     end
 
     def optional_choice(input, field, choices, default)
-      value = presence(input[field])
+      value = presence(input, field)
+      return nil if error_for?(field)
       return default if value.nil?
       return add_error(field, :unknown_value) unless choices.include?(value)
 
       value
     end
 
-    # トーンは指定が無ければ業種の標準を使います。標準の定義が無ければ
-    # 規則辞書の不備です。推測せず KeyError で失敗させます。
-    def brand_tone(input, industry)
-      value = presence(input[:brand_tone])
-      if value
-        return add_error(:brand_tone, :unknown_value) unless BRAND_TONES.include?(value)
+    def error_for?(field)
+      @errors.any? { |error| error[:field] == field }
+    end
 
-        return value
-      end
+    # 利用者が指定したトーンです。指定が無ければ空を返します。
+    def requested_tone(input)
+      value = presence(input, :brand_tone)
+      return nil if error_for?(:brand_tone) || value.nil?
+      return add_error(:brand_tone, :unknown_value) unless BRAND_TONES.include?(value)
 
-      # 業種そのものが誤っている場合は、標準トーンを引けません。
-      # 業種の誤りはすでに集めているため、ここでは何も足しません。
-      return nil if industry.nil?
+      value
+    end
 
-      dictionary.defaults_for(industry).fetch('tone') do
+    # 業種ごとの標準トーンです。規則辞書から引きます。
+    #
+    # 定義が無ければ辞書の不備です。推測せず失敗させます。**引いた値も
+    # 選択肢に照らします。** 辞書は管理画面から編集できるようになるため、
+    # 選べない値が入ったまま先へ進むと、以降の規則適用が想定しない値を
+    # 受け取ります。
+    def default_tone(industry)
+      tone = dictionary.defaults_for(industry).fetch('tone') do
         raise KeyError, "業種の標準トーンがありません: #{industry.inspect}" # 開発者向け
       end
+
+      unless BRAND_TONES.include?(tone)
+        raise InvalidDictionaryError,
+              "規則辞書の標準トーンが選択肢の外です: #{industry.inspect} -> #{tone.inspect}" # 開発者向け
+      end
+
+      tone
     end
 
     def service_summary(input)
-      value = presence(input[:service_summary])
-      return nil if value.nil?
+      value = presence(input, :service_summary)
+      return nil if error_for?(:service_summary) || value.nil?
       return add_error(:service_summary, :too_long) if value.length > MAX_SERVICE_SUMMARY_LENGTH
 
       value
     end
 
+    # ブランドカラーです。検証と正規化は BrandColors が持ちます。
     def brand_colors(input)
-      values = Array(input[:brand_colors]).filter_map { |value| presence(value) }
-      return [] if values.empty?
-      return add_error(:brand_colors, :too_many) if values.size > MAX_BRAND_COLORS
-      return add_error(:brand_colors, :invalid_format) unless values.all? { |v| v.match?(BRAND_COLOR_FORMAT) }
+      result = BrandColors.normalize(input[:brand_colors])
+      return add_error(:brand_colors, result.reason) if result.reason
 
-      values.map(&:upcase)
+      result.colors
     end
   end
 end
