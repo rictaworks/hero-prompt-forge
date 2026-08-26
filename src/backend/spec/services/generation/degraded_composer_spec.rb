@@ -8,6 +8,13 @@ RSpec.describe Generation::DegradedComposer do
   let(:refiner) { instance_double(Generation::LlmRefiner) }
   let(:composer) { described_class.new(refiner: refiner) }
 
+  # 規則辞書です。**磨く仕組みを組み立てるために使います。**
+  def dictionary
+    @dictionary ||= RuleDictionary.create!(
+      version: 'vspec.degraded', anti_ai_rules: InitialRuleDictionary.anti_ai_rules
+    )
+  end
+
   def with_key(present)
     allow(Generation::LlmRefiner).to receive(:available?).and_return(present)
   end
@@ -96,6 +103,18 @@ RSpec.describe Generation::DegradedComposer do
 
     it '理由を残します' do
       expect(degraded_note(composer.compose(draft))[:reason]).to eq(:llm_unavailable)
+    end
+  end
+
+  # **規則辞書から磨く仕組みを組み立てられます。**
+  describe '規則辞書から組み立てる場合' do
+    it '磨く仕組みを自分で用意します' do
+      expect { described_class.new(dictionary: dictionary) }.not_to raise_error
+    end
+
+    it '規則辞書が無ければ組み立てられません' do
+      expect { described_class.new }
+        .to raise_error(Generation::LlmRefiner::MissingDictionaryError)
     end
   end
 end

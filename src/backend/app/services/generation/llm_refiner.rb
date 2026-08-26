@@ -27,17 +27,25 @@ module Generation
     # 呼び出しが失敗した場合に投げます。
     RequestFailedError = GeminiClient::RequestFailedError
 
+    # 規則辞書が渡されていない場合に投げます。
+    class MissingDictionaryError < StandardError; end
+
     # ノートに残す印です。
     NOTE_KIND = :llm_refined
 
     # 日本語が混ざっていないかを見ます。
     JAPANESE = /[ぁ-んァ-ヶ一-龥]/
 
-    # @param dictionary [RuleDictionary, nil] アンチAIルック規則の再検査に使います
-    def initialize(client: GeminiClient.new, settings: LlmSettings.load, dictionary: nil)
+    # @param dictionary [RuleDictionary] アンチAIルック規則の再検査に使います
+    #
+    # **規則辞書は必須です。** 既定を空にすると、渡し忘れたときに
+    # **再検査が黙って無効になります**（PR #162 の 2 回目のレビューより）。
+    def initialize(dictionary:, client: GeminiClient.new, settings: LlmSettings.load)
+      raise MissingDictionaryError, '規則辞書がありません。' if dictionary.nil? # 開発者向け
+
       @client = client
       @settings = settings
-      @rules = dictionary && AntiAiRules.new(dictionary)
+      @rules = AntiAiRules.new(dictionary)
     end
 
     # API キーが用意されているかどうかを返します。
@@ -116,8 +124,6 @@ module Generation
     # 磨く過程で、排除するはずの語が戻ることがあります
     # （PR #162 のレビューより）。**戻ったら、その場で失敗させます。**
     def ensure_allowed!(refined)
-      return if rules.nil?
-
       matched = refined.filter_map { |line| rules.forbidden_match(line) }.uniq
       return if matched.empty?
 

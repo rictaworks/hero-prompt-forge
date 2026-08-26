@@ -19,8 +19,10 @@ module Generation
     # 何回まで試すかです。**越えたら縮退します。**
     DEFAULT_ATTEMPTS = 2
 
-    def initialize(refiner: LlmRefiner.new, attempts: DEFAULT_ATTEMPTS)
-      @refiner = refiner
+    # @param dictionary [RuleDictionary] 磨いた素材の再検査に使います
+    # @param refiner [LlmRefiner, nil] 差し替える場合に渡します
+    def initialize(dictionary: nil, refiner: nil, attempts: DEFAULT_ATTEMPTS)
+      @refiner = refiner || LlmRefiner.new(dictionary: dictionary)
       @attempts = attempts
     end
 
