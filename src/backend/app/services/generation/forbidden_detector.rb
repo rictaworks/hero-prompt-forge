@@ -116,13 +116,34 @@ module Generation
 
     # **見つかった箇所をすべて拾います。** 最初の1件だけを見ると、先に書かれた
     # 語で判定が終わり、後ろに書かれた本当の言及を取りこぼします。
+    #
+    # 重なり合う箇所は、長いほうだけを残します。同じ言及に対して規則が2つ当たると
+    # （「大谷翔平さん」と「大谷翔平」）、同じ相手について2行お伝えすることになります。
     def reasons_for(rule, text)
-      rule[:matchers].flat_map do |matcher|
-        text.scan(matcher).map do
-          Reason.new(kind: rule[:kind], matched: Regexp.last_match(0),
-                     suggestion_key: rule[:suggestion_key])
-        end
+      taken = []
+
+      matches_in(rule, text).filter_map do |matched|
+        span = matched.begin(0)...matched.end(0)
+        next if taken.any? { |other| overlap?(other, span) }
+
+        taken << span
+        Reason.new(kind: rule[:kind], matched: matched[0],
+                   suggestion_key: rule[:suggestion_key])
       end
+    end
+
+    # 見つかった箇所を、前から順に、長いものを先に並べます。
+    #
+    # `scan` の戻り値へ `map` をつなぐと、`Regexp.last_match` が最後の1件に
+    # 固定されます。列挙しながら取り出す形にします。
+    def matches_in(rule, text)
+      rule[:matchers]
+        .flat_map { |matcher| text.to_enum(:scan, matcher).map { Regexp.last_match } }
+        .sort_by { |matched| [matched.begin(0), -matched[0].length] }
+    end
+
+    def overlap?(one, other)
+      one.cover?(other.first) || other.cover?(one.first)
     end
 
     # 差し戻した事実を記録へ残します。

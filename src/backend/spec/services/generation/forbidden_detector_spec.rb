@@ -221,6 +221,88 @@ RSpec.describe Generation::ForbiddenDetector do
     end
   end
 
+  # **複数の言及があれば、そのすべてをお伝えします。**
+  # 1件だけ返すと、先に書かれたお名前を直すべきだと利用者が気づけません。
+  describe '同じ種別の言及が複数ある場合' do
+    it '2名のお名前をどちらも返します' do
+      result = detect('山田太郎さんと鈴木花子さんの写真を使います。')
+
+      expect(result.reasons.map(&:matched)).to contain_exactly('山田太郎さん', '鈴木花子さん')
+    end
+
+    it '3名のお名前をすべて返します' do
+      result = detect('佐藤一郎さん、高橋二郎さん、渡辺三郎さんを並べます。')
+
+      expect(result.reasons.size).to eq(3)
+    end
+
+    it '記録の件数も実際の件数と揃います' do
+      allow(Trace).to receive(:step).and_call_original
+
+      detect('山田太郎さんと鈴木花子さんと佐藤次郎さんの3名を並べます。')
+
+      expect(Trace).to have_received(:step) { |_name, context|
+        expect(context[:count]).to eq(3)
+      }
+    end
+
+    it '同じ言及に2つの規則が当たっても、1件にまとめます' do
+      result = detect('大谷翔平さんのような選手に使ってほしいです。')
+
+      expect(result.reasons.map(&:matched)).to eq(['大谷翔平さん'])
+    end
+  end
+
+  # 一覧に無い役職の語尾です。語の形で見分けていることを確かめます。
+  describe '一覧に無い役職の語尾' do
+    [
+      '協力会社さんとの情報共有を一本化します。',
+      '取引先さんへの請求を自動で作成します。',
+      '仕入先さんとの信頼で成り立つ料理です。',
+      '常連客さんに支えられて30年になります。',
+      '宮大工さんが建てた店舗が自慢です。',
+      '協力工場さんと歩んで50年です。',
+      '新郎新婦さんの門出を彩ります。',
+      '警察官さんの立ち会いのもと撮影します。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+  end
+
+  # 「実在」に続く語が人を指さない場合です。
+  describe '人を指さない「実在」' do
+    [
+      '実在する法人のみが登録できる仕組みです。',
+      '実在の求人情報だけを掲載します。',
+      '実在の店舗の見え方を再現します。',
+      '実在する会社の考え方を伝えます。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+  end
+
+  # **商標の調査・出願は士業の中核業務です。** 業種の一覧にも入っています。
+  describe '商標を業務として扱う言い回し' do
+    [
+      '他社の商標調査を代行します。',
+      '第三者の商標を侵害しないか確認します。',
+      '別のロゴ案もあわせてご提案します。',
+      '商標登録の出願をお手伝いします。'
+    ].each do |text|
+      it "「#{text}」を止めません" do
+        expect(detect(text)).not_to be_forbidden
+      end
+    end
+
+    it '画面へ置く意図があれば止めます' do
+      expect(detect('他社のロゴを載せたいです。')).to be_forbidden
+    end
+  end
+
   describe '理由の重なり' do
     it '同じ内容の理由を重ねて返しません' do
       result = detect('Apple のロゴを背景に入れてください。')
