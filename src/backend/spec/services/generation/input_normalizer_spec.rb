@@ -302,17 +302,36 @@ RSpec.describe Generation::InputNormalizer do
         expect(normalizer.call(params)).to include(industry: 'saas')
       end
     end
+
+    # **文字として扱えない並びも、項目名を添えた誤りにします。**
+    # そのまま `strip` を呼ぶと `Encoding::CompatibilityError` になり、
+    # 項目名も理由も付きません。issue #133 が直した症状と同じ形です。
+    describe '文字として扱えない並び' do
+      let(:broken) { "\xff\xfe".dup.force_encoding('UTF-8') }
+
+      it 'サービス概要なら、項目を添えて失敗します' do
+        expect { normalizer.call(given(service_summary: broken)) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :service_summary, reason: :invalid_type)
+          }
+      end
+
+      it '業種なら、項目を添えて失敗します' do
+        expect { normalizer.call(given(industry: broken)) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :industry, reason: :invalid_type)
+          }
+      end
+
+      it 'ブランドカラーの中身なら、項目を添えて失敗します' do
+        expect { normalizer.call(given(brand_colors: [broken])) }
+          .to raise_error(described_class::InvalidInputError) { |error|
+            expect(error.errors).to include(field: :brand_colors, reason: :invalid_type)
+          }
+      end
+    end
   end
 
-  # **1つのインスタンスを複数のスレッドから同時に使っても、結果が混ざりません。**
-  # 誤りの一覧をインスタンスへ持つと、正しい入力に対して誤りが返ります
-  # （issue #133 で、800 回のうち 20 回の混ざりを実測しました）。
-  #
-  # **回帰を防ぐのは、次の「途中の状態を持たないこと」の例です。**
-  # 直す前の実装に対して確実に失敗します。同時に呼ぶ例のほうは、
-  # 8000 回まで増やしても直す前の実装が通ってしまいました。混ざりが起きる
-  # 窓が狭く、実行のたびに当たり外れがあるためです。**当たり外れのある例を
-  # 守りとして数えません。** 実際に同時に呼んで壊れないことの確認として置きます。
   # 差し戻した事実を記録へ残します。**入力そのものを残しません。**
   # 記録は保管期間が長く、閲覧できる範囲も広くなります。
   describe '差し戻しの記録' do
@@ -345,6 +364,11 @@ RSpec.describe Generation::InputNormalizer do
     end
   end
 
+  # **1つのインスタンスを複数のスレッドから同時に使っても、結果が混ざりません。**
+  # 誤りの一覧をインスタンスへ持つと、正しい入力に対して誤りが返ります
+  # （issue #133 で、800 回のうち 20 回の混ざりを実測しました）。
+  #
+  # **回帰を防ぐのは、この節の例です。** 直す前の実装に対して確実に失敗します。
   describe '途中の状態を持たないこと' do
     it '誤りのある呼び出しのあとも、instance へ状態が残りません' do
       expect { normalizer.call(given(style_family: 'watercolor')) }
@@ -361,6 +385,10 @@ RSpec.describe Generation::InputNormalizer do
     end
   end
 
+  # **この節は、当たり外れのある例です。守りとして数えません。**
+  # 8000 回まで増やしても、直す前の実装が通ってしまいました。混ざりが起きる
+  # 窓が狭く、実行のたびに当たり外れがあるためです。実際に同時に呼んで
+  # 壊れないことの確認として置きます。
   describe '同時に呼び出したとき' do
     # **関門を置いて、足並みをそろえてから同時に呼びます。**
     # ばらばらに呼ぶと競合の窓に入らず、直す前の実装でもたまたま通ります。
@@ -441,40 +469,40 @@ RSpec.describe Generation::InputNormalizer do
 
   describe '一覧の持ち主' do
     it '業種の一覧をプロジェクトと共有します' do
-      expect(described_class::INDUSTRIES).to equal(Project::INDUSTRIES)
+      expect(Generation::InputChoices::INDUSTRIES).to equal(Project::INDUSTRIES)
     end
 
     it 'スタイル系統の一覧をプロジェクトと共有します' do
-      expect(described_class::STYLE_FAMILIES).to equal(Project::STYLE_FAMILIES)
+      expect(Generation::InputChoices::STYLE_FAMILIES).to equal(Project::STYLE_FAMILIES)
     end
 
     it '生成モデルの一覧を生成リクエストと共有します' do
-      expect(described_class::TARGET_MODELS).to equal(PromptRequest::TARGET_MODELS)
+      expect(Generation::InputChoices::TARGET_MODELS).to equal(PromptRequest::TARGET_MODELS)
     end
   end
 
   describe '選択肢の総当たり' do
     it 'すべての生成モデルを受け取れます' do
-      described_class::TARGET_MODELS.each do |model|
+      Generation::InputChoices::TARGET_MODELS.each do |model|
         expect(normalizer.call(given(target_model: model))[:target_model]).to eq(model)
       end
     end
 
     it 'すべてのコピースペース位置を受け取れます' do
-      described_class::COPY_SPACE_POSITIONS.each do |position|
+      Generation::InputChoices::COPY_SPACE_POSITIONS.each do |position|
         expect(normalizer.call(given(copy_space_position: position))[:copy_space_position])
           .to eq(position)
       end
     end
 
     it 'すべてのアスペクト比を受け取れます' do
-      described_class::ASPECT_RATIOS.each do |ratio|
+      Generation::InputChoices::ASPECT_RATIOS.each do |ratio|
         expect(normalizer.call(given(aspect_ratio: ratio))[:aspect_ratio]).to eq(ratio)
       end
     end
 
     it 'すべてのスタイル系統を受け取れます' do
-      described_class::STYLE_FAMILIES.each do |family|
+      Generation::InputChoices::STYLE_FAMILIES.each do |family|
         expect(normalizer.call(given(style_family: family))[:style_family]).to eq(family)
       end
     end

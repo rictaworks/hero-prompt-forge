@@ -7,9 +7,20 @@ module Generation
   #
   # **同じ色の重ねがけは、1色として扱わずに誤りとして返します。**
   # 黙って1色に減らすと、利用者が2色を指定したつもりの意図と食い違います。
+  #
+  # **一方で、空（nil）と空白だけの要素は、未指定として落とします。**
+  # 扱いを分けます。空の欄は「指定していない」ことの素直な表れですが、
+  # 同じ色を2度書くのは「2色指定したつもり」との食い違いだからです。
+  # 上限2色の判定も、落としたあとの件数で行います。
+  #
+  # **文字として扱えない並びは、誤りとして返します。** そのまま `strip` を
+  # 呼ぶと `Encoding::CompatibilityError` になり、項目名も理由も付きません。
   class BrandColors
     # 検証の結果です。`reason` があれば誤りです。
     Result = Struct.new(:colors, :reason, keyword_init: true)
+
+    # 文字として扱えない並びの目印です。落とさずに誤りへ回すために使います。
+    INVALID_TEXT = Object.new.freeze
 
     class << self
       # @return [Result]
@@ -27,6 +38,7 @@ module Generation
 
       def trimmed(value)
         return value unless value.is_a?(String)
+        return INVALID_TEXT unless value.valid_encoding?
 
         stripped = value.strip
         stripped.empty? ? nil : stripped

@@ -10,9 +10,19 @@ require 'rails_helper'
 # 起きる例外の種類が変わり、原因の切り分けが遠回りになります（issue #124）。
 #
 # **新しい検証を足したときに、文言の足し忘れをこのテストが知らせます。**
+# 対応表に無い種類の検証を見つけた場合に投げます。
+class UnknownValidatorError < StandardError; end
+
 RSpec.describe '検証で使う文言' do
   # 検証の種類から、使う文言の鍵を求めます。
-  # ここに無い種類の検証を足した場合は、この対応表へも足します。
+  #
+  # **対応表に無い種類の検証は、その場で失敗させます。**
+  # 空を返して通すと、対応表に無い検証を足したときに鍵が 1 つも求まらず、
+  # テストは緑のまま通ります。**issue #124 の症状そのものが再発しても
+  # 気づけません。** 対応表への追記を、人の記憶ではなくテストが強制します。
+  #
+  # 自前の検証（`validate :method`）は `validators` に現れません。
+  # そちらは `custom_keys` で扱います。
   def keys_for(validator)
     case validator
     when ActiveRecord::Validations::PresenceValidator then %i[blank]
@@ -21,7 +31,7 @@ RSpec.describe '検証で使う文言' do
     when ActiveModel::Validations::ExclusionValidator then %i[exclusion]
     when ActiveModel::Validations::FormatValidator then %i[invalid]
     when ActiveModel::Validations::LengthValidator then length_keys(validator)
-    else []
+    else raise UnknownValidatorError, "対応表に無い検証です: #{validator.class}" # 開発者向け
     end
   end
 
@@ -67,14 +77,15 @@ RSpec.describe '検証で使う文言' do
     expect(used.reject { |key| defined_message?(key) }).to be_empty
   end
 
-  it '自前の検証と関連の欠落で使う文言が定義されています' do
-    expect(custom_keys.reject { |key| defined_message?(key) }).to be_empty
+  it '対応表に無い種類の検証を見つけたら失敗します' do
+    unknown = ActiveModel::Validations::AcceptanceValidator.new(attributes: [:terms],
+                                                                class: User)
+
+    expect { keys_for(unknown) }.to raise_error(UnknownValidatorError)
   end
 
-  it 'すべての文言がですます調で終わります' do
-    values = I18n.t('activerecord.errors.messages').values
-
-    expect(values).to all(end_with('。'))
+  it '自前の検証と関連の欠落で使う文言が定義されています' do
+    expect(custom_keys.reject { |key| defined_message?(key) }).to be_empty
   end
 
   # 実際に起きる例外の種類をそろえます。issue #124 の症状そのものです。

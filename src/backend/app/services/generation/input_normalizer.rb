@@ -14,9 +14,9 @@ module Generation
   # ときに結果が混ざります（issue #133 で実測しました）。1回の呼び出しの状態は
   # Attempt が持ち、呼び出しごとに作り直します。
   class InputNormalizer
-    # 選択肢の定義です。**この層が選択肢の持ち主として外へ見せます。**
-    # 実際に照合するのは Attempt ですが、呼び出す側と試験は、この名前で引きます。
-    include InputChoices
+    # 選択肢の定義です。**外へ見せる名前を増やさないため、`include` しません。**
+    # 呼び出す側と試験は `Generation::InputChoices::` を直接参照します。
+    # 参照の経路が 2 通りあると、どちらが正なのかが読めなくなります。
 
     # 入力に誤りがある場合に投げます。誤りは項目ごとにまとめて持ちます。
     # 文言はこの層で作りません。呼び出す側が項目と理由から組み立てます。
@@ -120,10 +120,14 @@ module Generation
 
       # 文字列として受け取る項目の値を整えます。文字列でなければ、項目名を
       # 添えた誤りとして集めます。推測して文字列へ直しません。
+      # **文字として扱えない並びも、項目名を添えた誤りにします。**
+      # 壊れた並びのまま `strip` を呼ぶと `Encoding::CompatibilityError` になり、
+      # 項目名も理由も付きません。issue #133 が直した症状と同じ形です。
       def presence(input, field)
         value = input[field]
         return nil if value.nil?
         return add_error(field, :invalid_type) unless value.is_a?(String)
+        return add_error(field, :invalid_type) unless value.valid_encoding?
 
         stripped = value.strip
         stripped.empty? ? nil : stripped
@@ -135,20 +139,18 @@ module Generation
       end
 
       def required_choice(input, field, choices)
-        return nil if error_for?(field)
-
-        value = presence(input, field)
-        return nil if error_for?(field)
-        return add_error(field, :missing) if value.nil?
-        return add_error(field, :unknown_value) unless choices.include?(value)
-
-        value
+        choice(input, field, choices) { add_error(field, :missing) }
       end
 
       def optional_choice(input, field, choices, default)
+        choice(input, field, choices) { default }
+      end
+
+      # 値を取り出し、選択肢に照らします。欠けていた場合の扱いだけが違います。
+      def choice(input, field, choices)
         value = presence(input, field)
         return nil if error_for?(field)
-        return default if value.nil?
+        return yield if value.nil?
         return add_error(field, :unknown_value) unless choices.include?(value)
 
         value
