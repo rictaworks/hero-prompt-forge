@@ -28,10 +28,10 @@ module Generation
     def build(draft)
       applied = specifications_note_of(draft)
       chosen = specifications_for(applied)
-      dropped = dropped_terms(draft, applied, chosen)
+      dropped = dropped_terms(draft, applied)
       swapped = swapped_terms(draft, applied, chosen, dropped)
 
-      traced(swapped, dropped) { assembled(draft, chosen, dropped, swapped) }
+      traced(swapped, dropped) { assembled(draft, applied, chosen, dropped, swapped) }
     end
 
     private
@@ -44,10 +44,10 @@ module Generation
                  swapped: swapped[:swapped], dropped: dropped.size, &)
     end
 
-    def assembled(draft, chosen, dropped, swapped)
+    def assembled(draft, applied, chosen, dropped, swapped)
       draft.replace(
         main_terms: swapped[:main_terms],
-        notes: rewritten_notes(draft, chosen, dropped)
+        notes: rewritten_notes(draft, applied, chosen, dropped)
       ).add(
         main_terms: [composition.fetch(VariationRules::FOCUS_KEY)],
         notes: [variation_note] + dropped_notes(dropped)
@@ -78,23 +78,39 @@ module Generation
     end
 
     # その案で外す素材を、役割ごとに集めます。
-    def dropped_terms(draft, applied, chosen)
+    #
+    # **その下書きに無い役割は、外すものがありません。** 人物が写らない見込みの
+    # 業種には人物の構図が入りませんし、被写界深度を持たないスタイル系統も
+    # あります。**役割の名前そのものは、組み立ての時点で検めています。**
+    def dropped_terms(draft, applied)
       composition.fetch(VariationRules::DROPS_KEY)
-                 .index_with { |role| term_for_role(draft, applied, role, chosen) }
+                 .index_with { |role| term_for_role(draft, applied, role) }
                  .compact
     end
 
-    # 役割の名前から、その素材を引きます。
+    # 役割の名前から、**いま下書きに入っている素材**を引きます。
     #
     # **素材の文字列を照合して見分けません。** 言い回しが変わると黙って外れます。
-    def term_for_role(draft, applied, role, chosen)
+    #
+    # **選び直したあとの値ではなく、当てられている値を引きます。**
+    # 選び直したあとの値で引くと、下書きの素材と一致せず、引き算が当たりません。
+    # 差し替えの対象になっている素材を外す場合に、そのまま復活します
+    # （PR #155 の 2 回目のレビューより）。
+    def term_for_role(draft, applied, role)
+      term = lookup_role(draft, applied, role)
+      return term if term.is_a?(String) && draft.main_terms.include?(term)
+
+      nil
+    end
+
+    def lookup_role(draft, applied, role)
       return person_safety_terms(draft).first if role == PERSON_SAFETY_ROLE
 
       roles = copy_space_roles(draft)
       return roles[role] if roles.key?(role)
 
       position = rules.required_items_for(applied[:style_family]).index(role)
-      position ? chosen[position] : nil
+      position ? applied[:specifications][position] : nil
     end
 
     def copy_space_roles(draft)
@@ -106,7 +122,7 @@ module Generation
     def swapped_terms(draft, applied, chosen, dropped)
       replacements = applied[:specifications].zip(chosen).to_h
                                              .merge(person_safety_replacements(draft, dropped))
-      kept = draft.main_terms - dropped.values.compact
+      kept = draft.main_terms - dropped.values
 
       { main_terms: kept.map { |term| replacements.fetch(term, term) },
         swapped: swapped_count(kept, replacements) }
@@ -133,18 +149,9 @@ module Generation
       note ? Array(note[:compositions]) : []
     end
 
-    # **控えを、実際の素材に合わせます。**
-    def rewritten_notes(draft, chosen, dropped)
-      removed = dropped.values.compact
-
-      draft.notes.filter_map { |note| rewritten_note(note, chosen - removed, dropped) }
-    end
-
-    def rewritten_note(note, specifications, dropped)
-      return note.merge(specifications: specifications) if note[:kind] == StyleSpec::SPECIFICATIONS_NOTE_KIND
-      return nil if note[:kind] == StyleSpec::PERSON_SAFETY_NOTE_KIND && dropped.key?(PERSON_SAFETY_ROLE)
-
-      note
+    # **控えを、実際の素材に合わせます。** 書き直しは VariationNotes が持ちます。
+    def rewritten_notes(draft, applied, chosen, dropped)
+      VariationNotes.new(applied: applied, chosen: chosen, dropped: dropped).rewrite(draft.notes)
     end
 
     def style_family_of(draft)

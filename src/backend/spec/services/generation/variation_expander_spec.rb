@@ -158,6 +158,10 @@ RSpec.describe Generation::VariationExpander do
 
       expect(dropped.pluck(:role)).not_to include('person_safety')
     end
+
+    it '人物の構図が無くても 3 案そろいます' do
+      expect(variations(industry: 'ecommerce').size).to eq(3)
+    end
   end
 
   # **抽象背景の案からは、被写体があることを前提にした指示をすべて外します**
@@ -365,6 +369,19 @@ RSpec.describe Generation::VariationExpander do
       broken.delete('copy_space_conflicts')
 
       expect_rejected(broken)
+    end
+
+    # **役割の名前を、組み立ての時点で検めます**（PR #155 の 2 回目のレビューより）。
+    # 書き間違えても黙って何もしないと、「外した」と控えに書きながら素材が残ります。
+    it '定義されていない役割を書けば、組み立てで失敗します' do
+      dictionary
+      broken = sound_definition
+      broken['compositions']['abstract_background']['drops'] = ['no_such_role']
+      allow(YAML).to receive(:safe_load_file).and_return(broken)
+      Generation::VariationRules.reset!
+
+      expect { described_class.new(dictionary: dictionary) }
+        .to raise_error(described_class::UnknownRoleError)
     end
   end
 

@@ -39,6 +39,9 @@ module Generation
     # 別の版の規則辞書で作られた下書きを渡された場合に投げます。
     class VersionMismatchError < StandardError; end
 
+    # 外す素材の役割の名前が、どこにも定義されていない場合に投げます。
+    class UnknownRoleError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :variation
 
@@ -50,6 +53,7 @@ module Generation
 
       @rules = StyleRules.new(dictionary)
       @definition = VariationRules.load
+      ensure_roles!
     end
 
     # 3 案へ展開した下書きを返します。
@@ -73,6 +77,30 @@ module Generation
 
     def order
       definition.fetch(VariationRules::ORDER_KEY)
+    end
+
+    # **外す素材の役割の名前を、組み立ての時点で検めます。**
+    #
+    # 書き間違えても黙って何もしないと、「外した」と控えに書きながら素材が残ります
+    # （PR #155 の 2 回目のレビューより）。**規則は人が編集するデータです。**
+    #
+    # 認める名前は、人物を避ける構図・コピースペースの段の役割・
+    # スタイル仕様化規則の項目名です。
+    def ensure_roles!
+      known = known_roles
+      unknown = definition.fetch(VariationRules::COMPOSITIONS_KEY)
+                          .values.flat_map { |item| item.fetch(VariationRules::DROPS_KEY) }
+                          .uniq - known
+      return if unknown.empty?
+
+      raise UnknownRoleError,
+            "定義されていない役割です: #{unknown.join(', ')}" # 開発者向け
+    end
+
+    def known_roles
+      items = rules.style_families.flat_map { |family| rules.required_items_for(family) }
+
+      [VariationBuilder::PERSON_SAFETY_ROLE] + CopySpaceRules::ROLES + items
     end
 
     def builder_for(name, index)
