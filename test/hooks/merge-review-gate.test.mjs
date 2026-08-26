@@ -17,7 +17,13 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = join(HERE, "..", "..", "scripts", "hooks", "merge-review-gate.sh");
 
-/** マージの呼び出しを模したペイロードです。 */
+/**
+ * マージの呼び出しを模したペイロードです。
+ *
+ * **配列をつないで組み立てています。リテラルで書かないでください。**
+ * このファイルの中にコマンドをそのまま書くと、導入済みのマージ前フックが
+ * 反応し、テストを実行するコマンド自体が止まります（実際に起きました）。
+ */
 const MERGE_COMMAND = ["gh", "pr", "merge"].join(" ");
 
 /** 一時ディレクトリに、記録だけを持つ最小のリポジトリを作ります。 */
@@ -68,6 +74,43 @@ test("判定が芳しくない記録は止めます", () => {
   const { code, stderr } = runHook(root);
   assert.equal(code, 2);
   assert.match(stderr, /判定/);
+});
+
+// **許可制です。「合格」と明記されているときだけ通します。**
+// 特定の語だけを止める形にすると、書かれ方の数だけ穴が空きます。
+test("判定が「要修正」なら止めます", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 判定\n\n要修正（1 件）です。\n",
+  });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("判定が「保留」なら止めます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\n保留\n" });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("判定が「マージ不可」なら止めます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\nマージ不可\n" });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("判定が「条件付き合格」なら通します", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定\n\n条件付き合格\n" });
+  assert.equal(runHook(root).code, 0);
+});
+
+// 記録の中でフックの書式を例示しても、それを判定として拾いません。
+test("コードの塀の中の見出しは、判定の節として拾いません", () => {
+  const root = makeRepo({
+    reviewer: "# コードレビュー\n\n## 書式の例\n\n```\n## 判定\n\n合格\n```\n\n## 所感\n\nありません。\n",
+  });
+  assert.equal(runHook(root).code, 2);
+});
+
+test("見出しが一行形式なら止めます", () => {
+  const root = makeRepo({ reviewer: "# コードレビュー\n\n## 判定 : 合格\n\n指摘はありません。\n" });
+  assert.equal(runHook(root).code, 2);
 });
 
 test("判定の節が無ければ止めます", () => {

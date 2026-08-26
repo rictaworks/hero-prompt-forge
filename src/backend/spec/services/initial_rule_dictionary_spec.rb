@@ -16,11 +16,47 @@ RSpec.describe InitialRuleDictionary do
   # 排除する語と注入する語を、まとめて 1 つの文字列にして照合します。
   # どちらへ書かれていても、その表現に対処できている事実は変わりません。
   def anti_ai_text
-    rules = described_class.anti_ai_rules
+    (forbidden_terms + negative_prompt_terms).join(' ').downcase
+  end
 
-    (rules.fetch('forbidden_terms') + rules.fetch('negative_prompt_terms'))
-      .join(' ')
-      .downcase
+  # メインプロンプトから取り除く語です。
+  def forbidden_terms
+    described_class.anti_ai_rules.fetch('forbidden_terms')
+  end
+
+  # ネガティブプロンプトへ必ず入れる語です。
+  def negative_prompt_terms
+    described_class.anti_ai_rules.fetch('negative_prompt_terms')
+  end
+
+  # **二方向のどちらかが空になっていないことを、別々に確かめます。**
+  # まとめて照合するだけでは、片方を空にしても気づけません。
+  # 排除だけでは表記のゆれを取りこぼし、注入だけでは利用者の指定した語が
+  # メインプロンプトに残ります。両方がそろって初めて効きます。
+  describe '二方向の守り' do
+    it 'メインプロンプトから取り除く語を持ちます' do
+      expect(forbidden_terms).to be_present
+    end
+
+    it 'ネガティブプロンプトへ入れる語を持ちます' do
+      expect(negative_prompt_terms).to be_present
+    end
+
+    it '取り除く語が、そのままプロンプトへ入れられる文字列です' do
+      expect(forbidden_terms).to all(be_a(String).and(be_present))
+    end
+
+    it '入れる語が、そのままプロンプトへ入れられる文字列です' do
+      expect(negative_prompt_terms).to all(be_a(String).and(be_present))
+    end
+
+    it '取り除く語に、クリシェ配色が入っています' do
+      expect(forbidden_terms.join(' ').downcase).to match(/purple.*teal|teal.*purple/)
+    end
+
+    it '入れる語に、破綻した手指が入っています' do
+      expect(negative_prompt_terms.join(' ').downcase).to match(/hands|fingers/)
+    end
   end
 
   describe 'requirements.md 4.2 が挙げる 4 種別' do
