@@ -177,7 +177,8 @@ module Generation
       # 受け取ります。
       def default_tone(industry)
         tone = dictionary.defaults_for(industry).fetch('tone') do
-          raise KeyError, "業種の標準トーンがありません: #{industry.inspect}" # 開発者向け
+          raise RuleDictionary::MissingDefaultsError,
+                "業種の標準トーンがありません: #{industry.inspect}" # 開発者向け
         end
 
         unless BRAND_TONES.include?(tone)

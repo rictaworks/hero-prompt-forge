@@ -15,8 +15,18 @@ class PromptRequest < ApplicationRecord
   # 定義されていない遷移を試みた場合に投げます。
   class InvalidTransitionError < StandardError; end
 
-  STATUSES = %w[
-    draft queued generating completed degraded_completed failed rejected archived
+  # 状態の名前です。**呼び出す側へ書き写しません**（PR #165 のレビューより）。
+  DRAFT = 'draft'
+  QUEUED = 'queued'
+  GENERATING = 'generating'
+  COMPLETED = 'completed'
+  DEGRADED_COMPLETED = 'degraded_completed'
+  FAILED = 'failed'
+  REJECTED = 'rejected'
+  ARCHIVED = 'archived'
+
+  STATUSES = [
+    DRAFT, QUEUED, GENERATING, COMPLETED, DEGRADED_COMPLETED, FAILED, REJECTED, ARCHIVED
   ].freeze
 
   # 生成モデルです。requirements.md 4.1 の選択肢に対応します。
@@ -24,18 +34,22 @@ class PromptRequest < ApplicationRecord
 
   # 許される遷移です。ここに無い組み合わせは拒否します。
   TRANSITIONS = {
-    'draft' => %w[queued rejected],
-    'queued' => %w[generating],
-    'generating' => %w[completed degraded_completed failed],
-    'failed' => %w[queued],
-    'completed' => %w[archived],
-    'degraded_completed' => %w[archived],
-    'rejected' => [],
-    'archived' => []
+    DRAFT => [QUEUED, REJECTED],
+    QUEUED => [GENERATING],
+    GENERATING => [COMPLETED, DEGRADED_COMPLETED, FAILED],
+    FAILED => [QUEUED],
+    COMPLETED => [ARCHIVED],
+    DEGRADED_COMPLETED => [ARCHIVED],
+    REJECTED => [],
+    ARCHIVED => []
   }.freeze
 
   # 成果物を提供した状態です。クォータを確定します。
-  DELIVERED_STATUSES = %w[completed degraded_completed].freeze
+  DELIVERED_STATUSES = [COMPLETED, DEGRADED_COMPLETED].freeze
+
+  # まだ決着していない状態です。**枠を予約したまま、確定も返還もしていません。**
+  # 失敗として記録できるのは、この状態だけです。
+  UNSETTLED_STATUSES = [QUEUED, GENERATING].freeze
 
   belongs_to :project
   has_one :user, through: :project
