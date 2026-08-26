@@ -291,7 +291,13 @@ RSpec.describe Generation::ForbiddenDetector do
       '他社の商標調査を代行します。',
       '第三者の商標を侵害しないか確認します。',
       '別のロゴ案もあわせてご提案します。',
-      '商標登録の出願をお手伝いします。'
+      '商標登録の出願をお手伝いします。',
+      # 報告・納品まで続く長い文です。語と語の近さで判定すると、
+      # 文が長くなっただけで止めてしまいます。
+      '他社の商標を侵害しないか確認し、結果を報告書に掲載します。',
+      '他社のロゴの調査結果をレポートにまとめて掲載します。',
+      '別のロゴ案もあわせてご提案し、比較表を掲載します。',
+      '他社のロゴとの類似度を数値でお示しします。'
     ].each do |text|
       it "「#{text}」を止めません" do
         expect(detect(text)).not_to be_forbidden
@@ -315,6 +321,10 @@ RSpec.describe Generation::ForbiddenDetector do
       it "「#{allowed}」を止めません" do
         expect(detect(allowed)).not_to be_forbidden
       end
+    end
+
+    it '対象そのものを載せる場合は、文が長くても止めます' do
+      expect(detect('他社のロゴを、大きく掲載してください。')).to be_forbidden
     end
   end
 
