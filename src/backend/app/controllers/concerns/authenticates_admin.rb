@@ -20,6 +20,10 @@ module AuthenticatesAdmin
   USER_NAME_KEY = 'ADMIN_BASIC_AUTH_USER'
   PASSWORD_KEY = 'ADMIN_BASIC_AUTH_PASSWORD'
 
+  # ブラウザの認証の窓に出る名前です。**利用者には見えません。**
+  # 開発者だけが見るため、画面の文言とは別に持ちます。
+  REALM = 'hero-prompt-forge admin' # 開発者向け
+
   included do
     before_action :authenticate_admin!
   end
@@ -27,7 +31,7 @@ module AuthenticatesAdmin
   private
 
   def authenticate_admin!
-    authenticate_or_request_with_http_basic('hero-prompt-forge admin') do |name, password|
+    authenticate_or_request_with_http_basic(REALM) do |name, password|
       matches?(name, password)
     end
   end

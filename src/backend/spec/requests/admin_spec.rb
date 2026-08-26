@@ -93,6 +93,59 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
     end
   end
 
+  # **CSRF 対策が実際に働いていることを確かめます**（PR #150 のレビューより）。
+  #
+  # API モードではセッションの仕組みが外れており、`protect_from_forgery` を
+  # 書いても働きません。**書いたつもりで守られていない**状態になります。
+  # 読み取りの経路では確かめられませんので、書き込みの経路で確かめます。
+  describe '書き込みの守り' do
+    before do
+      Rails.application.routes.draw do
+        namespace :admin do
+          get '/spec/protected', to: 'spec_protected#show'
+          post '/spec/protected', to: 'spec_protected#update'
+        end
+      end
+      ActionController::Base.allow_forgery_protection = true
+    end
+
+    after do
+      ActionController::Base.allow_forgery_protection = false
+      Rails.application.reload_routes!
+    end
+
+    it '認証があっても、印の無い書き込みは通しません' do
+      post '/admin/spec/protected', headers: { 'HTTP_AUTHORIZATION' => with_credentials }
+
+      expect(response).not_to have_http_status(:ok)
+    end
+
+    it '印が無いことを理由に止めます' do
+      post '/admin/spec/protected', headers: { 'HTTP_AUTHORIZATION' => with_credentials }
+
+      expect(response.body).to include('InvalidAuthenticityToken')
+    end
+
+    it '読み取りは通ります' do
+      get '/admin/spec/protected', headers: { 'HTTP_AUTHORIZATION' => with_credentials }
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it '認証が無ければ、書き込みも通しません' do
+      post '/admin/spec/protected'
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    # **守りが働く前提（セッション）がそろっていることを確かめます。**
+    it '管理画面ではセッションを使えます' do
+      get '/admin/spec/protected', headers: { 'HTTP_AUTHORIZATION' => with_credentials }
+
+      expect(request.session).to be_a(ActionDispatch::Request::Session)
+    end
+  end
+
   # **利用者の X ログインでは、管理画面へ届きません。**
   describe '利用者の認証との切り分け' do
     it '利用者のセッションでは通しません' do

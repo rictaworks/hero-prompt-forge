@@ -40,6 +40,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:?.env に DATABASE_URL を設定してください}
       TEST_DATABASE_URL: ${TEST_DATABASE_URL:?.env に TEST_DATABASE_URL を設定してください}
       NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:?.env に NEXT_PUBLIC_APP_ENV を設定してください}
+      # 開発者用の管理画面の資格情報です。未設定なら管理画面は開けません。
+      ADMIN_BASIC_AUTH_USER: ${ADMIN_BASIC_AUTH_USER:-}
+      ADMIN_BASIC_AUTH_PASSWORD: ${ADMIN_BASIC_AUTH_PASSWORD:-}
     volumes:
       - .:/workspace
       - bundle:/bundle

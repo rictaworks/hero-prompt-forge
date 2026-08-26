@@ -70,11 +70,38 @@ RSpec.describe 'ヘルスチェック' do # rubocop:disable RSpec/DescribeClass
 
   # **待ち受ける番号は、環境が決めます。**
   # Railway は `PORT` を注入します。アプリはその値で待ち受けます。
+  #
+  # **設定を実際に読み込んで確かめます。** 文字が含まれることを見るだけでは、
+  # 使われずに残っているだけの記述でも通ります（PR #150 のレビューより）。
   describe '待ち受ける番号' do
-    it 'PORT を読みます' do
-      config = Rails.root.join('config/puma.rb').read
+    # `config/puma.rb` を実際に読み込み、待ち受ける番号を取り出します。
+    #
+    # **設定の書きぶりを見ません。実際に評価して、決まった番号を見ます。**
+    def port_from_puma(env)
+      require 'puma/configuration'
+      with_env(env) do
+        path = Rails.root.join('config/puma.rb').to_s
+        configuration = Puma::Configuration.new({ config_files: [path] })
+        configuration.load
+        configuration.clamp
+        configuration.options[:binds]
+      end
+    end
 
-      expect(config).to include('PORT')
+    def with_env(env)
+      original = ENV.fetch('PORT', nil)
+      ENV['PORT'] = env
+      yield
+    ensure
+      ENV['PORT'] = original
+    end
+
+    it '環境が指定した番号で待ち受けます' do
+      expect(port_from_puma('4567').join(' ')).to include('4567')
+    end
+
+    it '指定が無ければ 3000 で待ち受けます' do
+      expect(port_from_puma(nil).join(' ')).to include('3000')
     end
   end
 end
