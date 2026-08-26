@@ -102,6 +102,56 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
       end
     end
 
+    # **必須の項目が欠けても、形が違っても、契約の形で返します**
+    # （PR #166 のレビューより）。受け止めないと Rails の既定の応答になり、
+    # **画面が利用者へ見せる文言を作れません。**
+    describe 'プロジェクトの識別子が正しくない場合' do
+      before { login_as(user) }
+
+      def post_without_project(value = nil)
+        params = { inputs: input_fields }
+        params[:project_id] = value unless value.nil?
+        post '/api/v1/prompt_requests', params: params, as: :json
+      end
+
+      # 欠けている場合と、形が違う場合（配列・連想配列）です。
+      [nil, [1, 1], { 'a' => 1 }].each do |value|
+        it "識別子が #{value.inspect} なら 400 を返します" do
+          post_without_project(value)
+
+          expect(response).to have_http_status(:bad_request)
+        end
+
+        # **契約の形です。** `code` ・ `message` ・ `next_action` を備えます。
+        it "識別子が #{value.inspect} でも契約の形で返します" do
+          post_without_project(value)
+
+          expect(error_body.keys).to contain_exactly('code', 'message', 'next_action', 'details')
+        end
+
+        it "識別子が #{value.inspect} でも利用者へ見せる文言を返します" do
+          post_without_project(value)
+
+          expect([error_body['message'], error_body['next_action']]).to all(be_present)
+        end
+
+        it "識別子が #{value.inspect} なら項目名を添えます" do
+          post_without_project(value)
+
+          expect(error_body.dig('details', 'fields'))
+            .to include('field' => 'project_id', 'reason' => 'missing')
+        end
+
+        it "識別子が #{value.inspect} なら記録を作りません" do
+          expect { post_without_project(value) }.not_to change(PromptRequest, :count)
+        end
+
+        it "識別子が #{value.inspect} なら枠を使いません" do
+          expect { post_without_project(value) }.not_to change(QuotaConsumption, :count)
+        end
+      end
+    end
+
     describe '入力に誤りがある場合' do
       before { login_as(user) }
 

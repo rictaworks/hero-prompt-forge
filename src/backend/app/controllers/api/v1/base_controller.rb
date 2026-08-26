@@ -18,8 +18,23 @@ module Api
       before_action :require_authorized_plan!
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+      rescue_from ActionController::ParameterMissing, with: :render_parameter_missing
 
       private
+
+      # 必須の項目が欠けている、または形が違う場合です。
+      #
+      # **契約の形で返します。** 受け止めないと Rails の既定の応答
+      # （`{"status":400,"error":"Bad Request"}`）になり、`code` も `message` も
+      # `next_action` も入りません。**画面が利用者へ見せる文言を作れません**
+      # （PR #166 のレビューで実測されました）。
+      #
+      # **添えるのは項目名だけです。** 送られた値を返しません。
+      def render_parameter_missing(error)
+        render_error(code: 'invalid_input', scope: 'invalid_input',
+                     status: :bad_request,
+                     details: { fields: [{ field: error.param, reason: 'missing' }] })
+      end
 
       # 見つからない場合です。**他人の資源も同じ返し方にします。**
       def render_not_found
