@@ -209,6 +209,7 @@
 ```json
 {
   "id": 12,
+  "project_id": 3,
   "status": "queued",
   "degraded": false,
   "target_model": "midjourney",
@@ -256,6 +257,7 @@
 ```json
 {
   "id": 12,
+  "project_id": 3,
   "status": "degraded_completed",
   "degraded": true,
   "target_model": "midjourney",
