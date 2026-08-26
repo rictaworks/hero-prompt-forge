@@ -11,6 +11,25 @@ test/pr<PR番号>/*.spec.ts
 PR ごとにディレクトリを分けます。各ファイルは、その PR の本文に書かれた
 **非エンジニア向けユーザーテスト手順と1対1で対応**させます。手順に無い操作を足しません。
 
+## 開発の道具そのものの検査
+
+開発フック（`scripts/hooks/`）とハードコードの検査は、道具そのものが正しく
+働くかを確かめるテストを持ちます。
+
+```
+test/hooks/*.test.mjs        マージ前フックの検査
+test/hardcode/*.test.mjs     ハードコード検出の検査
+```
+
+いずれも `node --test` で動かします。**一時ディレクトリへ作った最小の
+リポジトリを対象にします。** このリポジトリの `review-records/` を対象にすると、
+記録が増減するたびに結果が変わります（`.claude/TEST-HARNESS-SAFETY.md` の TH4）。
+
+```bash
+npm run test:hooks
+npm run test:hardcode
+```
+
 ## 実行
 
 ```bash

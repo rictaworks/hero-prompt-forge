@@ -4,6 +4,10 @@
 # PreToolUse(Bash) から呼ばれます。標準入力に渡されたツール呼び出しの内容に
 # `gh pr merge` が含まれる場合、対象 PR の reviewer 記録と pr-checker 記録が
 # review-records/ に存在しなければ、終了コード 2 でマージを止めます。
+#
+# **判定は「## 判定」の節だけを読みます。** 記録の全文を対象にすると、
+# 本文で語を挙げただけでマージが止まります。実際に PR #119 と PR #121 で、
+# 「不合格の指摘はありません」という合格を意味する文で止まりました（issue #122）。
 set -u
 
 PAYLOAD="$(cat)"
@@ -40,22 +44,8 @@ MISSING=""
 [ -f "$REVIEWER_RECORD" ] || MISSING="${MISSING}  - reviewer の記録がありません : $REVIEWER_RECORD"$'\n'
 [ -f "$CHECKER_RECORD" ] || MISSING="${MISSING}  - pr-checker の記録がありません : $CHECKER_RECORD"$'\n'
 
-if [ -z "$MISSING" ]; then
-  # reviewer の判定が不合格のままなら止めます。
-  if grep -q '不合格' "$REVIEWER_RECORD"; then
-    cat >&2 <<EOF
-マージを止めました。reviewer の判定に「不合格」が残っています。
-
-記録 : $REVIEWER_RECORD
-
-指摘を修正し、reviewer を再実行して記録を更新してください。
-EOF
-    exit 2
-  fi
-  exit 0
-fi
-
-cat >&2 <<EOF
+if [ -n "$MISSING" ]; then
+  cat >&2 <<EOF
 マージを止めました。PR #${PR_NUMBER} のレビューが未完了です。
 
 $MISSING
@@ -70,4 +60,40 @@ $MISSING
 
 記録は版管理対象です。コミットしてから実行してください。
 EOF
-exit 2
+  exit 2
+fi
+
+# 「## 判定」の節だけを取り出します。次の「## 」で終わりです。
+VERDICT="$(awk '
+  /^##[[:space:]]+判定[[:space:]]*$/ { inside = 1; next }
+  /^##[[:space:]]/                   { inside = 0 }
+  inside                             { print }
+' "$REVIEWER_RECORD")"
+
+# **節が無い記録・節が空の記録は止めます。** 判定を読めないまま通すと、
+# レビューの有無を確かめる仕組みが黙って無効になります。
+if [ -z "$(printf '%s' "$VERDICT" | tr -d '[:space:]')" ]; then
+  cat >&2 <<EOF
+マージを止めました。reviewer の記録から判定を読み取れません。
+
+記録 : $REVIEWER_RECORD
+
+記録に「## 判定」の節を設け、その節へ判定を書いてください。
+節の中身が空の場合も、判定が無いものとして止めます。
+EOF
+  exit 2
+fi
+
+# 判定の節に「不合格」があれば止めます。本文の他の箇所は見ません。
+if printf '%s' "$VERDICT" | grep -q '不合格'; then
+  cat >&2 <<EOF
+マージを止めました。reviewer の判定が通っていません。
+
+記録 : $REVIEWER_RECORD
+
+指摘を修正し、reviewer を再実行して記録を更新してください。
+EOF
+  exit 2
+fi
+
+exit 0

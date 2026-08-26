@@ -143,6 +143,21 @@ jobs:
             puts "本番設定での読み込み・ジョブ・キャッシュ・環境判定: 正常"
           '
 
+  hooks:
+    name: 開発フックの検査
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 暴走したときにジョブが早く落ちるよう、実行そのものにも時間の上限を付けます
+      # （.claude/TEST-HARNESS-SAFETY.md の TH5）。
+      - name: マージ前フックの検査
+        run: timeout 120 npm run test:hooks
+
   hardcode:
     name: ハードコードの検査
     runs-on: ubuntu-latest

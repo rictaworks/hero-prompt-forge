@@ -6,6 +6,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:hardcode": "node --test test/hardcode/*.test.mjs",
+    "test:hooks": "node --test test/hooks/*.test.mjs",
     "check:hardcode": "node test/hardcode/check-hardcoded-strings.mjs ."
   },
   "devDependencies": {
