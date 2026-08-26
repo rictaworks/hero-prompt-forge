@@ -1,0 +1,5 @@
+# 検出の語が空の定義です。テストからのみ使います。
+rules:
+  - kind: real_person
+    suggestion_key: describe_person_by_role
+    patterns: []
