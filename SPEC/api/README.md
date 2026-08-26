@@ -93,7 +93,25 @@
 
 **`project[user_id]` は受け取りません。** 持ち主は、ログインしている利用者で決まります。
 
+**`brand_settings` に置ける鍵は `people` ・ `tone` ・ `colors` です。** それ以外を含むと `400` です。**JSON にしたときの長さが 2000 文字を越えると `400` です。**
+
 **消す経路を作りません。** 生成履歴が結び付いています。
+
+**返す項目**
+
+```json
+{
+  "id": 3,
+  "name": "あおぞら歯科",
+  "industry": "medical",
+  "style_family": "photoreal",
+  "brand_settings": { "people": "expected" },
+  "created_at": "2026-08-27T10:30:00+09:00",
+  "updated_at": "2026-08-27T10:30:00+09:00"
+}
+```
+
+一覧は `{ "projects": [ … ] }` の形で返します。**新しいものから並べます。**
 
 ### プリセット（`/api/v1/presets`）
 
@@ -102,6 +120,22 @@
 `input_conditions` に置ける鍵は、入力条件の項目に限られます。**それ以外を含むと `400` です。**
 
 **名前は利用者ごとに一意です。** 他の方と同じ名前は使えます。
+
+**JSON にしたときの長さが 2000 文字を越えると `400` です。**
+
+**返す項目**
+
+```json
+{
+  "id": 7,
+  "name": "定番",
+  "input_conditions": { "industry": "saas", "style_family": "photoreal" },
+  "created_at": "2026-08-27T10:30:00+09:00",
+  "updated_at": "2026-08-27T10:30:00+09:00"
+}
+```
+
+一覧は `{ "presets": [ … ] }` の形で返します。**名前の順に並べます。**
 
 ### 生成履歴（`GET /api/v1/prompt_requests`）
 
@@ -119,6 +153,7 @@
       "status": "degraded_completed",
       "degraded": true,
       "target_model": "midjourney",
+      "project_id": 3,
       "dictionary_version": "v1.0.0",
       "created_at": "2026-08-27T10:30:00+09:00",
       "updated_at": "2026-08-27T10:30:42+09:00",
@@ -128,13 +163,28 @@
 }
 ```
 
-### 評価メモ（`/api/v1/prompt_outputs/:prompt_output_id/evaluation_note`)
+### 評価メモ（`/api/v1/prompt_outputs/:prompt_output_id/evaluation_note`）
 
 **上限に達していても記録できます。** 記録は生成ではありません。
 
 **案 1 つにつき 1 件です。** すでにある案へ `POST` すると書き換えます。
 
 **受け取る項目**：`evaluation_note[rating]`（1 〜 5）・ `evaluation_note[memo]`（2000 文字まで）。**どちらも無い場合は `400` です。**
+
+**`POST` は、すでに記録がある場合に `200` を返して書き換えます。** 新しく作った場合は `201` です。
+
+**返す項目**
+
+```json
+{
+  "id": 11,
+  "prompt_output_id": 42,
+  "rating": 4,
+  "memo": "余白が読みやすいです。",
+  "created_at": "2026-08-27T10:30:00+09:00",
+  "updated_at": "2026-08-27T10:30:00+09:00"
+}
+```
 
 ### `POST /api/v1/prompt_requests`
 

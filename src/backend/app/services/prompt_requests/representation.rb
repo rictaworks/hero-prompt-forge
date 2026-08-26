@@ -21,6 +21,14 @@ module PromptRequests
     # 利用者へ理由を添える状態です。
     EXPLAINED = %w[rejected failed].freeze
 
+    # 常に返す項目です。
+    #
+    # **どのプロジェクトのものかも返します。** 一覧から辿れないと、
+    # 過去案の再表示ができません（PR #167 のレビューより）。
+    BASE_FIELDS = %i[
+      id project_id status degraded target_model dictionary_version
+    ].freeze
+
     def initialize(prompt_request)
       @prompt_request = prompt_request
     end
@@ -49,15 +57,10 @@ module PromptRequests
     attr_reader :prompt_request
 
     def base
-      {
-        id: prompt_request.id,
-        status: prompt_request.status,
-        degraded: prompt_request.degraded,
-        target_model: prompt_request.target_model,
-        dictionary_version: prompt_request.dictionary_version,
+      prompt_request.slice(*BASE_FIELDS).symbolize_keys.merge(
         created_at: prompt_request.created_at.iso8601,
         updated_at: prompt_request.updated_at.iso8601
-      }
+      )
     end
 
     def outputs

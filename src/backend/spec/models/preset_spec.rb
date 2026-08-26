@@ -74,6 +74,25 @@ RSpec.describe Preset do
     end
   end
 
+  # **鍵を絞っても、値の大きさは絞れません**（PR #167 のレビューより）。
+  describe '入力条件の大きさ' do
+    it '上限を越える大きさは保存できません' do
+      long = 'あ' * (described_class::MAX_CONDITIONS_LENGTH + 1)
+      preset = described_class.new(user: user, name: '長すぎる条件',
+                                   input_conditions: { 'service_summary' => long })
+
+      expect(preset).not_to be_valid
+    end
+
+    it '上限までなら保存できます' do
+      fitting = 'あ' * 100
+      preset = described_class.new(user: user, name: 'ふつうの条件',
+                                   input_conditions: { 'service_summary' => fitting })
+
+      expect(preset).to be_valid
+    end
+  end
+
   describe '他人のプリセット' do
     it '所有者で絞り込めます' do
       mine = build_preset.tap(&:save!)

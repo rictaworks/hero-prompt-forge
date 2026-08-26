@@ -114,6 +114,16 @@ RSpec.describe '生成履歴 API' do # rubocop:disable RSpec/DescribeClass
       expect(listed.first['degraded']).to be(false)
     end
 
+    # **どのプロジェクトのものかを返します**（PR #167 のレビューより）。
+    # 一覧から辿れないと、過去案の再表示ができません。
+    it 'プロジェクトの識別子を返します' do
+      mine = prompt_request
+
+      get '/api/v1/prompt_requests'
+
+      expect(listed.first['project_id']).to eq(mine.project_id)
+    end
+
     it '案の数を返します' do
       delivered
 
