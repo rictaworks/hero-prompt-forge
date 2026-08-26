@@ -182,4 +182,65 @@ RSpec.describe Generation::WordForms do
       expect(same).to be_empty
     end
   end
+
+  # **そろえた事実を記録へ残します**（issue #148）。
+  # どの語がなぜ消えたかを追うとき、どの規則が働いたかが要ります。
+  describe '記録に残す内容' do
+    before { allow(Trace).to receive(:step).and_call_original }
+
+    it 'そろえた場合は記録へ残します' do
+      described_class.canonical('glowing particles')
+
+      expect(Trace).to have_received(:step).with('generation.word_forms_normalized',
+                                                 hash_including(plural: 1))
+    end
+
+    it 'つづりをそろえた件数を残します' do
+      described_class.canonical('over-saturated colours')
+
+      expect(Trace).to have_received(:step).with('generation.word_forms_normalized',
+                                                 hash_including(spelling: 1))
+    end
+
+    it '記号を落とした件数を残します' do
+      described_class.canonical('smart, clean layout')
+
+      expect(Trace).to have_received(:step).with('generation.word_forms_normalized',
+                                                 hash_including(marks: 1))
+    end
+
+    # **そろえるものが無ければ、記録を増やしません。**
+    it 'そろえなかった場合は残しません' do
+      described_class.canonical('a calm office')
+
+      expect(Trace).not_to have_received(:step)
+    end
+
+    # **記録へ利用者の入力そのものを入れません。**
+    it '記録に語そのものを入れません' do
+      described_class.canonical('glowing particles')
+
+      expect(Trace).to have_received(:step) do |name, context|
+        expect(name).to eq('generation.word_forms_normalized')
+        expect(context.keys).to contain_exactly(:marks, :plural, :spelling)
+        expect(context.values).to all(be_a(Integer))
+      end
+    end
+  end
+
+  # **対応表の不備に、起動時に気づけるようにします**（issue #148）。
+  describe '対応表の検め' do
+    it '対応表が壊れていれば、読み込みで失敗します' do
+      allow(YAML).to receive(:safe_load_file).and_return('壊れています')
+
+      expect { Generation::WordFormsTable.load }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it '起動時に読み込む仕掛けがあります' do
+      initializer = Rails.root.join('config/initializers/generation_definitions.rb')
+
+      expect(initializer.read).to include('Generation::WordForms')
+    end
+  end
 end

@@ -11,6 +11,14 @@ module Generation
     RULES_KEY = 'rules'
     SUFFIX_READINGS_KEY = 'shop_suffix_readings'
 
+    # 会社名のうしろに付く語として認める形です。
+    # **記号や空白を含む語を認めません。** 落とす判定が静かに壊れます。
+    ATTRIBUTE_WORD_FORMAT = /\A[ぁ-ゖァ-ヴー一-龥]{1,10}\z/
+    ATTRIBUTE_WORDS_KEY = 'company_attribute_words'
+    ATTRIBUTE_PARTICLE_KEY = 'company_attribute_particle'
+    NON_NAME_WORDS_KEY = 'company_non_name_words'
+    PARTICLES_KEY = 'company_particles'
+
     class << self
       # @return [Array<Hash>]
       def load_rules(path)
@@ -20,6 +28,53 @@ module Generation
         end
 
         rules.map { |rule| build_rule(rule) }
+      end
+
+      # 会社名のうしろに付きやすい、会社そのものを指さない語です（issue #153）。
+      #
+      # **拾った名前の末尾が「の＋この一覧の語」で終わる場合だけ、そこを落とします。**
+      # 一覧に無ければ、拾った名前をそのまま使います。
+      #
+      # **語そのものの形も検めます。** 空の語や記号を含む語が混ざると、
+      # 落とす判定が静かに壊れます（PR #157 のレビューより）。
+      # @return [Array<String>]
+      def load_attribute_words(path)
+        loaded = read(path)
+        words = loaded[ATTRIBUTE_WORDS_KEY]
+        ensure_attribute_words!(words, path)
+        particle = loaded[ATTRIBUTE_PARTICLE_KEY]
+        ensure_particle!(particle, path)
+
+        { ATTRIBUTE_PARTICLE_KEY => particle,
+          ATTRIBUTE_WORDS_KEY => words,
+          NON_NAME_WORDS_KEY => list_of(loaded, NON_NAME_WORDS_KEY, path),
+          PARTICLES_KEY => list_of(loaded, PARTICLES_KEY, path) }.freeze
+      end
+
+      # **語の一覧を検めます。** 空の語や記号を含む語が混ざると、
+      # 会社名かどうかの判定が静かに壊れます。
+      def list_of(loaded, key, path)
+        words = loaded[key]
+        return words.freeze if words.is_a?(Array) && words.any? &&
+                               words.all? { |word| word.is_a?(String) && word.match?(ATTRIBUTE_WORD_FORMAT) }
+
+        raise InvalidDefinitionError, "語の一覧が読めません: #{key} (#{path})" # 開発者向け
+      end
+
+      # **名前と語をつなぐ助詞です。** 1 文字のかなだけを認めます。
+      def ensure_particle!(particle, path)
+        return if particle.is_a?(String) && particle.match?(/\A[ぁ-ゖ]\z/)
+
+        raise InvalidDefinitionError,
+              "名前と語をつなぐ助詞が読めません: #{path}" # 開発者向け
+      end
+
+      def ensure_attribute_words!(words, path)
+        return if words.is_a?(Array) && words.any? &&
+                  words.all? { |word| word.is_a?(String) && word.match?(ATTRIBUTE_WORD_FORMAT) }
+
+        raise InvalidDefinitionError,
+              "会社名のうしろに付く語の一覧が読めません: #{path}" # 開発者向け
       end
 
       # @return [Hash]

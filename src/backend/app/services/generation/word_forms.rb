@@ -36,6 +36,15 @@ module Generation
     # 日本語には単数・複数の区別が無く、つづりの揺れも別の話です。
     ASCII_WORD = /\A[a-z0-9]+\z/
 
+    # そろえた理由の印です。文言ではなく記号で持ちます。
+    #
+    # **記録へ利用者の入力そのものを入れません。** どの語がどう変わったかを
+    # 値で残すと、利用者の入力が記録へ流れます。**どの規則が何件働いたか**を
+    # 残します（issue #148）。
+    MARKS_REMOVED = :marks
+    PLURAL_TO_SINGULAR = :plural
+    SPELLING_UNIFIED = :spelling
+
     # 語の前後に付く記号です。**語の一部として扱いません。**
     # 規則辞書へ `art,` と登録されると、記号ごと 1 つの語として照合され、
     # `smart, clean layout` が丸ごと落ちます（issue #136 で実測しました）。
@@ -46,7 +55,11 @@ module Generation
       # 語の並びを、そろえた形にして返します。
       # @return [String]
       def canonical(text)
-        text.split.map { |word| canonical_word(word) }.join(' ')
+        applied = Hash.new(0)
+        canonical = text.split.map { |word| canonical_word(word, applied) }.join(' ')
+        return canonical if applied.empty?
+
+        traced(applied) { canonical }
       end
 
       # 英国式のつづりを米国式へ寄せる対応表です。
@@ -64,19 +77,34 @@ module Generation
         definition[PLURAL_FORMS_KEY]
       end
 
-      # テストから読み直せるようにします。**本番の経路では使いません。**
+      # 覚えた対応表を忘れます。**テストが読み直すために使います。**
       def reset!
         @definition = nil
       end
 
       private
 
-      def canonical_word(word)
+      # **そろえた事実を記録へ残します。** どの語がなぜ消えたかを追うとき、
+      # どの規則が働いたかが分からないと、規則辞書と素材のどちらを直せばよいか
+      # 決められません（issue #148）。
+      def traced(applied, &)
+        Trace.step('generation.word_forms_normalized',
+                   marks: applied[MARKS_REMOVED],
+                   plural: applied[PLURAL_TO_SINGULAR],
+                   spelling: applied[SPELLING_UNIFIED], &)
+      end
+
+      def canonical_word(word, applied)
         bare = word.gsub(SURROUNDING_MARKS, '')
         return word unless bare.match?(ASCII_WORD)
 
+        applied[MARKS_REMOVED] += 1 unless bare == word
         singular = singular_of(bare)
-        spelling_variants.fetch(singular, singular)
+        applied[PLURAL_TO_SINGULAR] += 1 unless singular == bare
+        unified = spelling_variants.fetch(singular, singular)
+        applied[SPELLING_UNIFIED] += 1 unless unified == singular
+
+        unified
       end
 
       # 複数形を単数形へ寄せます。
@@ -110,60 +138,7 @@ module Generation
       end
 
       def definition
-        @definition ||= load_definition
-      end
-
-      def load_definition
-        loaded = read_definition
-        variants = loaded[SPELLING_VARIANTS_KEY]
-        singulars = loaded[SINGULAR_WORDS_KEY]
-        plurals = loaded[PLURAL_FORMS_KEY]
-        ensure_variants!(variants, SPELLING_VARIANTS_KEY)
-        ensure_variants!(plurals, PLURAL_FORMS_KEY)
-        ensure_singulars!(singulars)
-
-        DeepFreeze.call({ SPELLING_VARIANTS_KEY => variants,
-                          SINGULAR_WORDS_KEY => singulars,
-                          PLURAL_FORMS_KEY => plurals })
-      end
-
-      def read_definition
-        loaded = YAML.safe_load_file(Rails.root.join(DEFINITION_PATH))
-        return loaded if loaded.is_a?(Hash)
-
-        raise InvalidDefinitionError,
-              "語の形の対応表が読めません: #{DEFINITION_PATH}" # 開発者向け
-      rescue Errno::ENOENT, Psych::SyntaxError => e
-        raise InvalidDefinitionError,
-              "語の形の対応表を読み込めません: #{DEFINITION_PATH} (#{e.class})" # 開発者向け
-      end
-
-      # **中身を検めます。** 対応表は人が編集するデータです。
-      # 空の語や文字列でない値が混ざると、照合が静かに壊れます。
-      def ensure_variants!(variants, key)
-        unless variants.is_a?(Hash) && variants.any?
-          raise InvalidDefinitionError,
-                "語の形の対応表がありません: #{key} (#{DEFINITION_PATH})" # 開発者向け
-        end
-
-        variants.each do |from, to|
-          next if valid_pair?(from, to)
-
-          raise InvalidDefinitionError,
-                "語の形の対応表に使えない値があります: #{from.inspect} -> #{to.inspect}" # 開発者向け
-        end
-      end
-
-      def ensure_singulars!(singulars)
-        return if singulars.is_a?(Array) &&
-                  singulars.all? { |word| word.is_a?(String) && word.match?(ASCII_WORD) }
-
-        raise InvalidDefinitionError,
-              "複数形でない語の一覧が読めません: #{DEFINITION_PATH}" # 開発者向け
-      end
-
-      def valid_pair?(from, to)
-        [from, to].all? { |value| value.is_a?(String) && value.match?(ASCII_WORD) } && from != to
+        @definition ||= WordFormsTable.load
       end
     end
   end

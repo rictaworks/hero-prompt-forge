@@ -184,6 +184,83 @@ RSpec.describe Generation::ProperNoun do
     it '助詞や語尾を名前に含めません' do
       expect(found_in('株式会社ミライ工房です。').map(&:original)).to eq(['ミライ工房'])
     end
+
+    # **「の」より後ろまで拾いません**（issue #153）。
+    #
+    # **「の」が名前の一部か、文をつなぐ助詞かは、文字だけでは決まりません。**
+    # 名前に使われる語（`name_forming_words`）が続く場合だけまたぎます。
+    describe '「の」の扱い' do
+      {
+        '株式会社みらいの強みは提案力です。' => 'みらい',
+        '株式会社みらいの事業は住宅です。' => 'みらい',
+        '株式会社ひかりの実績をご覧ください。' => 'ひかり',
+        '株式会社あおばの想いをお伝えします。' => 'あおば'
+      }.each do |summary, name|
+        it "「#{summary}」から「#{name}」だけを取り出します" do
+          expect(found_in(summary).map(&:original)).to eq([name])
+        end
+      end
+
+      {
+        '株式会社さくらの家が運営します。' => 'さくらの家',
+        '合同会社あおぞらの丘は分譲住宅を扱います。' => 'あおぞらの丘',
+        '有限会社きらめきの工房をご紹介します。' => 'きらめきの工房',
+        'さくらの家株式会社が運営します。' => 'さくらの家',
+        # **「の」が語中にある名前を切り詰めません**（PR #157 のレビューより）。
+        '株式会社みのりが運営します。' => 'みのり',
+        '株式会社きのこは製菓会社です。' => 'きのこ',
+        '株式会社たけのこをご紹介します。' => 'たけのこ',
+        '株式会社あけぼのが運営します。' => 'あけぼの',
+        '株式会社ものづくり研究所です。' => 'ものづくり研究所',
+        '株式会社いのちの木が運営します。' => 'いのちの木',
+        'このはな株式会社が運営します。' => 'このはな',
+        'きのこ株式会社です。' => 'きのこ',
+        # **「の」「は」は名前の先頭に現れます**（PR #157 の 2 回目のレビューより）。
+        '株式会社のぞみが運営します。' => 'のぞみ',
+        '株式会社はなまるをご紹介します。' => 'はなまる',
+        # **助詞と同じ字で始まる名前・終わる名前**（PR #157 の 3 回目のレビューより）。
+        '株式会社へいわが運営します。' => 'へいわ',
+        '株式会社よりみちは喫茶店です。' => 'よりみち',
+        '株式会社からだ工房が運営します。' => 'からだ工房',
+        '株式会社みらいでは家づくりを承ります。' => 'みらい'
+      }.each do |summary, name|
+        it "「#{summary}」から「#{name}」を切り詰めません" do
+          expect(found_in(summary).map(&:original)).to include(name)
+        end
+      end
+
+      # **重ねて落とします。**
+      it '「の◯◯」が重なっても落とします' do
+        expect(found_in('株式会社みらいの事業の強みをご覧ください。').map(&:original))
+          .to eq(['みらい'])
+      end
+
+      # **落とすのは、会社の名前だけです**（PR #157 の 2 回目のレビューより）。
+      # かぎ括弧で明示された名前は、利用者が名前として示したものです。
+      it 'かぎ括弧で明示された名前は落としません' do
+        expect(found_in('店名は「みらいの事業」です。').map(&:original)).to include('みらいの事業')
+      end
+
+      # **すべて落ちた場合は、名前がなかったものとして扱います。**
+      it '会社そのものを指さない文からは拾いません' do
+        expect(found_in('株式会社の設立をご支援します。')).to be_empty
+      end
+
+      # **名前が助詞で始まったり、助詞で終わったりする形は拾いません。**
+      ['弊社は株式会社です。',
+       '株式会社への変更をお手伝いします。',
+       '合同会社から株式会社へ組織変更しました。'].each do |summary|
+        it "「#{summary}」からは拾いません" do
+          expect(found_in(summary)).to be_empty
+        end
+      end
+
+      # **一覧に挙げた語だけを落とします。** 既定はそのまま残します。
+      it '会社そのものを指さない語が続けば、そこを落とします' do
+        expect(found_in('株式会社みらいの強みは提案力です。').map(&:original))
+          .not_to include('みらいの強み')
+      end
+    end
   end
 
   describe '見つからない場合' do
@@ -267,6 +344,25 @@ RSpec.describe Generation::ProperNoun do
 
       expect { described_class.load_rules }
         .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    it '会社名のうしろに付く語の一覧が無ければ失敗します' do
+      allow(YAML).to receive(:safe_load_file)
+        .and_return({ 'rules' => [{ 'kind' => 'x', 'gloss' => 'a name', 'patterns' => ['(a)'] }] })
+
+      expect { described_class.load_attribute_words }
+        .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **語そのものの形も検めます**（PR #157 のレビューより）。
+    [[''], ['強み|特長'], ['強 み'], [1]].each do |words|
+      it "うしろに付く語が「#{words.inspect}」なら失敗します" do
+        allow(YAML).to receive(:safe_load_file)
+          .and_return({ 'company_attribute_words' => words })
+
+        expect { described_class.load_attribute_words }
+          .to raise_error(described_class::InvalidDefinitionError)
+      end
     end
 
     it '屋号の語尾の読みが読めなければ失敗します' do
