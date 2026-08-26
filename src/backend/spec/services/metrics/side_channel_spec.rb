@@ -25,6 +25,33 @@ RSpec.describe Metrics::SideChannel do
     end
   end
 
+  # **記録の置き場が落ちる形は、1 つではありません**（PR #164 の 2 回目の
+  # レビューより）。`upsert` は書き込みを組み立てる前に列と一意索引を調べます
+  # ので、表が無ければ `ArgumentError`、列の名前がずれていれば
+  # `ActiveModel::UnknownAttributeError` になります。**種別で数え上げると、
+  # 必ず漏れます。**
+  [ActiveRecord::StatementInvalid, ArgumentError,
+   ActiveModel::UnknownAttributeError, RuntimeError].each do |failure|
+    describe "記録が #{failure} で落ちる場合" do
+      before do
+        allow(Metrics::Recorder).to receive(:record).and_raise(failure, 'broken') # 開発者向け
+      end
+
+      it '呼び出す側へ投げません' do
+        expect { described_class.record(MetricEvent::QUOTA_EXHAUSTED, now: noon) }
+          .not_to raise_error
+      end
+
+      it '失敗を残します' do
+        allow(Rails.logger).to receive(:warn)
+
+        described_class.record(MetricEvent::QUOTA_EXHAUSTED, now: noon)
+
+        expect(Rails.logger).to have_received(:warn).with(/record_failed/)
+      end
+    end
+  end
+
   describe '記録の置き場が落ちている場合' do
     before { broken }
 
@@ -39,15 +66,16 @@ RSpec.describe Metrics::SideChannel do
     end
 
     # **握りつぶしません。** 失敗そのものを追える形で残します。
-    it '失敗を記録へ残します' do
-      allow(Trace).to receive(:step).and_call_original
+    #
+    # **`warn` で残します。** 成功したときの「完了」の行に埋もれると、
+    # 測定が落ちていることに気づけません。
+    it '失敗を警告として残します' do
+      allow(Rails.logger).to receive(:warn)
 
       described_class.record(MetricEvent::QUOTA_EXHAUSTED, now: noon)
 
-      expect(Trace).to have_received(:step)
-        .with('metrics.record_failed',
-              hash_including(axis: MetricEvent::QUOTA_EXHAUSTED,
-                             error: 'ActiveRecord::StatementInvalid'))
+      expect(Rails.logger).to have_received(:warn)
+        .with(/record_failed axis=#{MetricEvent::QUOTA_EXHAUSTED} error=ActiveRecord::StatementInvalid/)
     end
   end
 

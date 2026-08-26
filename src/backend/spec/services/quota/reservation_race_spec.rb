@@ -136,5 +136,24 @@ RSpec.describe Quota::Reservation do
 
       expect(QuotaConsumption.where(user_id: user.id).count).to eq(1)
     end
+
+    # **上限到達の数え上げが、同時に呼ばれても合います**（issue #63）。
+    #
+    # 先を越された側は全員が上限到達です。**行は 1 つ、件数はその人数**に
+    # なります。読んでから足して書く形では、ここで数が合いません。
+    it '上限到達を、行 1 件へ数え上げます' do
+      race
+
+      expect(MetricEvent.where(axis: MetricEvent::QUOTA_EXHAUSTED).count).to eq(1)
+    end
+
+    it '上限到達の件数が、先を越された人数と一致します' do
+      race
+
+      expect(Metrics::Recorder.total(MetricEvent::QUOTA_EXHAUSTED,
+                                     from: Quota::QuotaDay.of(now),
+                                     to: Quota::QuotaDay.of(now)))
+        .to eq(racers - 1)
+    end
   end
 end

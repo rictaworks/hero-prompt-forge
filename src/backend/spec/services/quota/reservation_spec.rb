@@ -473,6 +473,22 @@ RSpec.describe Quota::Reservation do
       total_for(MetricEvent::QUOTA_RECLAIMED)
     end
 
+    # 記録の書き込みが SQL の段で失敗する形を作ります。
+    def breaking_the_record
+      allow(Metrics::Recorder).to receive(:record) do
+        QuotaConsumption.connection.execute('SELECT 1 FROM does_not_exist') # 開発者向け
+      end
+    end
+
+    # 呼び出す側がトランザクションで包んだ場合の決着です。
+    def settled_inside_a_transaction(request)
+      settled = nil
+      QuotaConsumption.transaction { settled = described_class.settle!(request, now: now) }
+      settled
+    rescue ActiveRecord::StatementInvalid
+      settled
+    end
+
     def queued_request
       described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
       prompt_request.transition_to!('queued')
@@ -528,6 +544,37 @@ RSpec.describe Quota::Reservation do
     end
 
     # **測定の記録は、本業の結果を書き換えません**（PR #164 のレビューより）。
+    #
+    # **落ち方を 1 つに決め打ちしません。** 記録の置き場は、表が無い・列の
+    # 名前がずれている、といった形でも落ちます。**種別で数え上げると漏れます。**
+    [ActiveRecord::StatementInvalid, ArgumentError,
+     ActiveModel::UnknownAttributeError].each do |failure|
+      describe "記録が #{failure} で落ちる場合" do
+        before do
+          allow(Metrics::Recorder).to receive(:record).and_raise(failure, 'broken') # 開発者向け
+        end
+
+        it '上限到達をそのまま知らせます' do
+          described_class.reserve!(user: user, now: now)
+
+          expect { described_class.reserve!(user: user, now: now) }
+            .to raise_error(described_class::ExhaustedError)
+        end
+
+        it '返還は成功したままです' do
+          request = failed_request
+
+          expect { described_class.settle!(request, now: now) }.not_to raise_error
+        end
+
+        it '枠は返還済みになります' do
+          consumption = described_class.settle!(failed_request, now: now)
+
+          expect(consumption.status).to eq('refunded')
+        end
+      end
+    end
+
     describe '記録の置き場が落ちている場合' do
       before do
         allow(Metrics::Recorder).to receive(:record)
@@ -569,7 +616,7 @@ RSpec.describe Quota::Reservation do
     #
     # **この制限を、テストとして書き残します。** 直したときにこの例が赤くなり、
     # 申し送りを消し忘れずに済みます。
-    it '呼び出す側がトランザクションで包むと巻き戻ります' do
+    it '呼び出す側がトランザクションで包むと記録が巻き戻ります' do
       begin
         QuotaConsumption.transaction do
           described_class.reserve!(user: user, now: now)
@@ -580,6 +627,20 @@ RSpec.describe Quota::Reservation do
       end
 
       expect(exhausted_total).to eq(0)
+    end
+
+    # **包むと、本業の変更まで巻き戻ります。しかも呼び出す側は成功を
+    # 受け取ります**（PR #164 の 2 回目のレビューで実測されました）。
+    #
+    # 記録の書き込みが SQL の段で失敗すると、その時点で外側のトランザクションが
+    # 中断状態になります。`Metrics::SideChannel` はその失敗を受け止めますので、
+    # **呼び出す側は「決着した」と受け取ったまま、決着が消えます。**
+    it '包むと、返還が成功したように見えて巻き戻ります' do
+      request = failed_request
+      breaking_the_record
+
+      expect(settled_inside_a_transaction(request)&.status).to eq('refunded')
+      expect(QuotaConsumption.find_by(prompt_request: request).status).to eq('reserved')
     end
   end
 end

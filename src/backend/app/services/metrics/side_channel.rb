@@ -17,30 +17,61 @@ module Metrics
   # **握りつぶしません。** 記録の失敗そのものを、追える形で残します。
   # 残すのは軸の名前と例外の種別だけです。
   #
-  # **受け止めるのは、記録の置き場の失敗だけです。** 定義に無い軸を渡した
-  # 誤りは受け止めません。**それは書き間違いであり、失敗させるべきものです。**
+  # **受け止める範囲は、守りたいことから決めます。**
   #
-  # **呼び出す側がトランザクションで包むと、記録は巻き戻ります。**
-  # `Recorder` は自前のトランザクションを持ちません。**包んで呼ばないでください。**
+  # 守りたいのは「上限到達のお知らせが失われないこと」と「やり直せない状態を
+  # 残さないこと」です。**記録の置き場が落ちる形は、1 つではありません。**
+  # `upsert` は書き込みを組み立てる前に列と一意索引を調べますので、表がまだ
+  # 無ければ `ArgumentError`、列の名前がずれていれば
+  # `ActiveModel::UnknownAttributeError` になります。**どちらも
+  # `ActiveRecord::ActiveRecordError` ではありません**（PR #164 の 2 回目の
+  # レビューで実測されました）。**種別で数え上げると、必ず漏れます。**
+  #
+  # **受け止めないものだけを名指しします。** 定義に無い軸を渡した誤りは
+  # 受け止めません。**それは書き間違いであり、失敗させるべきものです。**
+  #
+  # ## 呼び出す側がトランザクションで包むと、どうなるか
+  #
+  # **包まないでください。** `Recorder` は自前のトランザクションを持ちません。
   # 上限到達は、まさに外側のトランザクションが巻き戻る場面で起きます。
+  #
+  # **巻き戻るのは、記録だけではありません。** 記録の書き込みが SQL の段で
+  # 失敗すると、**その時点で呼び出す側のトランザクションが中断状態になります。**
+  # この持ち場はその失敗を受け止めますので、**呼び出す側は「成功した」と
+  # 受け取ります。** ところが、そのあとの問い合わせがすべて拒まれ、
+  # **本業の変更まで巻き戻ります**（同レビューで実測されました）。
+  #
+  #   settle! の戻り = refunded（呼び出す側は成功と受け取ります）
+  #   最終の枠       = reserved（返還が巻き戻っています）
+  #
+  # **この食い違いは静かです。** だからこそ、包んで呼ばないでください。
   class SideChannel
-    # 記録の置き場の失敗です。**ここに無い失敗は、そのまま外へ出します。**
-    STORE_FAILURES = [ActiveRecord::ActiveRecordError].freeze
+    # **受け止めない失敗です。** 書き間違いですので、その場で失敗させます。
+    PROGRAMMING_FAILURES = [Recorder::UnknownAxisError].freeze
 
     class << self
       # 軸の件数を 1 つ増やします。**失敗しても、呼び出す側へ投げません。**
       # @return [MetricEvent, nil] 記録できなかった場合は nil です
       def record(axis, now: Time.current)
         Recorder.record(axis, now: now)
-      rescue *STORE_FAILURES => e
+      rescue *PROGRAMMING_FAILURES
+        raise
+      rescue StandardError => e
         failed(axis, e)
       end
 
       private
 
       # **失敗を残します。** 記録できなかったことが、後から追えます。
+      #
+      # **`warn` で残します。** `Trace.step` は成功すると「完了」と書きますので、
+      # **失敗の記録が「完了」の行として埋もれます**（PR #164 の 2 回目の
+      # レビューより）。**気づけない記録は、握りつぶしと区別がつきません。**
       def failed(axis, error)
-        Trace.step('metrics.record_failed', axis: axis, error: error.class.name) { nil }
+        Rails.logger.warn(
+          "[metrics] record_failed axis=#{axis} error=#{error.class.name}" # 開発者向け
+        )
+        nil
       end
     end
   end
