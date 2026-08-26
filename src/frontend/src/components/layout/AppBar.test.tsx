@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { AppBar } from "@/components/layout/AppBar";
 import {
-  isImplemented,
+  linkTo,
   SCREENS,
   screenOf,
   UnknownScreenError,
