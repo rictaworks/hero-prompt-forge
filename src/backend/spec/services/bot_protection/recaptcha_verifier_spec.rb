@@ -153,6 +153,28 @@ RSpec.describe BotProtection::RecaptchaVerifier do
     end
   end
 
+  # **空文字も「無い」として扱います**（PR #168 の 2 回目のレビューより）。
+  # `.env.example` は空欄を配りますので、**空文字のまま運用へ渡る形は現実に起こります。**
+  describe '秘密鍵が空文字の場合' do
+    before { with_key('') }
+
+    it '用意されていないことを答えます' do
+      expect(described_class).not_to be_configured
+    end
+
+    it 'その場で失敗させます' do
+      expect { verify }.to raise_error(described_class::MissingSecretKeyError)
+    end
+  end
+
+  describe '秘密鍵が空白だけの場合' do
+    before { with_key('   ') }
+
+    it '用意されていないことを答えます' do
+      expect(described_class).not_to be_configured
+    end
+  end
+
   describe '秘密鍵が無い場合' do
     before { with_key(nil) }
 
@@ -169,10 +191,17 @@ RSpec.describe BotProtection::RecaptchaVerifier do
   # **設定の誤りは、設定の誤りとしてその場で失敗させます**
   # （PR #168 のレビューより）。500 として利用者へ届けません。
   describe '設定' do
+    # **名前を固定します。** 内容から作ると、Ruby のハッシュ値が起動ごとに
+    # 変わるため、実行のたびにファイルが増えます（PR #168 の 2 回目の
+    # レビューで実測されました）。**このリポジトリは削除を禁じていますので、
+    # 溜まり続けます。** 上書きして常に 1 ファイルにします。
+    def settings_path
+      'tmp/recaptcha_settings_spec.yml' # 開発者向け
+    end
+
     def written(values)
-      path = "tmp/recaptcha_#{values.hash.abs}.yml" # 開発者向け
-      Rails.root.join(path).write(values.to_yaml)
-      path
+      Rails.root.join(settings_path).write(values.to_yaml)
+      settings_path
     end
 
     def sound
