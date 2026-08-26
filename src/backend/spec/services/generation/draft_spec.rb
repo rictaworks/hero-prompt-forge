@@ -39,6 +39,30 @@ RSpec.describe Generation::Draft do
     it '素材へ直接足そうとすると失敗します' do
       expect { draft.main_terms << 'a calm office' }.to raise_error(FrozenError)
     end
+
+    # **器だけを凍らせても、中身は書き換えられます。**
+    # 「書き換えません」という約束を守るには、中身まで凍らせる必要があります。
+    it '入力の中身を書き換えようとすると失敗します' do
+      expect { draft.input[:industry] = 'changed' }.to raise_error(FrozenError)
+    end
+
+    it 'ノートの中身を書き換えようとすると失敗します' do
+      with_note = draft(notes: [{ kind: :anti_ai_removed, term: 'purple' }])
+
+      expect { with_note.notes.first[:term] = 'changed' }.to raise_error(FrozenError)
+    end
+
+    it '入れ子になった入力の中身も書き換えられません' do
+      nested = described_class.new(input: { brand: { colors: ['#111111'] } })
+
+      expect { nested.input[:brand][:colors] << '#222222' }.to raise_error(FrozenError)
+    end
+
+    it '素材の中の文字列も書き換えられません' do
+      with_terms = draft(main_terms: [+'a calm office'])
+
+      expect { with_terms.main_terms.first << ' extra' }.to raise_error(FrozenError)
+    end
   end
 
   describe '#add' do

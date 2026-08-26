@@ -68,12 +68,22 @@ RSpec.describe Generation::RuleEngine do
       expect(draft.negative_terms.count('oversaturation')).to eq(1)
     end
 
-    it '取り除いた語をノートへ残します' do
+    it '取り除いた素材をノートへ残します' do
       draft = applied(['purple to teal gradient'])
 
-      expect(draft.notes).to include(
-        { kind: described_class::REMOVED_NOTE_KIND, term: 'purple to teal gradient' }
-      )
+      expect(draft.notes.first[:term]).to eq('purple to teal gradient')
+    end
+
+    it '当たった語をノートへ残します' do
+      draft = applied(['soft purple to teal gradient in the background'])
+
+      expect(draft.notes.first[:matched]).to eq('purple to teal gradient')
+    end
+
+    it '取り除いた理由が種別で分かります' do
+      draft = applied(['purple to teal gradient'])
+
+      expect(draft.notes.first[:kind]).to eq(described_class::REMOVED_NOTE_KIND)
     end
 
     it '取り除いていなければノートを増やしません' do
@@ -86,6 +96,54 @@ RSpec.describe Generation::RuleEngine do
 
     it '入力はそのまま持ち越します' do
       expect(applied(['a calm office']).input).to eq(input)
+    end
+  end
+
+  # **同じ語の別の書き方を取りこぼしません。**
+  # 大文字と小文字の違い・連続する空白・ハイフンは、表記のゆれです。
+  describe '表記のゆれ' do
+    def applied(main_terms)
+      engine.apply(engine.start(input).add(main_terms: main_terms))
+    end
+
+    [
+      'Purple to teal gradient background',
+      'PURPLE TO TEAL GRADIENT',
+      'purple-to-teal gradient',
+      'purple to  teal gradient',
+      'Floating 3D shapes',
+      'floating_3d_shapes'
+    ].each do |term|
+      it "「#{term}」を取り除きます" do
+        expect(applied([term]).main_terms).to be_empty
+      end
+    end
+
+    it '当たった語は辞書の書き方で残します' do
+      draft = applied(['PURPLE TO TEAL GRADIENT'])
+
+      expect(draft.notes.first[:matched]).to eq('purple to teal gradient')
+    end
+  end
+
+  # **関係のない素材を巻き込みません。**
+  # 撮影の指示が消えると、requirements.md 4.2 が求める撮影指示を満たせません。
+  describe '通してよい素材' do
+    def applied(main_terms)
+      engine.apply(engine.start(input).add(main_terms: main_terms))
+    end
+
+    [
+      'a calm office',
+      'soft window light',
+      '85mm lens, shallow depth of field',
+      'a single subtle rim light',
+      'bounced fill from a white wall',
+      'path traced rendering, neutral tone mapping'
+    ].each do |term|
+      it "「#{term}」を残します" do
+        expect(applied([term]).main_terms).to eq([term])
+      end
     end
   end
 

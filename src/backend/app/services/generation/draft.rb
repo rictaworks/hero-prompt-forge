@@ -6,9 +6,12 @@ module Generation
   # 規則の適用・スタイルの仕様化・コピースペースの規定・矛盾の解決を、
   # この入れ物を受け渡しながら順に進めます（requirements.md 4.1 の 2 から 5）。
   #
-  # **書き換えません。** 各段は新しい下書きを返します。途中で誰が何を足したのかを
+  # **書き換えられません。** 各段は新しい下書きを返します。途中で誰が何を足したのかを
   # 追えるようにするためです。書き換える作りにすると、順序を変えたときの影響が
   # 読めなくなります。
+  #
+  # 凍らせるのは器だけではありません。**中身まで凍らせます。** 器だけを凍らせても、
+  # 連想配列の中の値は書き換えられ、「書き換えません」という約束が守られません。
   class Draft
     # 正規化済みの入力です。
     attr_reader :input
@@ -22,12 +25,22 @@ module Generation
     attr_reader :dictionary_version
 
     def initialize(input:, main_terms: [], negative_terms: [], notes: [], dictionary_version: nil)
-      @input = input
-      @main_terms = main_terms.freeze
-      @negative_terms = negative_terms.freeze
-      @notes = notes.freeze
-      @dictionary_version = dictionary_version
+      @input = self.class.deep_freeze(input)
+      @main_terms = self.class.deep_freeze(main_terms)
+      @negative_terms = self.class.deep_freeze(negative_terms)
+      @notes = self.class.deep_freeze(notes)
+      @dictionary_version = dictionary_version.freeze
       freeze
+    end
+
+    # 中身まで凍らせます。器だけでは、連想配列の中の値を書き換えられます。
+    def self.deep_freeze(value)
+      case value
+      when Hash then value.each_value { |item| deep_freeze(item) }
+      when Array then value.each { |item| deep_freeze(item) }
+      end
+
+      value.freeze
     end
 
     # 素材を足した下書きを返します。同じ語は重ねません。
