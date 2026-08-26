@@ -227,6 +227,49 @@ RSpec.describe Generation::StyleSpec do
 
       expect(rules.person_safety_for('photoreal').size).to eq(2)
     end
+
+    # **撮影指示の欠落と同格に扱います（requirements.md 4.2）。**
+    # 規則辞書の編集で消えた場合に、黙って効かなくなることを防ぎます。
+    it '実写系で避ける構図の定義が消えていたら失敗します' do
+      without_safety = style_spec_rules.deep_dup
+      without_safety['photoreal'].delete('person_safety')
+      broken = RuleDictionary.create!(version: 'vspec.no-safety',
+                                      style_spec_rules: without_safety)
+
+      expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+
+    it '実写系で避ける構図が空の一覧なら失敗します' do
+      empty_safety = style_spec_rules.deep_dup
+      empty_safety['photoreal']['person_safety'] = []
+      broken = RuleDictionary.create!(version: 'vspec.empty-safety',
+                                      style_spec_rules: empty_safety)
+
+      expect { described_class.new(dictionary: broken).apply(draft_for('photoreal')) }
+        .to raise_error(described_class::InvalidDictionaryError)
+    end
+  end
+
+  # 適用した版を追えるようにします（requirements.md 7.2）。
+  describe '規則辞書の版' do
+    it '適用した版を下書きへ残します' do
+      expect(applied('photoreal').dictionary_version).to eq('vspec.style')
+    end
+
+    it '同じ版であれば重ねて当てられます' do
+      once = spec.apply(draft_for('photoreal'))
+
+      expect { spec.apply(once) }.not_to raise_error
+    end
+
+    it '別の版を重ねて当てようとすると失敗します' do
+      other = Generation::Draft.new(
+        input: { style_family: 'photoreal' }, dictionary_version: 'vspec.other'
+      )
+
+      expect { spec.apply(other) }.to raise_error(described_class::VersionMismatchError)
+    end
   end
 
   describe '素材の作り方' do

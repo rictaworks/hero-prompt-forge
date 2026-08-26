@@ -37,6 +37,9 @@ module Generation
     # 下書きにスタイル系統が入っていない場合に投げます。
     class MissingStyleFamilyError < StandardError; end
 
+    # 別の版の規則を、同じ下書きへ重ねて当てようとした場合に投げます。
+    class VersionMismatchError < StandardError; end
+
     # ノートに残す印です。文言ではなく記号で持ちます。
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
 
@@ -49,11 +52,35 @@ module Generation
     # スタイル系統の指示を足した下書きを返します。
     # @return [Draft]
     def apply(draft)
+      ensure_same_version!(draft)
       style_family = style_family_of(draft)
-      specifications = rules.specifications_for(style_family)
-      safety = rules.person_safety_for(style_family)
 
+      traced(draft, style_family,
+             rules.specifications_for(style_family),
+             rules.person_safety_for(style_family))
+    end
+
+    private
+
+    attr_reader :rules
+
+    delegate :version, to: :rules
+
+    # **1つの下書きへ当てる規則辞書は1つだけです。**
+    # 生成リクエストが持てる版は1つですので、別の版を重ねると、
+    # 前の版で適用した事実が記録から消えます。RuleEngine と同じ扱いにします。
+    def ensure_same_version!(draft)
+      applied_version = draft.dictionary_version
+      return if applied_version.nil? || applied_version == version
+
+      raise VersionMismatchError,
+            "別の版の規則は重ねられません: #{applied_version} -> #{version}" # 開発者向け
+    end
+
+    # 何を、どの版で、いくつ足したかを記録へ残します。
+    def traced(draft, style_family, specifications, safety)
       Trace.step('generation.style_spec_applied',
+                 dictionary_version: version,
                  style_family: style_family,
                  specifications: specifications.size,
                  person_safety: safety.size) do
@@ -61,14 +88,13 @@ module Generation
       end
     end
 
-    private
-
-    attr_reader :rules
-
+    # **適用した版を下書きへ残します。** どの版の仕様化規則で作ったかを、
+    # あとから追えるようにするためです（requirements.md 7.2）。
     def applied(draft, specifications, safety)
       draft.add(
         main_terms: specifications + safety,
-        notes: safety.empty? ? [] : [{ kind: PERSON_SAFETY_NOTE_KIND, compositions: safety }]
+        notes: safety.empty? ? [] : [{ kind: PERSON_SAFETY_NOTE_KIND, compositions: safety }],
+        dictionary_version: version
       )
     end
 

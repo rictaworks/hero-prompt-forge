@@ -35,6 +35,17 @@ module Generation
     # 人物を含む場合に避ける構図の鍵です。
     PERSON_SAFETY_KEY = 'person_safety'
 
+    # 避ける構図を必ず持つスタイル系統です。
+    #
+    # requirements.md 4.2 は「撮影指示を欠くプロンプトは出力しない」と
+    # 「人物の顔を正面から大きく描写する構図は既定で回避する」を**同格で**
+    # 定めています。前者だけを必須にすると、規則辞書の編集で `person_safety` を
+    # 消したときに、顔の回避が黙って効かなくなります。
+    #
+    # 実写系だけを対象にします。顔と手指の破綻は、写真として見える出力で
+    # 最も表に出るためです。
+    PERSON_SAFETY_REQUIRED_STYLES = %w[photoreal].freeze
+
     # 項目の値そのものではなく、入れ子の中に指示を持つ項目の鍵です。
     NESTED_KEYS = %w[lighting].freeze
 
@@ -66,14 +77,28 @@ module Generation
       @rules.keys
     end
 
+    # 読み込んだ規則辞書の版です。適用した版を記録へ残すために使います。
+    attr_reader :version
+
     private
 
     # 避ける構図も、そのままプロンプトへ入れられる英文でなければなりません。
     def ensure_compositions!(style_family, compositions)
+      ensure_person_safety_present!(style_family, compositions)
       return if compositions.all? { |item| item.is_a?(String) && !item.strip.empty? }
 
       raise InvalidDictionaryError,
             "避ける構図が文字列ではありません: #{style_family} (#{@version})" # 開発者向け
+    end
+
+    # **実写系で避ける構図が消えていたら、その場で失敗させます。**
+    # 空の一覧を黙って返すと、顔と手指の破綻を避ける指示が出なくなります。
+    def ensure_person_safety_present!(style_family, compositions)
+      return unless PERSON_SAFETY_REQUIRED_STYLES.include?(style_family)
+      return if compositions.any?
+
+      raise InvalidDictionaryError,
+            "避ける構図がありません: #{style_family}.#{PERSON_SAFETY_KEY} (#{@version})" # 開発者向け
     end
 
     def rule_for(style_family)
