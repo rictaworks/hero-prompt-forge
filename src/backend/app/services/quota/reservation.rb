@@ -16,28 +16,14 @@ module Quota
   # 予約は QuotaConsumption の一意制約（利用者 × クォータ日）に守られます。
   # 並列に投入されても、通るのは1件だけです。
   class Reservation
-    # 本日の枠を使い切っている場合に投げます。次回のリセット時刻を添えます。
-    class ExhaustedError < StandardError
-      attr_reader :quota_day, :reset_at
-
-      def initialize(quota_day:, reset_at:)
-        @quota_day = quota_day
-        @reset_at = reset_at
-        super("本日の枠を使い切っています: #{quota_day}") # 開発者向け
-      end
-    end
-
-    # 予約が見つからない場合に投げます。
-    class MissingReservationError < StandardError; end
-
-    # まだ確定も返還もできない状態で決着を求められた場合に投げます。
-    class NotSettleableError < StandardError; end
-
-    # 他人の生成リクエストへ枠を結び付けようとした場合に投げます。
-    class ForeignRequestError < StandardError; end
-
-    # 決着が漏れた予約が別の日に残っている場合と、予約中の記録が複数ある場合の
-    # 例外は、それぞれ `reservation/` の下に置いています。
+    # **この持ち場の例外は、すべて `reservation/` の下に置いています。**
+    #
+    #   ExhaustedError            : 本日の枠を使い切っています
+    #   MissingReservationError   : 予約が見つかりません
+    #   NotSettleableError        : まだ確定も返還もできません
+    #   ForeignRequestError       : 他人の生成リクエストです
+    #   DanglingReservationError  : 決着が漏れた予約が別の日に残っています
+    #   AmbiguousReservationError : 予約中の記録が複数あります
 
     class << self
       # その時点のクォータ日で枠を予約します。
@@ -148,8 +134,15 @@ module Quota
       #
       # 同じ生成リクエストの予約が別の日に残っていると、一意索引が止めます。
       # **索引名と鍵の値を外へ出さず、この持ち場の例外へ包み直します。**
+      #
+      # **ここでも保存点を作ります。** `claim!` は行に錠をかけるために
+      # トランザクションを開きます。その中で一意性の違反が起きると、
+      # トランザクション全体が中断状態になり、**理由を調べる問い合わせ自体が
+      # 拒まれます**（`PG::InFailedSqlTransaction`）。包み直しが働きません。
       def reclaim!(consumption, prompt_request)
-        consumption.transition_to!('reserved', **request_attributes(prompt_request))
+        QuotaConsumption.transaction(requires_new: true) do
+          consumption.transition_to!('reserved', **request_attributes(prompt_request))
+        end
         consumption
       rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => e
         raise dangling_reservation(prompt_request) || e
@@ -181,12 +174,16 @@ module Quota
                                        status: 'reserved')
                                 .order(quota_day: :desc)
                                 .to_a
-        if found.size > 1
-          raise AmbiguousReservationError,
-                "予約中の記録が#{found.size}件あります: prompt_request=#{prompt_request.id}" # 開発者向け
-        end
+        ensure_single!(found, prompt_request)
 
         found.first
+      end
+
+      def ensure_single!(found, prompt_request)
+        return if found.size <= 1
+
+        raise AmbiguousReservationError,
+              "予約中の記録が#{found.size}件あります: prompt_request=#{prompt_request.id}" # 開発者向け
       end
 
       def next_status_for(prompt_request)

@@ -27,16 +27,31 @@ RSpec.describe Quota::Reservation do
   # クォータ日 2026-08-25 のまん中です。
   let(:now) { Time.find_zone!('Asia/Tokyo').parse('2026-08-25 12:00:00') }
   let(:racers) { 4 }
-  let!(:user) { User.create!(x_user_id: '7777777777', display_name: 'くろ') }
+  let(:x_user_id) { '7777777777' }
+
+  # **前の実行の残りを片付けてから作ります。**
+  # この例はテストごとのトランザクションを使いません。途中で失敗すると
+  # 記録が残り、次の実行が同じ `x_user_id` の作成で落ちます
+  # （PR #143 の整備で実測されました）。
+  let!(:user) do
+    clear_leftovers
+    User.create!(x_user_id: x_user_id, display_name: 'くろ')
+  end
   # **`let!` にします。** `let` のままだと最初の評価がスレッドの中で起こり、
   # 足並みがさらに崩れます。
   let!(:project) { Project.create!(user: user, industry: 'saas', style_family: 'photoreal') }
 
-  after do
-    QuotaConsumption.where(user_id: user.id).find_each(&:destroy!)
-    PromptRequest.where(project_id: project.id).find_each(&:destroy!)
-    project.destroy!
-    user.destroy!
+  after { clear_leftovers }
+
+  def clear_leftovers
+    User.where(x_user_id: x_user_id).find_each do |leftover|
+      QuotaConsumption.where(user_id: leftover.id).find_each(&:destroy!)
+      Project.where(user_id: leftover.id).find_each do |owned|
+        PromptRequest.where(project_id: owned.id).find_each(&:destroy!)
+        owned.destroy!
+      end
+      leftover.destroy!
+    end
   end
 
   # 生成リクエストを、スレッドの外で人数分だけ先に作ります。

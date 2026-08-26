@@ -304,7 +304,75 @@ RSpec.describe Quota::Reservation do
     end
   end
 
+  # **同じ日の作り直しでも、決着の漏れに当たります。**
+  # PR #143 のレビューで見つかりました。返還済みの枠を取り直す経路
+  # （`claim!`）は行に錠をかけるためにトランザクションを開きます。その中で
+  # 一意性の違反が起きると、トランザクション全体が中断状態になり、
+  # 理由を調べる問い合わせ自体が拒まれます。
+  #
+  # requirements.md 4.4 の「失敗したら当日中に作り直せます」が、まさに
+  # この手順です。
+  describe '返還済みの枠を取り直すときに、決着の漏れがある場合' do
+    let(:next_day) { Time.find_zone!('Asia/Tokyo').parse('2026-08-26 12:00:00') }
+
+    before do
+      # 1 日目：決着を呼ばないまま予約を残します（決着の漏れ）。
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      # 2 日目：別の生成リクエストで予約し、失敗して返還します。
+      other = PromptRequest.create!(project: project, target_model: 'dalle')
+      described_class.reserve!(user: user, prompt_request: other, now: next_day)
+      other.transition_to!('queued')
+      other.transition_to!('generating')
+      other.transition_to!('failed')
+      described_class.settle!(other)
+    end
+
+    it '同じ日の作り直しで、この持ち場の例外になります' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError)
+    end
+
+    it '残っているクォータ日が例外から分かります' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError) { |error|
+          expect(error.quota_day).to eq(Date.new(2026, 8, 25))
+        }
+    end
+
+    it '索引名と鍵の値を外へ出しません' do
+      expect { described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day) }
+        .to raise_error(described_class::DanglingReservationError) { |error|
+          expect(error.message).not_to include('index_quota_consumptions')
+          expect(error.message).not_to include('duplicate key')
+        }
+    end
+
+    it '呼び出す側がトランザクションで包んでも、読み替えが働きます' do
+      expect do
+        ActiveRecord::Base.transaction do
+          described_class.reserve!(user: user, prompt_request: prompt_request, now: next_day)
+        end
+      end.to raise_error(described_class::DanglingReservationError)
+    end
+
+    it '別の生成リクエストであれば、同じ日に取り直せます' do
+      another = PromptRequest.create!(project: project, target_model: 'midjourney')
+
+      consumption = described_class.reserve!(user: user, prompt_request: another, now: next_day)
+
+      expect(consumption.status).to eq('reserved')
+    end
+  end
+
   # 上限到達の読み替えが、呼び出す側のトランザクションの中でも働くことです。
+  #
+  # **この節は、検証で止まる経路です。** 保存点が無くても通ります。
+  # **保存点の効きを守るのは、「決着が漏れた予約」の 2 つの節です。**
+  # そちらはデータベースの一意索引で止まるため、保存点が無いと
+  # トランザクション全体が中断し、読み替えそのものが働かなくなります。
+  # 実際のデータベースの違反に対して読み替えが働くことは、
+  # `reservation_race_spec.rb` の「記録が無い状態から同時に予約したとき」で
+  # 確かめています。
   describe '上限到達の読み替え' do
     it '呼び出す側がトランザクションで包んでも働きます' do
       described_class.reserve!(user: user, now: now)
@@ -361,7 +429,9 @@ RSpec.describe Quota::Reservation do
       relation = instance_double(ActiveRecord::Relation, to_a: found.to_a * 2)
       allow(QuotaConsumption).to receive(:where)
         .with(prompt_request_id: prompt_request.id, status: 'reserved').and_return(relation)
-      allow(relation).to receive(:order).with(quota_day: :desc).and_return(relation)
+      # **並べ方の指定には依存しません。** 照合の書き方を変えただけで
+      # このテストが落ちると、実装の内部を固定したことになります。
+      allow(relation).to receive(:order).and_return(relation)
 
       expect { described_class.settle!(prompt_request) }
         .to raise_error(described_class::AmbiguousReservationError)
