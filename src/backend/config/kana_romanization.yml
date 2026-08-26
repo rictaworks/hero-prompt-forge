@@ -42,6 +42,29 @@ digraphs:
   りゃ: rya
   りゅ: ryu
   りょ: ryo
+  # 外来語の表記です。カタカナの店名でよく使われます。
+  ゔぁ: va
+  ゔぃ: vi
+  ゔぇ: ve
+  ゔぉ: vo
+  ふぁ: fa
+  ふぃ: fi
+  ふぇ: fe
+  ふぉ: fo
+  てぃ: ti
+  でぃ: di
+  とぅ: tu
+  どぅ: du
+  しぇ: she
+  じぇ: je
+  ちぇ: che
+  つぁ: tsa
+  つぃ: tsi
+  つぇ: tse
+  つぉ: tso
+  うぃ: wi
+  うぇ: we
+  うぉ: wo
 
 singles:
   あ: a
@@ -114,6 +137,9 @@ singles:
   れ: re
   ろ: ro
   わ: wa
+  ゐ: i
+  ゑ: e
+  ゔ: vu
   を: o
   ん: "n"
   ゃ: ya

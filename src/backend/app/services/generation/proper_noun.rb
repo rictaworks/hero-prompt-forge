@@ -108,17 +108,24 @@ module Generation
            .uniq(&:original)
     end
 
+    # **見つかった位置ごとに扱います。**
+    # 位置を見ずに名前だけで読みを引くと、同じ手がかりが 2 度当たったときに、
+    # **別の名前へ付いた読みを取り違えます**（PR #149 のレビューより）。
     def matches_for(rule, text)
-      rule[:matchers].flat_map { |matcher| text.scan(matcher).flatten }
-                     .filter_map { |name| build_found(rule, name, text) }
+      rule[:matchers].flat_map { |matcher| matches_of(matcher, text) }
+                     .filter_map { |matched| build_found(rule, matched, text) }
     end
 
-    # **同じ名前を 2 度足しません。** かぎ括弧と屋号の両方に当たる名前があります
-    # （「さくら堂」）。
-    def build_found(rule, name, text)
-      return nil if name.strip.empty?
+    def matches_of(matcher, text)
+      text.to_enum(:scan, matcher).map { Regexp.last_match }
+    end
 
-      Found.new(original: name, romaji: romaji_for(name, text),
+    # **同じ名前を 2 度足しません。**
+    def build_found(rule, matched, text)
+      name = matched[1]
+      return nil if name.nil? || name.strip.empty?
+
+      Found.new(original: name, romaji: romaji_for(name, matched, text),
                 gloss: rule[:gloss], kind: rule[:kind])
     end
 
@@ -127,10 +134,10 @@ module Generation
     #   1. 名前そのものがかなであれば、そのまま写します
     #   2. 名前の直後に丸括弧で読みが添えられていれば、それを使います
     #   3. どちらでもなければ、読みは決まりません
-    def romaji_for(name, text)
+    def romaji_for(name, matched, text)
       return Romaji.of(name) if Romaji.kana?(name)
 
-      reading = reading_after(name, text) || suffix_reading(name)
+      reading = reading_after(matched, text) || suffix_reading(name)
       reading ? Romaji.of(reading) : nil
     end
 
@@ -150,13 +157,11 @@ module Generation
       nil
     end
 
-    def reading_after(name, text)
-      index = text.index(name)
-      return nil if index.nil?
-
-      following = text[(index + name.length)..]
-      match = following&.match(/\A#{READING_IN_PARENTHESES.source}/)
-      match && match[1]
+    # **その名前が見つかった位置の、すぐ後ろだけを見ます。**
+    def reading_after(matched, text)
+      following = text[matched.end(1)..]
+      found = following&.match(/\A#{READING_IN_PARENTHESES.source}/)
+      found && found[1]
     end
 
     # 見つけた事実を記録へ残します。

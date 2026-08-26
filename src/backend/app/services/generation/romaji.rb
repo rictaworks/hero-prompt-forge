@@ -31,6 +31,10 @@ module Generation
     CHOUON = 'ー' # 開発者向け（同上）
     # 中黒です。語の区切りとして空白に直します。
     NAKAGURO = '・' # 開発者向け（同上）
+    # 撥音（ん）のローマ字です。後ろに母音や y が続く場合は区切りを入れます。
+    SYLLABIC_N = 'n'
+    # 撥音と次の音の区切りです。ヘボン式の決まりです。
+    SEPARATOR = "'"
 
     class << self
       # かなの並びをローマ字へ直します。
@@ -77,10 +81,20 @@ module Generation
         index = 0
         while index < kana.length
           consumed, romaji = read_at(kana, index)
-          letters << romaji
+          letters << separated(letters.last, romaji)
           index += consumed
         end
         letters.join.squeeze(' ').strip
+      end
+
+      # **「ん」の後ろに母音や `y` が続く場合は、区切りを入れます。**
+      # ヘボン式の決まりです。入れないと「しんいち」と「しにち」が同じ綴りに
+      # なり、別の名前が同じローマ字になります（PR #149 のレビューより）。
+      def separated(previous, romaji)
+        return romaji unless previous == SYLLABIC_N
+        return romaji unless romaji.match?(/\A[aiueoy]/)
+
+        "#{SEPARATOR}#{romaji}"
       end
 
       # その位置から読める、いちばん長い単位を読みます。
@@ -95,6 +109,7 @@ module Generation
 
       def single_at(kana, index)
         letter = kana[index]
+        return '' if letter.nil?
         return doubled_consonant(kana, index) if letter == SOKUON
         return '' if letter == CHOUON
         return ' ' if letter == NAKAGURO || letter.match?(/\s/)
@@ -106,9 +121,15 @@ module Generation
       end
 
       # 促音は、次の音の子音を重ねます。次が無ければ落とします。
+      #
+      # **`ch` の前は `t` を重ねます。** ヘボン式では「まっちゃ」は "matcha" です。
+      # "maccha" は式から外れます（PR #149 のレビューより）。
       def doubled_consonant(kana, index)
+        return '' if index + 1 >= kana.length
+
         _consumed, following = read_at(kana, index + 1)
         return '' if following.blank?
+        return 't' if following.start_with?('ch')
 
         following[0]
       end

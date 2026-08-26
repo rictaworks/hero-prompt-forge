@@ -43,11 +43,42 @@ RSpec.describe Generation::Romaji do
     end
 
     # **促音は、次の音の子音を重ねます。**
+    # **`ch` の前は `t` を重ねます。** ヘボン式の決まりです。
     describe '促音' do
       {
         'がっこう' => 'Gakkou',
         'いっぷく' => 'Ippuku',
-        'まっちゃ' => 'Maccha'
+        'まっちゃ' => 'Matcha'
+      }.each do |kana, romaji|
+        it "「#{kana}」を「#{romaji}」にします" do
+          expect(described_class.of(kana)).to eq(romaji)
+        end
+      end
+    end
+
+    # **「ん」の後ろに母音や y が続く場合は、区切りを入れます。**
+    # 入れないと「しんいち」と「しにち」が同じ綴りになります。
+    describe '撥音の区切り' do
+      {
+        'しんいち' => "Shin'ichi",
+        'しにち' => 'Shinichi',
+        'こんや' => "Kon'ya",
+        'こにゃ' => 'Konya',
+        'たんい' => "Tan'i"
+      }.each do |kana, romaji|
+        it "「#{kana}」を「#{romaji}」にします" do
+          expect(described_class.of(kana)).to eq(romaji)
+        end
+      end
+    end
+
+    # **外来語の表記でも読めます。** カタカナの店名でよく使われます。
+    describe '外来語の表記' do
+      {
+        'ヴィラ' => 'Vira',
+        'カフェ' => 'Kafe',
+        'フォレスト' => 'Foresuto',
+        'チェーン' => 'Chen'
       }.each do |kana, romaji|
         it "「#{kana}」を「#{romaji}」にします" do
           expect(described_class.of(kana)).to eq(romaji)
@@ -85,6 +116,11 @@ RSpec.describe Generation::Romaji do
 
       it '空なら失敗します' do
         expect { described_class.of(nil) }.to raise_error(described_class::NotKanaError)
+      end
+
+      # **促音で終わっても落ちません**（PR #149 のレビューより）。
+      it '促音で終わっても落ちません' do
+        expect(described_class.of('さくらっ')).to eq('Sakura')
       end
     end
   end

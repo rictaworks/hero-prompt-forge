@@ -18,15 +18,48 @@ RSpec.describe Generation::ProperNoun do
     {
       '「さくら」という名前のベーカリーです。' => 'Sakura',
       '株式会社ミライ工房が運営します。' => 'Miraikoubou',
-      'さくら堂の焼き菓子をお届けします。' => 'Sakuradou',
-      'まるみ商店の店先です。' => 'Marumishouten'
+      '「さくら堂」の焼き菓子をお届けします。' => 'Sakuradou',
+      '櫻花堂（おうかどう）の店構えを撮ります。' => 'Oukadou'
     }.each do |summary, romaji|
       it "「#{summary}」の名前をローマ字で写します" do
         expect(terms_in(summary)).to include(a_string_starting_with(romaji))
       end
+    end
 
-      it "「#{summary}」の名前を英語へ訳しません" do
-        expect(terms_in(summary)).to all(satisfy { |term| term.exclude?('Cherry') })
+    it '英語へ訳しません' do
+      expect(terms_in('「さくら」という名前のベーカリーです。'))
+        .to all(satisfy { |term| term.exclude?('Cherry') })
+    end
+  end
+
+  # **通してよい文章を壊さないことを、見つけることと同じくらい重視します。**
+  # 屋号の語尾だけを手がかりにすると、一般名詞を名前として拾います
+  # （PR #149 のレビューで、23 文中 20 文の誤検出を実測しました）。
+  describe '拾わないこと' do
+    [
+      '明るい部屋で撮影します。',
+      '近所の本屋と食堂を背景にします。',
+      '学校の校舎を遠景に入れます。',
+      '古い山荘の外観です。',
+      '落ち着いた雰囲気の歯科医院です。',
+      '焙煎したての珈琲をお届けします。',
+      '八百屋の店先を撮ります。',
+      '旅館の大浴場を紹介します。',
+      '公民館で開く教室です。',
+      'お客様のご要望に合わせます。',
+      '会社の雰囲気を伝えたいです。',
+      '事務所のロゴを中央に置きます。',
+      '製作所の職人が手作業で仕上げます。',
+      '写真館のような柔らかい光にします。',
+      '牧場の朝の風景です。',
+      '工房の道具を並べます。',
+      '商店街のにぎわいを表します。',
+      '食堂のカウンターを撮ります。',
+      '本屋の書棚を背景にします。',
+      '部屋の隅に観葉植物を置きます。'
+    ].each do |summary|
+      it "「#{summary}」を名前として拾いません" do
+        expect(found_in(summary)).to be_empty
       end
     end
   end
@@ -42,17 +75,11 @@ RSpec.describe Generation::ProperNoun do
       expect(terms_in('株式会社ミライ工房が運営します。'))
         .to include(a_string_including('a company name'))
     end
-
-    it '屋号には、店である旨を添えます' do
-      expect(terms_in('さくら堂の焼き菓子をお届けします。'))
-        .to include(a_string_including('a shop name'))
-    end
   end
 
   # **読みが決まらない漢字を、推し量りません。**
-  # 「東海林」は「しょうじ」とも「とうかいりん」とも読みます。
   describe '読みが決まらない場合' do
-    let(:summary) { '東海林写真館の外観です。' }
+    let(:summary) { '「東海林写真館」の外観です。' }
 
     it '元の表記のまま残します' do
       expect(terms_in(summary)).to include(a_string_starting_with('東海林写真館'))
@@ -67,7 +94,7 @@ RSpec.describe Generation::ProperNoun do
     end
 
     it '意味説明は併記します' do
-      expect(terms_in(summary)).to include(a_string_including('a shop name'))
+      expect(terms_in(summary)).to include(a_string_including('a proper name'))
     end
   end
 
@@ -82,30 +109,54 @@ RSpec.describe Generation::ProperNoun do
       expect(terms_in('櫻花堂(おうかどう)の店構えを撮ります。'))
         .to include(a_string_starting_with('Oukadou'))
     end
+
+    # **別の名前の読みを取り違えません**（PR #149 のレビューより）。
+    it '同じ形の名前が並んでも、読みを取り違えません' do
+      found = found_in('櫻花堂と月見堂（つきみどう）を紹介します。')
+      readable = found.select(&:readable?).map(&:romaji)
+
+      expect(readable).to eq(['Tsukimidou'])
+    end
+
+    # **名前をつなぐ助詞を、名前の一部にしません。**
+    it '名前が並んでいても、まとめて 1 つの名前にしません' do
+      found = found_in('櫻花堂と月見堂（つきみどう）を紹介します。')
+
+      expect(found.map(&:original)).to eq(['月見堂'])
+    end
   end
 
   # **屋号の語尾は読みが決まっています。**
   describe '屋号の語尾' do
     {
-      'さくら堂' => 'Sakuradou',
-      'まるみ商店' => 'Marumishouten',
-      'みどり牧場' => 'Midoribokujou'
+      '「さくら堂」' => 'Sakuradou',
+      '「まるみ商店」' => 'Marumishouten',
+      '「みどり牧場」' => 'Midoribokujou'
     }.each do |name, romaji|
-      it "「#{name}」を「#{romaji}」にします" do
+      it "#{name}を「#{romaji}」にします" do
         expect(terms_in("#{name}の紹介です。")).to include(a_string_starting_with(romaji))
       end
     end
+  end
 
-    it '長い語尾から先に読みます' do
-      expect(terms_in('みどり牧場の紹介です。')).to include(a_string_starting_with('Midoribokujou'))
+  describe '会社の名前の切り出し' do
+    {
+      '株式会社ミライ工房が運営します。' => 'ミライ工房',
+      'ミライ工房株式会社です。' => 'ミライ工房',
+      '株式会社さくらの家が運営します。' => 'さくらの家',
+      '合同会社あおぞらと提携します。' => 'あおぞら'
+    }.each do |summary, name|
+      it "「#{summary}」から「#{name}」を取り出します" do
+        expect(found_in(summary).map(&:original)).to include(name)
+      end
+    end
+
+    it '助詞や語尾を名前に含めません' do
+      expect(found_in('株式会社ミライ工房です。').map(&:original)).to eq(['ミライ工房'])
     end
   end
 
   describe '見つからない場合' do
-    it '固有名詞が無ければ空です' do
-      expect(found_in('落ち着いた雰囲気の歯科医院です。')).to be_empty
-    end
-
     it '空（nil）なら空です' do
       expect(detector.call(service_summary: nil)).to be_empty
     end
@@ -117,16 +168,9 @@ RSpec.describe Generation::ProperNoun do
     end
   end
 
-  describe '同じ名前が複数の手がかりに当たる場合' do
-    it '1件にまとめます' do
-      expect(found_in('「さくら堂」の焼き菓子です。').map(&:original).uniq.size)
-        .to eq(found_in('「さくら堂」の焼き菓子です。').size)
-    end
-  end
-
   describe '下書きへの追加' do
     let(:draft) do
-      Generation::Draft.new(input: { service_summary: 'さくら堂の焼き菓子をお届けします。' })
+      Generation::Draft.new(input: { service_summary: '「さくら堂」の焼き菓子をお届けします。' })
     end
 
     it '素材へ足します' do
@@ -159,7 +203,7 @@ RSpec.describe Generation::ProperNoun do
     before { allow(Trace).to receive(:step).and_call_original }
 
     it '種別と件数だけを残します' do
-      found_in('さくら堂の焼き菓子をお届けします。')
+      found_in('「さくら堂」の焼き菓子をお届けします。')
 
       expect(Trace).to have_received(:step) do |name, context|
         expect(name).to eq('generation.proper_noun_found')
@@ -198,6 +242,15 @@ RSpec.describe Generation::ProperNoun do
 
       expect { described_class.load_suffix_readings }
         .to raise_error(described_class::InvalidDefinitionError)
+    end
+
+    # **外来語の表記でも落ちません**（PR #149 のレビューより）。
+    it 'ヴを含む名前でも落ちません' do
+      expect { found_in('「ヴィラさくら」の外観です。') }.not_to raise_error
+    end
+
+    it '促音で終わる名前でも落ちません' do
+      expect { found_in('「さくらっ」の看板です。') }.not_to raise_error
     end
   end
 end
