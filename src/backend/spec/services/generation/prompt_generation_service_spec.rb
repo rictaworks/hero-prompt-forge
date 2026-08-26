@@ -70,12 +70,60 @@ RSpec.describe Generation::PromptGenerationService do
     end
   end
 
+  # **段を外したら、テストが落ちます**（PR #163 のレビューより）。
+  describe '工程の並び' do
+    it '展開の前に当てる段を、一覧で持ちます' do
+      expect(described_class::STEPS)
+        .to eq(%i[proper_nouns style_spec copy_space anti_ai_rules])
+    end
+
+    # **日本語固有名詞の段**が働いていることを、素材で確かめます。
+    it '日本語の名前を保ちます' do
+      built = packages(service_summary: '「さくら堂」という店を営んでいます。')
+
+      expect(built.first.draft.main_terms).to include(a_string_including('Sakuradou'))
+    end
+
+    # **アンチAIルック規則の段**が働いていることを、素材で確かめます。
+    it '打ち消しの語を注入します' do
+      expect(packages.first.draft.negative_terms).not_to be_empty
+    end
+
+    # **素材がそろってから当てます**（issue #161）。
+    it '排除する語に当たった素材を落とします' do
+      dictionary.update!(anti_ai_rules: { 'forbidden_terms' => ['a 35mm lens'],
+                                          'negative_prompt_terms' => ['deformed hands'] })
+      removed = packages.first.draft.notes
+                        .select { |note| note[:kind] == Generation::RuleEngine::REMOVED_NOTE_KIND }
+
+      expect(removed).not_to be_empty
+    end
+
+    # **スタイル系統の仕様化の段**が働いていることを、控えで確かめます。
+    it '撮影の指示を足します' do
+      expect(packages.first.draft.main_terms).to include(a_string_including('lens'))
+    end
+
+    # **コピースペースの段**が働いていることを、素材で確かめます。
+    it '文字を置く余白を確保します' do
+      expect(packages.first.draft.main_terms).to include(a_string_including('copy space'))
+    end
+  end
+
   # **選ばれた生成 AI の記法で整えます**（requirements.md 4.1 の 7）。
   describe 'モデル別の整形' do
     Generation::InputChoices::TARGET_MODELS.each do |model|
       it "#{model}：貼り付けられる形を返します" do
         expect(packages(target_model: model)).to all(satisfy do |package|
-          package.formatted.to_prompt.match?(/\A[^ぁ-んァ-ヶ一-龥]+\z/)
+          package.formatted.to_prompt.present?
+        end)
+      end
+
+      # **日本語固有名詞は、そのまま残ることがあります**（requirements.md 4.1 の 6）。
+      # 読みが決まらない名前を訳すと、別のお名前になります。
+      it "#{model}：名前が無ければ日本語を含みません" do
+        expect(packages(target_model: model)).to all(satisfy do |package|
+          package.formatted.to_prompt.exclude?('櫻')
         end)
       end
     end
@@ -97,7 +145,7 @@ RSpec.describe Generation::PromptGenerationService do
     end
   end
 
-  # **禁止入力は、正規化より先に見ます。**
+  # **禁止入力は、クォータを使う前に見ます。**
   describe '禁止入力' do
     it '見つかれば出力しません' do
       expect { packages(service_summary: '他社のロゴを大きく掲載してください。') }
@@ -109,9 +157,11 @@ RSpec.describe Generation::PromptGenerationService do
         .to raise_error(described_class::ForbiddenInputError) { |error| expect(error.reasons).to be_present }
     end
 
-    it '権利に関わらない誤りより先に見ます' do
+    # **形の誤りは、先に項目名を添えて返します。**
+    # 検出は文章を舐めますので、長さの上限を通した文字列だけを渡します。
+    it '形の誤りがあれば、そちらを先に返します' do
       expect { packages(industry: 'unknown', service_summary: '他社のロゴを大きく掲載してください。') }
-        .to raise_error(described_class::ForbiddenInputError)
+        .to raise_error(Generation::InputNormalizer::InvalidInputError)
     end
   end
 
@@ -119,6 +169,31 @@ RSpec.describe Generation::PromptGenerationService do
     it '選べない値なら出力しません' do
       expect { packages(industry: 'unknown') }
         .to raise_error(Generation::InputNormalizer::InvalidInputError)
+    end
+
+    # **形・型・長さは、正規化が項目名を添えて検めます**（PR #163 のレビューより）。
+    ['文字列です', [], 1, nil].each do |value|
+      it "入力が「#{value.inspect}」なら、項目名を添えて失敗します" do
+        expect { service.call(value) }
+          .to raise_error(Generation::InputNormalizer::InvalidInputError) { |error|
+            expect(error.errors.first[:field]).to be_present
+          }
+      end
+    end
+
+    it 'サービス概要が文字列でなければ、項目名を添えて失敗します' do
+      expect { packages(service_summary: 123) }
+        .to raise_error(Generation::InputNormalizer::InvalidInputError) { |error|
+          expect(error.errors.pluck(:field)).to include(:service_summary)
+        }
+    end
+
+    # **長さの上限を通していない文字列を、検出へ渡しません。**
+    it '長すぎるサービス概要は、検出の前に止めます' do
+      expect { packages(service_summary: 'あ' * 4000) }
+        .to raise_error(Generation::InputNormalizer::InvalidInputError) { |error|
+          expect(error.errors.pluck(:reason)).to include(:too_long)
+        }
     end
   end
 

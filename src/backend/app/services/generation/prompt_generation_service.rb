@@ -6,16 +6,26 @@ module Generation
   # 各段は「下書きを受け取って下書きを返す」部品として揃っています。
   # **それらを決まった順で呼ぶのが、この段の仕事です。**
   #
-  #   1. 禁止入力の検出（4.1 の 1）
-  #   2. 入力の正規化（4.1 の 1）
-  #   3. アンチAIルック規則の適用（4.1 の 2）
-  #   4. 日本語固有名詞の保持（4.1 の 6）
-  #   5. スタイル系統の仕様化（4.1 の 3）
-  #   6. コピースペースの規定（4.1 の 4）
-  #   7. 矛盾の解決と統合（4.1 の 5）
-  #   8. バリエーション3案の展開（4.1 の 8）
+  #   1. 入力の正規化（4.1 の 1）
+  #   2. 禁止入力の検出（4.1 の 1）
+  #   3. 日本語固有名詞の保持（4.1 の 6）
+  #   4. スタイル系統の仕様化（4.1 の 3）
+  #   5. コピースペースの規定（4.1 の 4）
+  #   6. アンチAIルック規則の適用（4.1 の 2）
+  #   7. バリエーション3案の展開（4.1 の 8）
+  #   8. 矛盾の解決と統合（4.1 の 5）
   #   9. モデル別の整形（4.1 の 7）
   #  10. アートディレクションノート（4.1 の 9）
+  #
+  # **正規化を、禁止入力の検出より先に置きます。** 検出は文章を舐めますので、
+  # **長さの上限を通していない文字列を渡すと、際限なく時間がかかります**
+  # （PR #163 のレビューで、400 万字に 2.28 秒かかることが実測されました）。
+  # 形・型・長さは、正規化が項目名を添えて検めます。
+  #
+  # **アンチAIルック規則は、素材がそろってから当てます。** 4.1 の並びのまま
+  # 最初に当てると、**当てる相手が 1 件もありません**（issue #161）。
+  # 排除する語は 1 件も働かず、規則辞書へクリシェの語を足しても効きません。
+  # **統合より前であれば、弱めて残したブランドカラーを消す心配もありません。**
   #
   # **順序をこの段が持ちます。** 4.1 の 5 が定める優先順位（①コピースペースの確保
   # ＞ ②ブランドカラー ＞ ③スタイル系統 ＞ ④トーン装飾）は、統合の段が
@@ -52,6 +62,12 @@ module Generation
     # 規則辞書の版が途中で変わった場合に投げます。
     class VersionMismatchError < StandardError; end
 
+    # 展開の前に当てる段です。**この並びが工程の順です。**
+    #
+    # **一覧で持ちます。** 呼び出しを直に並べると、1 つ外してもどのテストも
+    # 落ちません（PR #163 のレビューで実測されました）。
+    STEPS = %i[proper_nouns style_spec copy_space anti_ai_rules].freeze
+
     # 1 案ぶんの出力です。
     Package = Struct.new(:variation, :formatted, :note, :draft, keyword_init: true) do
       def to_h
@@ -86,33 +102,48 @@ module Generation
                  fields: raw.is_a?(Hash) ? raw.keys.size : 0, &)
     end
 
-    # 禁止入力の検出と、入力の正規化です。
+    # 入力の正規化と、禁止入力の検出です。
     #
-    # **検出を先に行います。** 正規化は選べない値をその場で失敗させますので、
-    # 正規化を先に置くと、権利に関わる理由ではなく形式の誤りとして返ります。
+    # **正規化を先に行います。** 検出は文章を舐めますので、長さの上限を
+    # 通していない文字列を渡すと、際限なく時間がかかります
+    # （PR #163 のレビューで、400 万字に 2.28 秒かかることが実測されました）。
+    # **形・型・長さは、正規化が項目名を添えて検めます。**
     def normalized(raw)
-      detected = Trace.step('generation.forbidden_input_checked') do
-        ForbiddenDetector.new.call(service_summary: summary_of(raw))
+      input = Trace.step('generation.input_normalized') do
+        InputNormalizer.new(dictionary: dictionary).call(raw)
       end
-      raise ForbiddenInputError, detected.reasons if detected.forbidden?
+      ensure_allowed!(input)
 
-      Trace.step('generation.input_normalized') { InputNormalizer.new(dictionary: dictionary).call(raw) }
+      input
     end
 
-    def summary_of(raw)
-      return nil unless raw.respond_to?(:[])
+    # **権利に触れる入力は、枠を使う前に止めます**（requirements.md 4.1 の 1）。
+    def ensure_allowed!(input)
+      detected = Trace.step('generation.forbidden_input_checked') do
+        ForbiddenDetector.new.call(service_summary: input[:service_summary])
+      end
+      return unless detected.forbidden?
 
-      raw[:service_summary] || raw['service_summary']
+      raise ForbiddenInputError, detected.reasons
     end
 
     # 展開の前までを、決まった順で当てます。
+    #
+    # **段の並びを一覧で持ちます。** 呼び出しを直に並べると、1 つ外しても
+    # どのテストも落ちません（PR #163 のレビューで実測されました）。
     def prepared(input)
       engine = RuleEngine.new(dictionary: dictionary)
-      applied = engine.apply(engine.start(input))
-      named = ProperNoun.new.apply(applied)
-      spec = StyleSpec.new(dictionary: dictionary).apply(named)
 
-      CopySpace.new.apply(spec)
+      STEPS.reduce(engine.start(input)) { |draft, step| apply_step(step, draft, engine) }
+    end
+
+    def apply_step(step, draft, engine)
+      case step
+      when :proper_nouns then ProperNoun.new.apply(draft)
+      when :style_spec then StyleSpec.new(dictionary: dictionary).apply(draft)
+      when :copy_space then CopySpace.new.apply(draft)
+      when :anti_ai_rules then engine.apply(draft)
+      end
     end
 
     # 3 案へ展開し、案ごとに統合します。
