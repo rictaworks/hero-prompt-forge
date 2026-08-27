@@ -8,15 +8,23 @@ module Generation
   # **仕様の技術スタックが LangChain を挙げています**（requirements.md 3）。
   # 呼び出しの組み立てと応答の読み取りは、そちらへ委ねます。
   #
-  # **ただし、次の 2 点だけは、この持ち場で上書きします。**
+  # **ただし、次の 3 点だけは、この持ち場で上書きします。**
   #
-  # ## 1. API キーを URL へ載せません
+  # ## 1. 呼び出し先を、設定から決めます
+  #
+  # `langchainrb` は、呼び出し先を gem の中で組み立てます。**そのままでは
+  # `config/llm.yml` の `endpoint` が効きません。** 設定を直しても呼び出し先が
+  # 変わらず、**「暗号化された通信だけを認めます」という検め
+  # （`LlmSettings.ensure_endpoint!`）が、実際の呼び出し先を守りません**
+  # （PR #176 のレビュー・要修正 1）。**設定の呼び出し先だけを使います。**
+  #
+  # ## 2. API キーを URL へ載せません
   #
   # `langchainrb` の既定は、キーを問い合わせの文字列（`?key=...`）へ載せます。
   # **URL は記録に残ります**（アクセスログ・中継の記録・例外の記録）。
   # 見出しで送れば残りません。**この持ち場は、そのために存在します。**
   #
-  # ## 2. 待ち続けません
+  # ## 3. 待ち続けません
   #
   # `langchainrb` は待ち時間の上限を設けません。**外への呼び出しが返らない
   # 場合、ジョブがそのまま止まります。** 上限を設け、越えたら失敗させて
@@ -31,9 +39,13 @@ module Generation
     # @param api_key [String] 環境変数から読んだ鍵です
     # @param default_options [Hash] 既定の設定です
     # @param timeouts [Hash] `open` ・ `read` ・ `write` の秒数です
-    def initialize(api_key:, timeouts:, default_options: {})
+    # @param endpoint [String] 呼び出し先です。`%<model>s` にモデル名が入ります
+    # @param model [String] 呼び出すモデルの名前です
+    def initialize(api_key:, timeouts:, endpoint:, model:, default_options: {})
       super(api_key: api_key, default_options: default_options)
       @timeouts = timeouts
+      @endpoint = endpoint
+      @model = model
     end
 
     # 送る本文から落とす項目です。
@@ -44,22 +56,24 @@ module Generation
 
     private
 
-    attr_reader :timeouts
+    attr_reader :timeouts, :endpoint, :model
 
-    # **キーを見出しで送り、URL から落とします。**
-    def http_post(url, params)
-      target = without_key(url)
+    # **キーを見出しで送り、呼び出し先は設定から決めます。**
+    #
+    # **gem が組み立てた URL を使いません。** 使うと、設定の `endpoint` が
+    # 効かなくなります（PR #176 のレビュー・要修正 1）。
+    def http_post(_url, params)
+      target = target_url
       http = client_for(target)
       response = http.request(request_for(target, params.except(*DROPPED_PARAMS)))
 
       JSON.parse(response.body)
     end
 
-    # 問い合わせの文字列を落とします。**キーはここに載りません。**
-    def without_key(url)
-      target = URI(url.to_s)
-      target.query = nil
-      target
+    # 設定の呼び出し先です。**問い合わせの文字列を持ちません。**
+    # キーは見出しで送りますので、URL へ載りません。
+    def target_url
+      URI(format(endpoint, model: model))
     end
 
     def client_for(target)

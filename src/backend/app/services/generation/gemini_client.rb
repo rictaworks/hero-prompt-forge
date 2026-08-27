@@ -92,6 +92,8 @@ module Generation
         timeouts: { open: settings.fetch('open_timeout_seconds'),
                     read: settings.fetch('read_timeout_seconds'),
                     write: settings.fetch('write_timeout_seconds') },
+        endpoint: settings.fetch('endpoint'),
+        model: settings.fetch('model'),
         default_options: { chat_model: settings.fetch('model'),
                            temperature: settings.fetch('temperature') }
       )

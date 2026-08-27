@@ -110,15 +110,39 @@ RSpec.describe ReclaimPromptRequestsJob do
 
       expect(enqueued_ids.size).to eq(2)
     end
+
+    # **2 つの並びを足した数にも、上限が効きます。**
+    #
+    # 片方の並びだけで確かめると、**足したあとの上限を外しても緑のままです**
+    # （PR #176 のレビュー・要修正 4）。**それぞれが上限まで拾った場面**を作ります。
+    it '2 つの並びを足しても、上限を越えて投入しません' do
+      stub_const("#{described_class}::BATCH_SIZE", 3)
+      stale = Array.new(2) { request_in('generating', updated: 1.hour.ago, reserve: false).id }
+      # **枠を取りません。** 同じ利用者は 1 日 1 回しか予約できません
+      # （requirements.md 4.4）。ここで確かめたいのは投入の数です。
+      unsettled = Array.new(2) { request_in('completed', updated: 1.minute.ago, reserve: false).id }
+      job = described_class.new
+      allow(job).to receive_messages(stale_ids: stale, unsettled_ids: unsettled)
+
+      job.perform
+
+      expect(enqueued_ids.size).to eq(3)
+    end
   end
 
   describe '同じ行を二度投入しないこと' do
-    # **2 つの条件に当てはまる行があっても、投入は 1 回です。**
+    # **2 つの並びに同じ行が入っても、投入は 1 回です。**
+    #
+    # **いまの 2 つの並びは、状態が重なりません。** 動きの無い行は `generating`、
+    # 決着だけが残る行は `completed` ・ `degraded_completed` ・ `failed` です。
+    # **ですので、実際のデータでは重なりを作れません**（PR #176 のレビュー・要修正 4）。
+    # 拾う条件が広がった日に二重投入が起きないよう、**並びを直に与えて確かめます。**
     it '重なった行を 1 回だけ投入します' do
       target = request_in('generating', updated: 1.hour.ago)
-      QuotaConsumption.find_by(prompt_request: target)
+      job = described_class.new
+      allow(job).to receive_messages(stale_ids: [target.id], unsettled_ids: [target.id])
 
-      described_class.perform_now
+      job.perform
 
       expect(enqueued_ids.count(target.id)).to eq(1)
     end

@@ -31,6 +31,18 @@ RSpec.describe Generation::GeminiClient do
     client.refine(instruction: 'Refine these fragments.', lines: lines)
   end
 
+  # 呼び出しに使った接続そのものを取り出します。**待ち時間の上限を見るためです。**
+  def connection
+    captured = nil
+    allow(Net::HTTP).to receive(:new).and_wrap_original do |original, *arguments|
+      captured = original.call(*arguments)
+    end
+
+    refine
+
+    captured
+  end
+
   before do
     with_key('test-key')
     requests = sent
@@ -216,6 +228,51 @@ RSpec.describe Generation::GeminiClient do
       stub_request(:post, endpoint).to_timeout
 
       expect { refine }.to raise_error(described_class::RequestFailedError)
+    end
+
+    # **設定した秒数が、実際の呼び出しへ入っていることを確かめます。**
+    #
+    # 時間切れを起こすだけでは足りません。**上限の 3 行を丸ごと消しても、
+    # 時間切れは起きます**（PR #176 のレビュー・要修正 3）。
+    it '設定した秒数を、呼び出しへ入れます' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      settings = Generation::LlmSettings.load
+
+      expect(connection).to have_attributes(
+        open_timeout: settings.fetch('open_timeout_seconds'),
+        read_timeout: settings.fetch('read_timeout_seconds'),
+        write_timeout: settings.fetch('write_timeout_seconds')
+      )
+    end
+
+    # **呼び出し先は設定から決めます。**
+    #
+    # gem が組み立てた URL を使うと、**設定を直しても呼び出し先が変わりません**
+    # （PR #176 のレビュー・要修正 1）。
+    it '設定の呼び出し先へ送ります' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+
+      refine
+
+      # **問い合わせの文字列を持ちません。** 鍵は見出しで送ります。
+      expect(sent.last.uri).to have_attributes(
+        scheme: 'https',
+        host: 'generativelanguage.googleapis.com',
+        path: '/v1beta/models/gemini-2.5-flash-lite:generateContent',
+        query: nil
+      )
+    end
+
+    it '設定を変えると、送り先も変わります' do
+      elsewhere = 'https://example.invalid/v1beta/models/%<model>s:generateContent'
+      allow(Generation::LlmSettings).to receive(:load)
+        .and_return(Generation::LlmSettings.load.merge('endpoint' => elsewhere))
+      stub_request(:post, 'https://example.invalid/v1beta/models/gemini-2.5-flash-lite:generateContent')
+        .to_return(status: 200, body: answer('first'))
+
+      refine
+
+      expect(sent.last.uri.host).to eq('example.invalid')
     end
 
     # **追跡（LangSmith）を有効にしません。** 磨く対象の英文が第三者の保管先へ渡ります。
