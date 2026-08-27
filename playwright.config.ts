@@ -24,7 +24,22 @@ if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(baseURL)) {
 export default defineConfig({
   testDir: "./test",
   testMatch: "**/pr*/**/*.spec.ts",
-  fullyParallel: true,
+  /**
+   * **1 つずつ流します。**
+   *
+   * 確認の相手は、**1 台の開発サーバーと 1 つのアカウント**です。
+   * そのアカウントの生成の枠は **1 日 1 回**で（requirements.md 4.4）、
+   * 保存したプロジェクト・プリセット・評価メモも、すべての例で共有されます。
+   * **例ごとに分けられない資源です。**
+   *
+   * 並べて流すと、枠を使い切る前の要求と後の要求が入れ替わり、どちらの結果も
+   * 定まりません（PR #174 のレビュー・要修正 8）。**設定と実際の流し方を
+   * 一致させます。** 「設定どおりに流すと落ちる」状態を残しません。
+   *
+   * **速さより、結果が毎回同じであることを採ります。**
+   */
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: [["list"]],

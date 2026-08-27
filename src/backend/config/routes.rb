@@ -16,6 +16,10 @@ Rails.application.routes.draw do
   # 版を付けて、画面と足並みを揃えて変えられるようにします。
   namespace :api do
     namespace :v1 do
+      # いまログインしている利用者です。**上部バーが使います。**
+      # **プラン値の判定を求めません。** `pending` の方も自分の状態を見られます。
+      resource :session, only: %i[show], controller: 'session'
+
       # プロジェクトです（requirements.md 4.1）。
       # **消す経路を作りません。** 生成履歴が結び付いています。
       resources :projects, only: %i[index create update]

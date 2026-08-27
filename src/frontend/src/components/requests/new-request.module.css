@@ -1,0 +1,194 @@
+/* 入力フォーム（03）です。
+   app-ui のデザインシステム（degraded.css のパネル・ラベル）に合わせます。 */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.group {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 28px 28px 32px;
+}
+
+.legend {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey-777);
+  padding: 0 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.required {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--red);
+  border: 1px solid rgba(192, 57, 43, 0.5);
+  padding: 2px 6px;
+}
+
+.help {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--grey-666);
+  margin: 0;
+}
+
+.control {
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.control:focus {
+  outline: 1px solid var(--red);
+}
+
+.textarea {
+  line-height: 1.9;
+  resize: vertical;
+}
+
+.counter {
+  font-size: 11px;
+  color: var(--grey-555);
+  margin: 0;
+  text-align: right;
+}
+
+.colors {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.colorLabel {
+  font-size: 11.5px;
+  color: var(--grey-999);
+  white-space: nowrap;
+}
+
+.error {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--red-bright);
+  margin: 0;
+}
+
+/* 名前の書き方の案内です（issue #152）。 */
+.guide {
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  background: var(--dark3);
+  padding: 20px 22px;
+  margin-top: 22px;
+}
+
+.guideHeading {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+
+.guideBody {
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--grey-999);
+  margin: 0 0 12px;
+}
+
+.guideList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.guideItem {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text);
+  border-left: 2px solid var(--gold);
+  padding-left: 12px;
+}
+
+.guideCaution {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--grey-666);
+  margin: 0;
+}
+
+.submit {
+  width: 280px;
+}
+
+@media (max-width: 768px) {
+  .group {
+    padding: 22px 20px 26px;
+  }
+  .colors {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .submit {
+    width: 100%;
+  }
+}
+
+/* いまの条件をプリセットとして保存する欄です（issue #75）。 */
+.presetSubmit {
+  width: 240px;
+  margin-top: 18px;
+}
+
+.saved {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--gold);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .presetSubmit {
+    width: 100%;
+  }
+}

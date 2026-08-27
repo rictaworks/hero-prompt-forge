@@ -470,6 +470,43 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
 
         expect(response.parsed_body['dictionary_version']).to eq(dictionary.version)
       end
+
+      # **案の識別子を返します**（issue #74）。評価メモは案ごとに記録しますので、
+      # 識別子が無いと、画面から記録の経路へ辿れません。
+      it '案の識別子を返します' do
+        get_request
+
+        expect(response.parsed_body['outputs'].pluck('id'))
+          .to eq(prompt_request.prompt_outputs.in_order.pluck(:id))
+      end
+
+      it '評価メモが無ければ空を返します' do
+        get_request
+
+        expect(response.parsed_body['outputs'].pluck('evaluation_note'))
+          .to all(be_nil)
+      end
+
+      it '評価メモがあれば、案と一緒に返します' do
+        output = prompt_request.prompt_outputs.in_order.first
+        EvaluationNote.create!(prompt_output: output, rating: 4, memo: '余白が読みやすいです。')
+
+        get_request
+
+        expect(response.parsed_body['outputs'].first['evaluation_note'])
+          .to include('rating' => 4, 'memo' => '余白が読みやすいです。')
+      end
+
+      # **他の案の記録を混ぜません。**
+      it '記録のある案だけに評価メモが付きます' do
+        output = prompt_request.prompt_outputs.in_order.first
+        EvaluationNote.create!(prompt_output: output, rating: 4, memo: '余白が読みやすいです。')
+
+        get_request
+
+        expect(response.parsed_body['outputs'].pluck('evaluation_note').map(&:nil?))
+          .to eq([false, true, true])
+      end
     end
 
     describe '縮退で生成された場合' do

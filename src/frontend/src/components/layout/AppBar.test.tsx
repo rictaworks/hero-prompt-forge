@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 
 import { AppBar } from "@/components/layout/AppBar";
-import { SCREENS, screenOf, UnknownScreenError } from "@/config/screens";
+import {
+  linkTo,
+  SCREENS,
+  screenOf,
+  UnknownScreenError,
+} from "@/config/screens";
 import { text } from "@/strings";
 
 describe("AppBar", () => {
@@ -24,26 +29,59 @@ describe("AppBar", () => {
     );
   });
 
+  // **未実装の画面へは導線を張りません。** 開いても何も無い状態を作りません。
+  // **一覧（`SCREENS`）が正です。** ここへ画面の名前を書き写しません。
   it("未実装の画面へは導線を張りません", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
-    // Projects・Presets・Admin はいずれも未実装のため、移動先を持ちません。
-    expect(screen.queryByRole("link", { name: /Projects/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Presets/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Admin/ })).toBeNull();
+    for (const key of ["projects", "presets"] as const) {
+      const label = text(`nav.${key}.en`);
+      const found = screen.queryByRole("link", { name: new RegExp(label) });
+
+      expect([label, found === null]).toEqual([label, linkTo(key) === null]);
+    }
   });
 
-  it("未実装の画面の名前は表示します", () => {
+  it("実装済みの画面へは移動先を張ります", () => {
+    render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
+
+    expect(
+      screen.getByRole("link", { name: new RegExp(text("nav.projects.en")) }),
+    ).toHaveAttribute("href", linkTo("projects") ?? "");
+  });
+
+  // **一般の利用者の画面に、管理の導線を出しません**（issue #77）。
+  it("管理への導線を出しません", () => {
+    render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
+
+    expect(screen.queryByText(text("nav.admin.en"))).toBeNull();
+    expect(screen.queryByText(text("nav.admin.ja"))).toBeNull();
+    expect(screen.queryByRole("link", { name: /admin/i })).toBeNull();
+  });
+
+  it("画面の名前は、実装の有無にかかわらず表示します", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
     expect(screen.getByText("Projects")).toBeVisible();
     expect(screen.getByText("プロジェクト")).toBeVisible();
   });
 
-  it("新規生成は未実装のため押せません", () => {
+  // **一覧（`SCREENS`）が正です。** 実装の有無を、ここへ書き写しません。
+  it("新規生成は、実装済みなら移動先を張り、未実装なら押せません", () => {
     render(<AppBar plan="PLAN · ACTIVE" user="@ao_design" />);
 
-    expect(screen.getByRole("button", { name: "新規生成" })).toBeDisabled();
+    const label = text("nav.newRequest.action");
+
+    const path = linkTo("newRequest");
+
+    if (path !== null) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+        "href",
+        path,
+      );
+    } else {
+      expect(screen.getByRole("button", { name: label })).toBeDisabled();
+    }
   });
 });
 
@@ -64,6 +102,14 @@ describe("画面の一覧", () => {
       "08",
       "09",
     ]);
+  });
+
+  // **識別子で決まる画面は、固定の入口を持ちません。**
+  // 実装済みかどうかを `path` の有無で表すと、この 3 画面が永久に未実装になります。
+  it("識別子で決まる画面は、実装済みでも固定の入口を持ちません", () => {
+    for (const key of ["generating", "result"] as const) {
+      expect([key, screenOf(key).implemented, linkTo(key)]).toEqual([key, true, null]);
+    }
   });
 
   it("未定義の画面を求めると例外にします", () => {

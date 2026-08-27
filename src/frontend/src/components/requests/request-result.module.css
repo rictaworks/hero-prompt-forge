@@ -1,0 +1,197 @@
+/* 結果 3 案（05）です。
+   値は app-ui/styles/degraded.css の案の表示と 1:1 で対応させています。 */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.loading,
+.empty {
+  padding: 32px 0;
+  font-size: 12.5px;
+  color: var(--grey-777);
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+}
+
+.meta {
+  font-size: 11.5px;
+  color: var(--grey-666);
+}
+
+.chips {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--grey-999);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+}
+
+.chipWarn {
+  color: var(--red);
+  border-color: rgba(192, 57, 43, 0.5);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.blockHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--grey-777);
+}
+
+.quote {
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  padding: 16px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.absent {
+  font-size: 11.5px;
+  color: var(--grey-666);
+  margin: 0;
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+}
+
+.factsRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.factsRow:last-child {
+  border-bottom: none;
+}
+
+.factsKey {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--grey-999);
+}
+
+.factsValue {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.listItem {
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--grey-999);
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+}
+
+.listHeading {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.error {
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: var(--red-bright);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.actionLink {
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .card {
+    padding: 24px 20px;
+  }
+}

@@ -69,6 +69,7 @@
 
 | 種別 | パス | 概要 | 仕様 |
 |---|---|---|---|
+| `GET` | `/api/v1/session` | いまログインしている利用者です | 下記 |
 | `GET` | `/api/v1/projects` | プロジェクトの一覧です | 下記 |
 | `POST` | `/api/v1/projects` | プロジェクトを作ります | 下記 |
 | `PATCH` | `/api/v1/projects/:id` | プロジェクトを更新します | 下記 |
@@ -86,6 +87,24 @@
 **いずれも認証が要ります。プラン値が有効でなければ `403` です。**
 
 **他人の資源は、必ず `404` です。** 一覧には載らず、識別子を指定しても見つかりません。
+
+### いまログインしている利用者（`GET /api/v1/session`）
+
+**上部バーが使います。** 表示名とプラン値を出すためです。
+
+**プラン値の判定を求めません。** `pending` の方も、自分の状態を見られます。**見られなければ、なぜ使えないのかが分かりません。**
+
+**X のユーザー ID を返しません。** 画面に要りません。
+
+```json
+{ "display_name": "あお", "plan": "active" }
+```
+
+**失敗**
+
+| コード | `code` | 場面 |
+|---|---|---|
+| `401` | `unauthorized` | 未認証です |
 
 ### プロジェクト（`/api/v1/projects`）
 
@@ -205,6 +224,21 @@
 | `inputs.copy_space_position` | − | 文字を置く余白の位置です。既定は `left` です |
 | `inputs.aspect_ratio` | − | 画角です。既定は `16:9` です |
 
+**入力条件で選べる値**
+
+**この一覧が契約です。** 画面（`src/frontend/src/types/resources.ts`）とバックエンド（`Generation::InputChoices`）は、いずれもこの表を実装します。**片方だけを増やすと、画面では選べるのに投入で弾かれます。**
+
+| 項目 | 選べる値 | 既定値 |
+|---|---|---|
+| `industry` | `saas` ・ `restaurant` ・ `medical` ・ `education` ・ `real_estate` ・ `manufacturing` ・ `professional_services` ・ `ecommerce` ・ `beauty` ・ `other` | 既定値はありません（必須です） |
+| `style_family` | `photoreal` ・ `illustration` ・ `three_d` ・ `abstract` | 既定値はありません（必須です） |
+| `target_model` | `midjourney` ・ `dalle` ・ `stable_diffusion` ・ `nano_banana` | 既定値はありません（必須です） |
+| `brand_tone` | `trust` ・ `advanced` ・ `warmth` ・ `premium` ・ `friendly` ・ `minimal` | 業種ごとの標準 |
+| `copy_space_position` | `left` ・ `right` ・ `bottom_center` | `left` |
+| `aspect_ratio` | `16:9` ・ `21:9` ・ `3:2` | `16:9` |
+| `service_summary` | 自由記述です。**1000 文字まで**です | 空です |
+| `brand_colors` | `#RRGGBB` の形の文字列を**2 つまで**です | 空です |
+
 **応答（`201`）**
 
 ```json
@@ -267,6 +301,7 @@
 | 項目 | 返す場面 | 内容 |
 |---|---|---|
 | `status` | 常に | `draft` / `queued` / `generating` / `completed` / `degraded_completed` / `failed` / `rejected` / `archived` |
+| `inputs` | 常に | **正規化済みの入力条件です。** 作り直しに使います |
 | `degraded` | 常に | **縮退で作った場合に `true` です** |
 | `outputs` | `completed` ・ `degraded_completed` のみ | 3 案です。案ごとにも `degraded` が付きます |
 | `failure` | `rejected` ・ `failed` のみ | 利用者へ見せる文言と、次に行う操作です |
@@ -281,19 +316,30 @@
   "dictionary_version": "v1.0.0",
   "created_at": "2026-08-27T10:30:00+09:00",
   "updated_at": "2026-08-27T10:30:42+09:00",
+  "inputs": { "industry": "medical", "style_family": "photoreal", "target_model": "midjourney" },
   "outputs": [
     {
+      "id": 42,
       "variation_no": 1,
       "composition_type": "subject_led",
       "main_prompt": "...",
       "negative_prompt": "...",
       "parameters": { "aspect_ratio": "16:9" },
       "art_direction_note": { "checkpoints": [] },
-      "degraded": true
+      "degraded": true,
+      "evaluation_note": { "id": 11, "rating": 4, "memo": "余白が読みやすいです。" }
     }
   ]
 }
 ```
+
+**正規化済みの入力条件（`inputs`）を返します。** 「同じ条件で作り直す」ために要ります。**返す範囲は広がりません。** 要求した本人が送った入力の写しです。**一覧には載せません。**
+
+**差し戻した記録には、自由に書いていただいた `service_summary` が残っていません。** 受け付けの時点で落としています。
+
+**案には識別子（`id`）が付きます。** 評価メモは案ごとに記録しますので、識別子が無いと記録の経路へ辿れません。
+
+**すでに記録された評価メモは、案と一緒に返します。** 記録が無い案は `null` です。**案ごとに問い合わせ直しません。**
 
 **失敗**
 
