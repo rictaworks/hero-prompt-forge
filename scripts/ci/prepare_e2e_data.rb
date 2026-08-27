@@ -109,10 +109,9 @@ class E2eFixture
         { key: 'people', heading: I18n.t('art_direction_note.headings.checkpoints'),
           text: '人物の手指が破綻していないことを確かめます。' }
       ],
-      adjustments: [
-        { key: 'stylize', heading: I18n.t('art_direction_note.headings.adjustments'),
-          text: '硬い印象が強い場合は、光をやわらげます。' }
-      ],
+      # **調整の案は、文字列の並びです**（`Generation::AdjustmentList#build`）。
+      # 連想配列にすると、画面が「そのまま出せないもの」を受け取って落ちます。
+      adjustments: ['硬い印象が強い場合は、光をやわらげます。'],
       headings: {
         checkpoints: I18n.t('art_direction_note.headings.checkpoints'),
         adjustments: I18n.t('art_direction_note.headings.adjustments')
