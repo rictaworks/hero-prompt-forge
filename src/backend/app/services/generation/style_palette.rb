@@ -25,6 +25,12 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :style_palette_weakened
 
+    # 弱めた配色指定の役割です。**整形の段（issue #156）が引きます。**
+    #
+    # **もとの素材の役割（`palette`）を引き継ぎます。** 引き継がないと、
+    # 弱めた素材だけが役割を失い、既定の述語で述べられます。
+    ROLE = 'palette'
+
     ITEMS_KEY = 'items'
     WEAKENED_KEY = 'weakened'
 
@@ -75,7 +81,7 @@ module Generation
     # 素材の全体へ `uniq` を掛けると、もともと重なっていた素材まで
     # 黙って 1 件へまとまり、通る道によって素材の数が変わります。
     def note_for(term)
-      { kind: NOTE_KIND, term: term, weakened: weakened }
+      { kind: NOTE_KIND, term: term, weakened: weakened, roles: { ROLE => weakened } }
     end
   end
 end

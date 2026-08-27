@@ -54,8 +54,10 @@ module Generation
       )
     end
 
+    # **役割の名前も一緒に残します**（issue #156）。
     def variation_note
-      { kind: VariationExpander::NOTE_KIND, composition: name, number: index + 1 }
+      { kind: VariationExpander::NOTE_KIND, composition: name, number: index + 1,
+        roles: { VariationExpander::FOCUS_ROLE => composition.fetch(VariationRules::FOCUS_KEY) } }
     end
 
     # **外した事実を、役割ごとに残します。**

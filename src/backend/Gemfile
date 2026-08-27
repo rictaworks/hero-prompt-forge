@@ -31,6 +31,45 @@ gem 'thruster', require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 gem 'image_processing', '~> 1.2'
 
+# プロンプト精緻化です（requirements.md 3、issue #160）。
+#
+# **仕様の技術スタックが LangChain を挙げています。** Ruby 版は
+# `langchainrb`（https://github.com/patterns-ai-core/langchainrb ）です。
+#
+# **ライセンスと保守状況を確かめました**（2026-08-27 時点）。
+#
+#   ライセンス   : MIT
+#   星の数       : 1,991
+#   最終の push  : 2026-08-26（前日です）
+#   保管の状態   : 現役です（archived ではありません）
+#   取得の総数   : 1,529,796
+#   実行時の依存 : baran ・ csv ・ json-schema ・ matrix ・ pragmatic_segmenter ・ zeitwerk
+#
+# **ただし、実際に入る版は 0.19.5 で、公開は 2025-05-01 です**（約 16 か月前）。
+# **これが最新の公開版です。** 先端の書き換えは続いていますが、**公開版は
+# 16 か月出ていません**（PR #176 のレビュー・要修正 2）。**「先端が活発である
+# こと」と「入る版が新しいこと」は別です。**
+#
+# **それでも採ります。理由は 2 つです。**
+#
+#   1. **呼び出しの要所を、こちらで押さえています。** 呼び出し先・鍵の送り方・
+#      待ち時間・送る内容は `Generation::LangchainGemini` が決めます。
+#      **gem が古びても、危ない挙動がそのまま入ってきません。**
+#   2. **離れられます。** 使っているのは `Langchain::LLM::GoogleGemini` だけです。
+#      **`Generation::GeminiClient` の差し替えで離脱できます。**
+#
+# **Python の別サービス（FastAPI ＋ 本家の LangChain）と比べました。**
+# 本家は LangGraph ・ LangSmith まで揃いますが、**サービスが 1 つ増えます。**
+# 配置先・監視・秘匿値の受け渡しが増え、無料の枠では割に合いません。
+# **CLAUDE.md は「必要な場合のみ FastAPI を足す」としています。** いま AI の
+# 呼び出しは 1 系統だけですので、**足す条件を満たしません。**
+#
+# **実行時の依存が軽いことを確かめています。** 各社の呼び出し先は、使うものだけを
+# 別の gem として足す作りです。**Gemini の呼び出しは標準ライブラリだけで動きます。**
+#
+# **API キーはここへ書きません。** 環境変数 `GEMINI_API_KEY` から読みます。
+gem 'langchainrb', '~> 0.19.5'
+
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 

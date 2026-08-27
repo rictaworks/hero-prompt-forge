@@ -42,8 +42,10 @@ module Adapters
         @all ||= deep_freeze(read(DEFINITION_PATH))
       end
 
+      # **別名（アンカー）を許します。** 自然文で書くモデルは、役割ごとの述語を
+      # 同じ内容で持ちます。書き写すと、片方だけを直したときに食い違います。
       def read(path)
-        loaded = YAML.safe_load_file(Rails.root.join(path))
+        loaded = YAML.safe_load_file(Rails.root.join(path), aliases: true)
         return loaded if loaded.is_a?(Hash)
 
         raise InvalidDefinitionError, "記法が読めません: #{path}" # 開発者向け

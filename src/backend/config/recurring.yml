@@ -9,7 +9,26 @@
 #     priority: 2
 #     schedule: at 5am every day
 
+# **置き去りの生成リクエストを拾い直します**（issue #169）。
+#
+# **定時に走らせます。** 待ち行列が戻した回が一度見送られると、その回は
+# 正常終了しますので二度と投入されません。**何度でも機会が来る形にします。**
+#
+# **間隔は、置き去りと見なすまでの時間（2 分）と釣り合わせます。**
+# 短くしすぎると、組み立ての最中の行へ何度も投入を重ねます（拾われはしませんが、
+# 待ち行列を無駄に使います）。
+#
+# **開発でも走らせます。** 本番でだけ走る仕組みは、本番で初めて壊れます。
+shared: &shared
+  reclaim_prompt_requests:
+    class: ReclaimPromptRequestsJob
+    schedule: every 5 minutes
+
+development:
+  <<: *shared
+
 production:
+  <<: *shared
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12

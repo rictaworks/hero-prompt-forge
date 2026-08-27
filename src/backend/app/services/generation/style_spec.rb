@@ -65,6 +65,9 @@ module Generation
     # 案ごとに別の値へ選び直すために使います。素材の並びだけでは、どれが
     # この段の足したものか分かりません。
     SPECIFICATIONS_NOTE_KIND = :style_spec_applied
+
+    # 人物の構図の役割です。**整形の段（issue #156）が引きます。**
+    PERSON_SAFETY_ROLE = 'person_safety'
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
     # 構図を当てなかったことを残す印です。**理由を添えます。**
     PERSON_SAFETY_SKIPPED_NOTE_KIND = :person_safety_skipped
@@ -186,9 +189,15 @@ module Generation
     end
 
     # **当てた仕様そのものを残します。** issue #50 が選び直すために使います。
+    #
+    # **役割の名前も一緒に残します**（issue #156）。整形の段は、どれが撮影の
+    # 手段でどれが描き方かを見分けて、役割ごとの述語で文を組み立てます。
+    # **素材の文字列を照合して見分けると、言い回しが変わったときに黙って外れます。**
     def specifications_note(draft, specifications)
-      { kind: SPECIFICATIONS_NOTE_KIND, style_family: style_family_of(draft),
-        specifications: specifications }
+      style_family = style_family_of(draft)
+
+      { kind: SPECIFICATIONS_NOTE_KIND, style_family: style_family,
+        specifications: specifications, roles: rules.roles_for(style_family) }
     end
 
     # **当てた場合も、当てなかった場合も、ノートへ残します。**
@@ -202,9 +211,12 @@ module Generation
       with_source(note, decision)
     end
 
+    # **役割の名前も一緒に残します**（issue #156）。
     def applied_note(decision)
-      with_source({ kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions] },
-                  decision)
+      roles = decision[:compositions].index_with { PERSON_SAFETY_ROLE }.invert
+
+      with_source({ kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions],
+                    roles: roles }, decision)
     end
 
     # **どこから引いた見込みかを残します**（issue #147）。

@@ -31,6 +31,18 @@ RSpec.describe Generation::GeminiClient do
     client.refine(instruction: 'Refine these fragments.', lines: lines)
   end
 
+  # 呼び出しに使った接続そのものを取り出します。**待ち時間の上限を見るためです。**
+  def connection
+    captured = nil
+    allow(Net::HTTP).to receive(:new).and_wrap_original do |original, *arguments|
+      captured = original.call(*arguments)
+    end
+
+    refine
+
+    captured
+  end
+
   before do
     with_key('test-key')
     requests = sent
@@ -94,11 +106,22 @@ RSpec.describe Generation::GeminiClient do
       expect(sent_text).to eq(expected)
     end
 
+    # **項目名は `generation_config` です**（issue #160）。
+    # LangChain 経由になり、Google の受け付ける 2 つの書き方のうち、
+    # もとの項目名（下線区切り）で送るようになりました。**送る内容は同じです。**
     it '利用者を指せる値を送りません' do
       stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
       refine
 
-      expect(sent_body.keys).to contain_exactly('contents', 'generationConfig')
+      expect(sent_body.keys).to contain_exactly('contents', 'generation_config')
+    end
+
+    # **モデルの名前は URL が持ちます。** 本文へ重ねません。
+    it 'モデルの名前を本文へ入れません' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      refine
+
+      expect(sent_body).not_to have_key('model')
     end
 
     def sent_body
@@ -158,6 +181,119 @@ RSpec.describe Generation::GeminiClient do
       with_key(nil)
 
       expect(described_class).not_to be_available
+    end
+  end
+
+  # **LangChain（`langchainrb`）を通します**（issue #160）。
+  describe 'LangChain 経由であること' do
+    it 'LangChain の呼び出し先を使います' do
+      expect(Generation::LangchainGemini.ancestors).to include(Langchain::LLM::GoogleGemini)
+    end
+
+    it 'LangChain の呼び出しを通ります' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      allow(Generation::LangchainGemini).to receive(:new).and_call_original
+
+      refine
+
+      expect(Generation::LangchainGemini).to have_received(:new)
+    end
+
+    # **API キーは環境変数から読みます。** ソースにも設定ファイルにも書きません。
+    it '鍵を設定ファイルから読みません' do
+      settings = Generation::LlmSettings.load
+
+      expect(settings.values.join).not_to include('test-key')
+    end
+
+    # **鍵を URL へ載せません。** URL は記録に残ります。
+    it '鍵を URL へ載せません' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+
+      refine
+
+      expect(sent.last.uri.to_s).not_to include('test-key')
+    end
+
+    it '鍵を見出しで送ります' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+
+      refine
+
+      expect(sent.last.headers['X-Goog-Api-Key']).to eq('test-key')
+    end
+
+    # **待ち続けません。** 上限を越えたら失敗させ、縮退へ回します。
+    it '待ち時間の上限を設けます' do
+      stub_request(:post, endpoint).to_timeout
+
+      expect { refine }.to raise_error(described_class::RequestFailedError)
+    end
+
+    # **設定した秒数が、実際の呼び出しへ入っていることを確かめます。**
+    #
+    # 時間切れを起こすだけでは足りません。**上限の 3 行を丸ごと消しても、
+    # 時間切れは起きます**（PR #176 のレビュー・要修正 3）。
+    it '設定した秒数を、呼び出しへ入れます' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      settings = Generation::LlmSettings.load
+
+      expect(connection).to have_attributes(
+        open_timeout: settings.fetch('open_timeout_seconds'),
+        read_timeout: settings.fetch('read_timeout_seconds'),
+        write_timeout: settings.fetch('write_timeout_seconds')
+      )
+    end
+
+    # **呼び出し先は設定から決めます。**
+    #
+    # gem が組み立てた URL を使うと、**設定を直しても呼び出し先が変わりません**
+    # （PR #176 のレビュー・要修正 1）。
+    it '設定の呼び出し先へ送ります' do
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+
+      refine
+
+      # **問い合わせの文字列を持ちません。** 鍵は見出しで送ります。
+      expect(sent.last.uri).to have_attributes(
+        scheme: 'https',
+        host: 'generativelanguage.googleapis.com',
+        path: '/v1beta/models/gemini-2.5-flash-lite:generateContent',
+        query: nil
+      )
+    end
+
+    it '設定を変えると、送り先も変わります' do
+      elsewhere = 'https://example.invalid/v1beta/models/%<model>s:generateContent'
+      allow(Generation::LlmSettings).to receive(:load)
+        .and_return(Generation::LlmSettings.load.merge('endpoint' => elsewhere))
+      stub_request(:post, 'https://example.invalid/v1beta/models/gemini-2.5-flash-lite:generateContent')
+        .to_return(status: 200, body: answer('first'))
+
+      refine
+
+      expect(sent.last.uri.host).to eq('example.invalid')
+    end
+
+    # **追跡（LangSmith）を有効にしません。** 磨く対象の英文が第三者の保管先へ渡ります。
+    it '追跡の設定を持ちません' do
+      expect(ENV.fetch('LANGCHAIN_TRACING_V2', nil)).to be_blank
+    end
+
+    # **書き間違いを飲み込みません。**
+    it '書き間違いは、そのまま外へ出します' do
+      allow_any_instance_of(Generation::LangchainGemini).to receive(:chat).and_raise(NoMethodError) # rubocop:disable RSpec/AnyInstance
+
+      expect { refine }.to raise_error(NoMethodError)
+    end
+
+    # **応答に文が無い場合、応答そのものを記録へ流しません。**
+    it '応答の中身を持ち越しません' do
+      stub_request(:post, endpoint).to_return(status: 200, body: { 'error' => 'ひみつ' }.to_json)
+
+      expect { refine }.to raise_error(described_class::RequestFailedError) { |error|
+        expect(error.message).not_to include('ひみつ')
+      }
     end
   end
 end

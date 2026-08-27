@@ -69,6 +69,17 @@ Metrics/ClassLength:
   Exclude:
     - "app/services/auth/*.rb"
     - "app/services/follower_gate_client.rb"
+    # 組み立ての段は、**当てた素材の役割を控えへ残します**（issue #156）。
+    # 控えの組み立ては、その段が持つ知識でしか書けません。別の持ち場へ
+    # 移すと、どの段が何を当てたのかが読めなくなります。
+    - "app/services/generation/conflict_resolver.rb"
+    - "app/services/generation/style_spec.rb"
+    - "app/services/generation/variation_builder.rb"
+    # 生成のジョブは、**状態の見分け方そのもの**を持ちます（issue #54、#169）。
+    # 拾い直す条件・決着だけが残った場合・繰り返さない誤りの分け方は、
+    # いずれもこの持ち場の判断です。分けると、どの条件がどの状態に効くのかが
+    # 追えなくなります。
+    - "app/jobs/generate_prompt_job.rb"
 
 # 移行は表の定義をそのまま並べるため行数が伸びます。
 # 分割すると、どの表がどう作られるのかが追えなくなります。

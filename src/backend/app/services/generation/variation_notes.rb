@@ -33,11 +33,36 @@ module Generation
     attr_reader :applied, :chosen, :dropped, :person_safety
 
     def rewritten(note)
-      return note.merge(specifications: kept_specifications) if specifications_note?(note)
+      return rewritten_specifications(note) if specifications_note?(note)
       return nil if dropped_person_safety_note?(note)
-      return note.merge(compositions: person_safety) if person_safety_note?(note)
+      return rewritten_person_safety(note) if person_safety_note?(note)
 
       note
+    end
+
+    def rewritten_specifications(note)
+      note.merge(specifications: kept_specifications, roles: kept_roles)
+    end
+
+    def rewritten_person_safety(note)
+      note.merge(compositions: person_safety, roles: person_safety_roles)
+    end
+
+    # **役割と素材の対応も、選び直したあとの値へそろえます**（issue #156）。
+    #
+    # そろえないと、整形の段が古い素材で役割を引き、**選び直した素材が
+    # 役割を失って既定の述語で述べられます。**
+    def kept_roles
+      names = Array(applied[:roles]).map(&:first)
+
+      names.zip(chosen).to_h
+           .reject { |name, _term| dropped.value?(applied[:roles][name]) }
+    end
+
+    def person_safety_roles
+      return {} if person_safety.empty?
+
+      { VariationBuilder::PERSON_SAFETY_ROLE => person_safety.first }
     end
 
     def person_safety_note?(note)
