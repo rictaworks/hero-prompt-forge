@@ -30,8 +30,11 @@ RSpec.describe BotProtection::RecaptchaVerifier do
   end
 
   # 既定の合図は、開発者向けの当たり障りのない値です。
+  #
+  # **要求元のアドレスを渡しません**（issue #171）。任意の項目であり、
+  # 送ると利用者のアドレスが Google へ渡ります。
   def verify(token: 'token-value')
-    described_class.new.call(token: token, remote_ip: '203.0.113.10')
+    described_class.new.call(token: token)
   end
 
   describe '通る場合' do
@@ -56,12 +59,32 @@ RSpec.describe BotProtection::RecaptchaVerifier do
         .to have_been_made
     end
 
-    # **送るのは合図と要求元のアドレスだけです。**
-    it '送る項目は 3 つだけです' do
+    # **送るのは秘密鍵と合図だけです**（issue #171）。
+    it '送る項目は 2 つだけです' do
       verify
 
-      expect(a_request(:post, endpoint).with { |request| sent_keys(request) == %w[remoteip response secret] })
+      expect(a_request(:post, endpoint).with { |request| sent_keys(request) == %w[response secret] })
         .to have_been_made
+    end
+
+    # **要求元のアドレスを送りません。**
+    #
+    # requirements.md 5.3 は「保持する個人関連情報は X のユーザーID と
+    # 表示名のみ」と定めています。**その方針に合わせます。**
+    it '要求元のアドレスを送りません' do
+      verify
+
+      expect(a_request(:post, endpoint).with { |request| request.body.include?('remoteip') })
+        .not_to have_been_made
+    end
+
+    # **アドレスを渡す書き方そのものを受け付けません。**
+    #
+    # 受け取って捨てる形にすると、**呼び出す側は「送っている」と思ったまま**に
+    # なります。渡した時点で失敗すれば、その場で気づけます。
+    it 'アドレスを渡す呼び出しは、その場で失敗します' do
+      expect { described_class.new.call(token: 'token-value', remote_ip: '203.0.113.10') }
+        .to raise_error(ArgumentError)
     end
   end
 

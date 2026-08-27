@@ -1,3 +1,5 @@
+import { legal } from "@/strings/legal";
+
 /**
  * 画面に出す文言です。
  *
@@ -409,6 +411,16 @@ export const strings = {
         },
       },
     },
+    // 画面の下の帯です（issue #172）。**モックには無い要素です。**
+    // **モックは書き換えません。** Cookie を置く以上、伝える必要があります。
+    footer: {
+      labels: {
+        terms: "利用規約",
+        privacy: "プライバシーポリシー",
+        commerce: "特定商取引法に基づく表示",
+      },
+      note: "ログインの際に、状態を保つための Cookie を置きます。詳しくはプライバシーポリシーをご覧ください。",
+    },
     contact: {
       title: "第一印象を、業務品質に。",
       body: "ログインは指定アカウントのフォロワー判定のみで完了します。メールアドレスの登録はありません。",
@@ -447,6 +459,8 @@ export const strings = {
       nextAction: "時間をおいて、もう一度お試しください。",
     },
   },
+  // 法務ページです（issue #171、#172）。**本文は `legal.ts` にあります。**
+  legal,
 } as const;
 
 export type Strings = typeof strings;

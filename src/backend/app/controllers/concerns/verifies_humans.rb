@@ -32,9 +32,18 @@ module VerifiesHumans
   def verify_human!
     return unless verification_required?
 
-    BotProtection::RecaptchaVerifier
-      .new
-      .call(token: request.headers[TOKEN_HEADER], remote_ip: request.remote_ip)
+    # **要求元のアドレスを送りません**（issue #171）。
+    #
+    # `remoteip` は任意の項目です。**送ると、利用者のアドレスが Google へ
+    # 渡ります。** requirements.md 5.3 は「保持する個人関連情報は X の
+    # ユーザーID と表示名のみ」と定めています。**その方針に合わせます。**
+    #
+    # **得点の精度は、そのぶん下がります。** それでも、投入の経路は
+    # **X ログインとプラン値ですでに守られています。** 誰でも投げられる
+    # 経路ではありませんので、Bot の入り込む余地はもともと小さいものです。
+    #
+    # **判断はプライバシーポリシーに書いています**（`src/frontend/src/strings/legal.ts`）。
+    BotProtection::RecaptchaVerifier.new.call(token: request.headers[TOKEN_HEADER])
   end
 
   # **本番では必ず照合します。**

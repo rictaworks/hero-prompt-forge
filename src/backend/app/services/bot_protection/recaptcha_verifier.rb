@@ -66,13 +66,17 @@ module BotProtection
     end
 
     # 照合します。通らなければ例外にします。
+    #
     # @param token [String, nil] 画面が受け取った合図です
-    # @param remote_ip [String, nil] 要求元のアドレスです
     # @return [Float] 得点です
-    def call(token:, remote_ip: nil)
+    #
+    # **要求元のアドレスを受け取りません**（issue #171）。受け取って捨てる形に
+    # すると、**呼び出す側は「送っている」と思ったまま**になります。
+    # 引数そのものを置かなければ、渡した時点で失敗しますので気づけます。
+    def call(token:)
       raise VerificationFailedError, MISSING_TOKEN if token.blank?
 
-      traced { judged(request(token, remote_ip)) }
+      traced { judged(request(token)) }
     end
 
     private
@@ -109,16 +113,22 @@ module BotProtection
             "環境変数 #{SECRET_KEY_VARIABLE} が設定されていません。" # 開発者向け
     end
 
-    def request(token, remote_ip)
-      response = post(form(token, remote_ip))
+    def request(token)
+      response = post(form(token))
       parse(response)
     end
 
     # **秘密鍵は本文へ載せます。** URL へ載せません。記録へ残ります。
-    def form(token, remote_ip)
-      values = { 'secret' => secret_key, 'response' => token }
-      values['remoteip'] = remote_ip if remote_ip.present?
-      values
+    #
+    # **要求元のアドレス（`remoteip`）を送りません**（issue #171）。
+    # 任意の項目であり、**送ると利用者のアドレスが Google へ渡ります。**
+    # requirements.md 5.3 は「保持する個人関連情報は X のユーザーID と
+    # 表示名のみ」と定めています。**その方針に合わせます。**
+    #
+    # **得点の精度は、そのぶん下がります。** それでも、投入の経路は
+    # X ログインとプラン値ですでに守られています。
+    def form(token)
+      { 'secret' => secret_key, 'response' => token }
     end
 
     def post(values)
