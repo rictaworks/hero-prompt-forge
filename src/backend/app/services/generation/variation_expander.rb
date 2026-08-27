@@ -45,6 +45,9 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     NOTE_KIND = :variation
 
+    # 主役の置き方の役割です。**整形の段（issue #156）が引きます。**
+    FOCUS_ROLE = 'variation_focus'
+
     # 案ごとに素材を外したことを残す印です。
     DROPPED_NOTE_KIND = :variation_dropped
 

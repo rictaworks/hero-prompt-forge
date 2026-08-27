@@ -375,6 +375,57 @@ RSpec.describe GeneratePromptJob do
 
       expect(request.reload.status).to eq('generating')
     end
+
+    # **待ち行列が仕事を戻す窓より短くします**（issue #169）。
+    #
+    # Solid Queue は、掴まれたままの仕事をおよそ 5 分で戻します
+    # （`process_alive_threshold` の既定）。戻ってきた回の「動きの無さ」は
+    # **およそ 5 分ぶん**ですので、これより長い値では**一度も発火しません。**
+    it '置き去りと見なすまでの時間は、待ち行列が仕事を戻す窓より短いです' do
+      expect(described_class::STALE_AFTER).to be < 5.minutes
+    end
+
+    # **組み立ての長さより長くします。** 磨きの読み取り待ちは 1 案あたり
+    # 最大 20 秒で、3 案ぶんでも 60 秒です。
+    it '置き去りと見なすまでの時間は、組み立ての長さより長いです' do
+      expect(described_class::STALE_AFTER).to be > 60.seconds
+    end
+
+    # **拾ったときに、行の持ち時間を新しくします**（issue #169）。
+    #
+    # 新しくしないと、置き去りの行に対しては錠が効きません。2 人が同時に
+    # 拾って両方が組み立て切り、**同じ組み立てを 2 度行います**
+    # （有償の呼び出しが二重にかかります）。
+    it '2 人が同時に拾っても、組み立てが 2 度走りません' do
+      target = abandoned(described_class::STALE_AFTER + 1.minute)
+      calls = 0
+      allow(Generation::PromptGenerationService).to receive(:new).and_wrap_original do |original, **kwargs|
+        calls += 1
+        # **組み立ての最中に、もう 1 人が拾おうとします。**
+        described_class.perform_now(target.id) if calls == 1
+        original.call(**kwargs)
+      end
+
+      described_class.perform_now(target.id)
+
+      expect(calls).to eq(1)
+    end
+
+    it '2 人が同時に拾っても、案は 3 つのままです' do
+      target = abandoned(described_class::STALE_AFTER + 1.minute)
+      first = true
+      allow(Generation::PromptGenerationService).to receive(:new).and_wrap_original do |original, **kwargs|
+        if first
+          first = false
+          described_class.perform_now(target.id)
+        end
+        original.call(**kwargs)
+      end
+
+      described_class.perform_now(target.id)
+
+      expect(request.reload.prompt_outputs.count).to eq(3)
+    end
   end
 
   # **確定だけが残った場合も、投入し直しで拾い直します。**

@@ -9,6 +9,39 @@
 #
 # `%<aspect_ratio>s` ・ `%<terms>s` には値が入ります。
 
+# 役割ごとの述語です（issue #156）。
+#
+# **素材の役割は、控え（ノート）から受け取ります。** 素材の文字列を照合して
+# 見分けると、言い回しが変わったときに黙って外れます。
+#
+# **撮影の手段を、画に写っているものとして述べません。** レンズは撮影の手段で
+# あり、画に写るものではありません。`The image shows ..., a 35mm lens, ...` は
+# **「35mm レンズが写った絵」を呼び込みかねません**（PR #154 の 3 回目のレビューより）。
+#
+# **上から順に見て、はじめに当たった役割の文へ入れます。**
+# **どの役割にも当たらない素材は、既定の文（`body`）で述べます。**
+#
+# `%<terms>s` に素材の並びが入ります。
+_narrative_role_clauses: &narrative_role_clauses
+  # 撮影の手段です。**画に写るものではありません。**
+  - roles: [lens_mm, key_light, fill_light, rim_light, depth_of_field]
+    template: "The scene is photographed with %<terms>s"
+  # 描き方です（イラスト・3D・抽象）。
+  - roles: [line_quality, shading, palette, material, rendering, lighting, geometry, motion]
+    template: "The image is rendered with %<terms>s"
+  # その案の主役の置き方です。
+  - roles: [variation_focus]
+    template: "The image is led by %<terms>s"
+  # 構図の指定です。**被写体の置き場所・視線・余白・余白を静かに保つ指定です。**
+  - roles: [subject, gaze, reserved, restraint, person_safety, brand_color_restraint, tone_restraint]
+    template: "The composition keeps %<terms>s"
+  # 配色です。
+  - roles: [brand_color]
+    template: "The palette carries %<terms>s"
+  # 全体の雰囲気です。
+  - roles: [tone]
+    template: "The scene carries %<terms>s"
+
 # Midjourney 系です。
 #
 # **語をカンマで並べ、パラメータを本文の末尾へ付けます。**
@@ -51,6 +84,7 @@ dalle:
   # `composed for a 16:9 wide crop` のような過去分詞句を受けると、文になりません
   # （PR #154 の 2 回目のレビューより）。
   body: "The image shows %<terms>s"
+  role_clauses: *narrative_role_clauses
   term_separator: ", "
   final_separator: ", and "
   pair_separator: " and "
@@ -85,6 +119,7 @@ nano_banana:
   frame: "The whole frame is %<clause>s"
   default_frame_clause: "composed as a %<aspect_ratio>s crop"
   body: "The image shows %<terms>s"
+  role_clauses: *narrative_role_clauses
   term_separator: ", "
   final_separator: ", and "
   pair_separator: " and "

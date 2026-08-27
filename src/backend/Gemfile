@@ -31,6 +31,26 @@ gem 'thruster', require: false
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 gem 'image_processing', '~> 1.2'
 
+# プロンプト精緻化です（requirements.md 3、issue #160）。
+#
+# **仕様の技術スタックが LangChain を挙げています。** Ruby 版は
+# `langchainrb`（https://github.com/patterns-ai-core/langchainrb ）です。
+#
+# **ライセンスと保守状況を確かめました**（2026-08-27 時点）。
+#
+#   ライセンス   : MIT
+#   星の数       : 1,991
+#   最終の push  : 2026-08-26（前日です）
+#   保管の状態   : 現役です（archived ではありません）
+#   取得の総数   : 1,529,796
+#   実行時の依存 : baran ・ csv ・ json-schema ・ matrix ・ pragmatic_segmenter ・ zeitwerk
+#
+# **実行時の依存が軽いことを確かめています。** 各社の呼び出し先は、使うものだけを
+# 別の gem として足す作りです。**Gemini の呼び出しは標準ライブラリだけで動きます。**
+#
+# **API キーはここへ書きません。** 環境変数 `GEMINI_API_KEY` から読みます。
+gem 'langchainrb', '~> 0.19.5'
+
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 

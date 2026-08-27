@@ -44,6 +44,14 @@ module Generation
     # ノートに残す印です。文言ではなく記号で持ちます。
     BRAND_COLOR_NOTE_KIND = :brand_color_integrated
     TONE_NOTE_KIND = :tone_integrated
+    # 色を余白へ入り込ませない指定の控えです（issue #156）。
+    BRAND_COLOR_RESTRAINT_NOTE_KIND = :brand_color_restraint_applied
+
+    # 役割の名前です。**整形の段（issue #156）が、述語を選ぶために引きます。**
+    BRAND_COLOR_ROLE = 'brand_color'
+    BRAND_COLOR_RESTRAINT_ROLE = 'brand_color_restraint'
+    TONE_ROLE = 'tone'
+    TONE_RESTRAINT_ROLE = 'tone_restraint'
     STYLE_PALETTE_NOTE_KIND = StylePalette::NOTE_KIND
 
     # ブランドカラーの統合の強さです。**扱いは BrandColorIntegration が持ちます。**
@@ -127,7 +135,8 @@ module Generation
     def integrated(draft, colors, styles, tone)
       draft.replace(main_terms: styles[:main_terms]).add(
         main_terms: colors.pluck(:term) + color_restraint(colors) + tone[:terms],
-        notes: colors.map { |item| color_note(item) } + styles[:notes] + [tone_note(tone)]
+        notes: colors.map { |item| color_note(item) } + color_restraint_note(colors) +
+               styles[:notes] + [tone_note(tone)]
       )
     end
 
@@ -141,6 +150,15 @@ module Generation
       return [] if colors.empty?
 
       [definition.fetch('brand_color_restraint')]
+    end
+
+    # **色を余白へ入り込ませない指定の役割です**（issue #156）。
+    # 配色ではなく構図の指定ですので、役割を分けます。
+    def color_restraint_note(colors)
+      return [] if colors.empty?
+
+      [{ kind: BRAND_COLOR_RESTRAINT_NOTE_KIND,
+         roles: { BRAND_COLOR_RESTRAINT_ROLE => definition.fetch('brand_color_restraint') } }]
     end
 
     # **スタイル系統の配色指定を弱めます。** 弱め方は StylePalette が持ちます。
@@ -171,9 +189,12 @@ module Generation
       BrandColorIntegration.new(rules: rules, definition: definition).integrations_for(colors)
     end
 
+    # **役割の名前も一緒に残します**（issue #156）。整形の段は、色の指定を
+    # 「画に写っているもの」ではなく「配色」として述べます。
     def color_note(item)
       { kind: BRAND_COLOR_NOTE_KIND, color: item[:color], name: item[:name],
-        strength: item[:strength], matched: item[:matched] }
+        strength: item[:strength], matched: item[:matched], term: item[:term],
+        roles: { BRAND_COLOR_ROLE => item[:term] } }
     end
 
     # トーン装飾を統合します。**いちばん弱い指定です。**
@@ -190,8 +211,19 @@ module Generation
       { tone: tone, terms: terms, restrained: true }
     end
 
+    # **役割の名前も一緒に残します**（issue #156）。
+    #
+    # トーンの素材は 2 つです。1 つ目が全体の雰囲気、2 つ目が余白を飾らない
+    # ための指定です。**後者は構図の指定ですので、役割を分けます。**
     def tone_note(tone)
-      { kind: TONE_NOTE_KIND, tone: tone[:tone], restrained: tone[:restrained] }
+      { kind: TONE_NOTE_KIND, tone: tone[:tone], restrained: tone[:restrained],
+        terms: tone[:terms], roles: tone_roles(tone[:terms]) }
+    end
+
+    def tone_roles(terms)
+      roles = { TONE_ROLE => terms.first }
+      roles[TONE_RESTRAINT_ROLE] = terms.second if terms.size > 1
+      roles
     end
 
     # **トーンは必ず決まっています。** 入力の正規化が、指定が無ければ業種の

@@ -58,9 +58,27 @@ class GeneratePromptJob < ApplicationJob
   # `generating` のまま永久に取り残されます（PR #165 の 2 回目のレビューで
   # 実測されました）。**時間で見分けます。**
   #
+  # ## この値を 2 分にした根拠（issue #169）
+  #
+  # **待ち行列が仕事を戻す窓より短くしなければ、拾い直しは一度も発火しません。**
+  #
+  # | 事実 | 値 |
+  # |---|---|
+  # | 本番の待ち行列 | Solid Queue |
+  # | 掴まれたままの仕事を戻すまで | **およそ 5 分**（`process_alive_threshold` の既定。上書きしていません） |
+  # | ジョブ自身の仕事の長さ | 磨きの読み取り待ち 20 秒 × 案の数。**分の単位に届きません** |
+  #
+  # 戻ってきた回の「動きの無さ」は**およそ 5 分ぶん**です。15 分では届かず、
+  # その回は見送られ、しかも正常終了しますので**二度と投入されません**
+  # （PR #165 の 3 回目のレビューで実測されました）。
+  #
   # **短くしすぎません。** 組み立ての途中で別の働き手が横入りします。
-  # 組み立ては、磨きの待ち時間（1 案あたり最大 20 秒）を含めても分の単位です。
-  STALE_AFTER = 15.minutes
+  # 組み立ては、磨きの待ち時間（1 案あたり最大 20 秒 × 3 案 = 60 秒）を含めても
+  # **2 分に届きません。** 5 分より短く、組み立ての長さより長い値として
+  # **2 分**を採ります。
+  #
+  # **`ReclaimPromptRequestsJob` の間隔も、この値に合わせます。**
+  STALE_AFTER = 2.minutes
 
   # **繰り返せば通ることがある誤りです。** 上限まで試します。
   #
@@ -145,11 +163,25 @@ class GeneratePromptJob < ApplicationJob
   #
   # **錠は、権利を取る間だけです。** 組み立ての間は外します。組み立ては
   # 外への問い合わせを含みますので、その間ずっと錠をかけると行が長く塞がります。
+  # **拾ったときは、必ず行を新しくします**（issue #169）。
+  #
+  # `queued` からは状態が進みますので、行が更新されます。**しかし置き去りの
+  # `generating` を拾った場合、状態は変わりません。** 行が一切更新されないと、
+  # **置き去りの行に対しては錠が効きません。** 2 人が同時に拾って両方が組み立て
+  # 切り、**同じ組み立てを 2 度行い（有償の呼び出しが二重にかかります）、
+  # 勝てなかった側が理由の分からない失敗として記録に残ります**
+  # （PR #165 の 3 回目のレビューで実測されました）。
+  #
+  # **持ち時間を新しくすれば、2 人目は「置き去りではない」と見て見送ります。**
   def claimed?(request)
     request.with_lock do
       next skipped(request) unless resumable?(request)
 
-      request.transition_to!(PromptRequest::GENERATING) if request.status == PromptRequest::QUEUED
+      if request.status == PromptRequest::QUEUED
+        request.transition_to!(PromptRequest::GENERATING)
+      else
+        request.touch # rubocop:disable Rails/SkipsModelValidations
+      end
       true
     end
   end

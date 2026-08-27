@@ -65,6 +65,18 @@ module Generation
       rule.fetch(REQUIRED_KEY).map { |item| specification(rule, style_family, item, variation) }
     end
 
+    # そのスタイル系統で必ず出す指示を、**役割の名前と組にして**返します。
+    #
+    # **整形の段（issue #156）が、役割ごとの述語で文を組み立てるために使います。**
+    # 素材の文字列を照合して見分けると、言い回しが変わったときに黙って外れます。
+    # @return [Hash{String => String}]
+    def roles_for(style_family, variation: 0)
+      rule = rule_for(style_family)
+
+      rule.fetch(REQUIRED_KEY)
+          .index_with { |item| specification(rule, style_family, item, variation) }
+    end
+
     # 人物を含む場合に、顔や手指の破綻を避ける構図です。
     # **複製して返します。** そのまま返すと、呼び出す側から規則の中身を書き換えられます。
     def person_safety_for(style_family)
