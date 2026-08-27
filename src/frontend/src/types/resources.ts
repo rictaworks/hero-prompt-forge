@@ -89,6 +89,16 @@ export interface RequestFailure {
 /** 生成リクエストの、取り出しの形です。 */
 export interface PromptRequestDetail
   extends Omit<PromptRequestSummary, "outputs_count"> {
+  /**
+   * 正規化済みの入力条件です。
+   *
+   * **「同じ条件で作り直す」ために使います。** 業種とスタイル系統だけでは、
+   * 生成モデル・トーン・サービス概要・ブランドカラー・余白の位置・画角が
+   * 失われます（PR #174 のレビューより）。
+   *
+   * **差し戻した記録には、サービス概要が残っていません。**
+   */
+  inputs: Record<string, unknown>;
   outputs?: PromptOutput[];
   failure?: RequestFailure;
 }
@@ -204,6 +214,9 @@ export const PRESET_CONDITION_KEYS = [
 
 /** プリセットの名前の長さの上限です。 */
 export const MAX_PRESET_NAME_LENGTH = 50;
+
+/** プロジェクトの名前（サイト名）の長さの上限です。 */
+export const MAX_PROJECT_NAME_LENGTH = 100;
 
 /** 評価の段階です。 */
 export const RATINGS = [1, 2, 3, 4, 5] as const;

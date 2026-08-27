@@ -90,8 +90,15 @@ describe("strings", () => {
             )
           : [];
 
-    const labels = collect(strings, "").filter(([path]) =>
-      path.split(".").includes("labels"),
+    // **モックの文言をそのまま使う押しものです。**
+    //
+    // `app-ui/degraded.html` の「入力を修正する」は、述語で終わります。
+    // **モックは書き換えません**（CLAUDE.md）。ここで明示して外します。
+    // **逃げ道にしません。** 増えるときは、モックのどこに当たるかを書きます。
+    const FROM_MOCK = ["exceptions.labels.rejectedFix"];
+
+    const labels = collect(strings, "").filter(
+      ([path]) => path.split(".").includes("labels") && !FROM_MOCK.includes(path),
     );
 
     // 文であることを示す語尾です。**`labels` はここで終わりません。**

@@ -154,6 +154,23 @@ function PromptBlock({ heading, value }: { heading: string; value: string }) {
   );
 }
 
+/**
+ * 呼び名を持つ推奨パラメータの鍵です。
+ *
+ * **例外を制御の代わりに使いません。** 呼び名の有無を、ここで明示します。
+ */
+const SPELLED_PARAMETERS: readonly string[] = ["aspect_ratio", "size", "api_version"];
+
+/**
+ * 推奨パラメータの鍵の呼び名です。
+ *
+ * **呼び名を持たない鍵は、鍵のまま出します。** モデルごとに増えますので、
+ * 出せないものを隠すより、出したうえで足していきます。
+ */
+function spellParameter(key: string): string {
+  return SPELLED_PARAMETERS.includes(key) ? text(`result.parameters.labels.${key}`) : key;
+}
+
 function Parameters({ parameters }: { parameters: Record<string, unknown> }) {
   const entries = Object.entries(parameters);
   if (entries.length === 0) {
@@ -166,7 +183,7 @@ function Parameters({ parameters }: { parameters: Record<string, unknown> }) {
       <div className={styles.facts}>
         {entries.map(([key, value]) => (
           <div key={key} className={styles.factsRow}>
-            <span className={styles.factsKey}>{key}</span>
+            <span className={styles.factsKey}>{spellParameter(key)}</span>
             <span className={styles.factsValue}>{String(value)}</span>
           </div>
         ))}
@@ -245,9 +262,22 @@ function useCopy(value: string): Copy {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  // **写し取れない場所があります。** 安全でない場所（http）や、権限を
+  // 与えていないブラウザでは、写し取りの仕組みそのものがありません。
+  // **`.catch()` は約束の失敗しか受けませんので、呼び出しの手前で受け止めます**
+  // （PR #174 のレビュー・要修正 12）。
   const copy = (): void => {
-    navigator.clipboard
-      .writeText(value)
+    let writing: Promise<void>;
+    try {
+      writing = navigator.clipboard.writeText(value);
+    } catch (cause) {
+      traceError("result.copy", cause);
+      setCopied(false);
+      setFailed(true);
+      return;
+    }
+
+    writing
       .then(() => {
         setCopied(true);
         setFailed(false);

@@ -27,12 +27,43 @@ test.describe("履歴・一覧（02）", () => {
   });
 
   // 手順 2：上部バーに管理の導線が出ないこと（issue #77）
+  //
+  // **語ではなく、入口そのものを見ます。** 語の完全一致だけでは、別の
+  // 言い回しの近道（「管理コンソール」など）が素通りします
+  // （PR #174 のレビュー・要修正 10）。
   test("管理への導線が出ません", async ({ page }) => {
     await open(page, "/projects");
 
     await expect(page.getByText("Admin", { exact: true })).toHaveCount(0);
     await expect(page.getByText("管理", { exact: true })).toHaveCount(0);
   });
+
+  test("管理へ向かう入口が 1 つもありません", async ({ page }) => {
+    await open(page, "/projects");
+
+    const targets = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("a[href], [data-href]")).map(
+        (element) => element.getAttribute("href") ?? element.getAttribute("data-href") ?? "",
+      ),
+    );
+
+    expect(targets.filter((href) => href.startsWith("/admin"))).toEqual([]);
+  });
+
+  // **どの画面からも出しません。**
+  for (const path of ["/requests/new", "/presets", "/requests/1/result"]) {
+    test(`管理へ向かう入口がありません（${path}）`, async ({ page }) => {
+      await open(page, path);
+
+      const targets = await page.evaluate(() =>
+        Array.from(document.querySelectorAll("a[href]")).map((element) =>
+          element.getAttribute("href") ?? "",
+        ),
+      );
+
+      expect(targets.filter((href) => href.startsWith("/admin"))).toEqual([]);
+    });
+  }
 
   // 手順 3：新規生成の入口があること
   test("新規生成の入口があります", async ({ page }) => {
@@ -106,11 +137,22 @@ test.describe("入力フォーム（03）", () => {
 
 test.describe("生成中・縮退（04・08）", () => {
   // 手順 10：状態が出ること
+  //
+  // **見出しは状態に合わせて変わります。** 受け取り済みの案では
+  // 「Package Ready」です（PR #174 のレビュー・要修正 13）。
   test("状態が出ます", async ({ page }) => {
     await open(page, "/requests/1");
 
-    await expect(page.getByRole("heading", { name: "Generating" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Package Ready" })).toBeVisible();
     await expect(page.getByText("MODEL", { exact: true })).toBeVisible();
+    await expect(page.getByText("STATE", { exact: true })).toBeVisible();
+  });
+
+  // 手順 10b：終わった状態で「生成中」の見出しを出さないこと
+  test("終わった状態で、生成中の見出しを出しません", async ({ page }) => {
+    await open(page, "/requests/1");
+
+    await expect(page.getByRole("heading", { name: "Generating" })).toHaveCount(0);
   });
 
   // 手順 11：縮退の帯が出ること（issue #76）
@@ -223,14 +265,159 @@ test.describe("プリセット（07）", () => {
   });
 
   // 手順 21：保存した条件を入力フォームへ呼び出せること
+  //
+  // **この例だけで完結させます。** 先に保存されたプリセットが並びの先頭に
+  // 来ることに頼ると、並べて動かしたときに落ちます
+  // （PR #174 のレビュー・要修正 8）。
   test("保存した条件を入力フォームへ呼び出せます", async ({ page }) => {
-    await open(page, "/presets");
+    const name = `呼び出しの確認 ${Date.now()}`;
 
-    await page.getByRole("link", { name: "この条件で作る" }).first().click();
+    await open(page, "/requests/new");
+    await page.getByLabel(/業種/).selectOption("beauty");
+    await page.getByLabel(/スタイル系統/).selectOption("illustration");
+    await page.getByLabel(/生成モデル/).selectOption("dalle");
+    await page.getByLabel("プリセット名").fill(name);
+    await page.getByRole("button", { name: "いまの条件を保存" }).click();
+    await expect(page.getByText("プリセットを保存しました。")).toBeVisible();
+
+    await open(page, "/presets");
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: name })
+      .getByRole("link", { name: "この条件で作る" })
+      .click();
 
     await expect(page).toHaveURL(/\/requests\/new\?preset_id=\d+$/);
-    await expect(page.getByLabel(/業種/)).toHaveValue("saas");
-    await expect(page.getByLabel(/生成モデル/)).toHaveValue("midjourney");
+    await expect(page.getByLabel(/業種/)).toHaveValue("beauty");
+    await expect(page.getByLabel(/スタイル系統/)).toHaveValue("illustration");
+    await expect(page.getByLabel(/生成モデル/)).toHaveValue("dalle");
+  });
+});
+
+test.describe("上限到達と差し戻し（08）", () => {
+  /**
+   * **順番に流します。**
+   *
+   * 生成の枠は **1 アカウントにつき 1 日 1 回**です（requirements.md 4.4）。
+   * **画面ごとに分けられない、共有の資源です。** 並べて流すと、枠を使い切る
+   * 前の要求と後の要求が入れ替わり、どちらの結果も定まりません。
+   *
+   * **画面の中身の問題ではありません。** 仕様が定める共有の資源を、
+   * 順番に確かめます。
+   */
+  test.describe.configure({ mode: "serial" });
+
+  // 手順 23：禁止入力を送ると、差し戻しの理由が出ること（issue #71 ・ #76）
+  test("禁止入力の差し戻しが画面に出ます", async ({ page }) => {
+    await open(page, "/requests/new");
+
+    await page.getByLabel(/業種/).selectOption("professional_services");
+    await page.getByLabel(/スタイル系統/).selectOption("photoreal");
+    await page.getByLabel(/生成モデル/).selectOption("midjourney");
+    await page.getByLabel(/サービス概要/).fill("有名人を前面に出した構図にしたいです。");
+    await page.getByRole("button", { name: "3 案を生成" }).click();
+
+    await expect(page.getByText("REJECTED")).toBeVisible();
+  });
+
+  // 手順 24：差し戻しの理由と直し方が出ること
+  test("差し戻しの理由と直し方が出ます", async ({ page }) => {
+    await open(page, "/requests/new");
+
+    await page.getByLabel(/業種/).selectOption("professional_services");
+    await page.getByLabel(/スタイル系統/).selectOption("photoreal");
+    await page.getByLabel(/生成モデル/).selectOption("midjourney");
+    await page.getByLabel(/サービス概要/).fill("有名人を前面に出した構図にしたいです。");
+    await page.getByRole("button", { name: "3 案を生成" }).click();
+
+    await expect(page.getByText(/実在人物名の指定です/)).toBeVisible();
+    await expect(page.getByText("SUGGESTION")).toBeVisible();
+  });
+
+  // 手順 25：送った文章に印が付くこと（`app-ui/degraded.html`）
+  test("送った文章に印が付きます", async ({ page }) => {
+    await open(page, "/requests/new");
+
+    await page.getByLabel(/業種/).selectOption("professional_services");
+    await page.getByLabel(/スタイル系統/).selectOption("photoreal");
+    await page.getByLabel(/生成モデル/).selectOption("midjourney");
+    await page.getByLabel(/サービス概要/).fill("有名人を前面に出した構図にしたいです。");
+    await page.getByRole("button", { name: "3 案を生成" }).click();
+
+    // **印の付いた語だけを見ます。** 理由の説明にも同じ語が出ます。
+    await expect(page.locator("span").filter({ hasText: /^有名人$/ }).first()).toBeVisible();
+  });
+
+  // 手順 26：入力へ戻れること
+  test("入力へ戻れます", async ({ page }) => {
+    await open(page, "/requests/new");
+
+    await page.getByLabel(/業種/).selectOption("professional_services");
+    await page.getByLabel(/スタイル系統/).selectOption("photoreal");
+    await page.getByLabel(/生成モデル/).selectOption("midjourney");
+    await page.getByLabel(/サービス概要/).fill("有名人を前面に出した構図にしたいです。");
+    await page.getByRole("button", { name: "3 案を生成" }).click();
+    await expect(page.getByText("REJECTED")).toBeVisible();
+
+    await page.getByRole("button", { name: "入力を修正する" }).click();
+
+    await expect(page.getByText("REJECTED")).toHaveCount(0);
+  });
+
+  /**
+   * 枠を使い切った状態を作ります。
+   *
+   * **枠は 1 アカウントにつき 1 日 1 回です**（requirements.md 4.4）。
+   * すでに使い切っていれば 1 回目で断られますし、残っていれば 1 回目が
+   * 通って 2 回目で断られます。**どちらから始めても、同じ状態になります。**
+   */
+  async function submitOnce(page: import("@playwright/test").Page): Promise<string> {
+    await open(page, "/requests/new");
+    await page.getByLabel(/業種/).selectOption("saas");
+    await page.getByLabel(/スタイル系統/).selectOption("photoreal");
+    await page.getByLabel(/生成モデル/).selectOption("midjourney");
+    await page.getByRole("button", { name: "3 案を生成" }).click();
+
+    // **どちらかが必ず起きます。** 受け付けられて移るか、断られて帯が出るかです。
+    return Promise.race([
+      page.waitForURL(/\/requests\/\d+$/).then(() => "accepted"),
+      page
+        .getByText("DAILY QUOTA")
+        .waitFor({ state: "visible" })
+        .then(() => "exhausted"),
+    ]);
+  }
+
+  async function exhaust(page: import("@playwright/test").Page) {
+    if ((await submitOnce(page)) === "exhausted") {
+      return;
+    }
+
+    expect(await submitOnce(page)).toBe("exhausted");
+  }
+
+  // 手順 27：枠を使い切っていると、次回のリセット時刻が出ること（issue #76）
+  test("上限到達に、次回のリセット時刻が出ます", async ({ page }) => {
+    await exhaust(page);
+
+    await expect(page.getByText("NEXT RESET")).toBeVisible();
+    // **いちばん大きな文字が、次回のリセット時刻です。**
+    await expect(page.getByText("03:00", { exact: true })).toBeVisible();
+    await expect(page.getByText(/JST/)).toBeVisible();
+  });
+
+  // 手順 28：上限到達でも、閲覧と記録が続けられると伝えること
+  test("上限到達でも、閲覧と記録が続けられると伝えます", async ({ page }) => {
+    await exhaust(page);
+
+    await expect(page.getByText(/上限に関係なく行えます/)).toBeVisible();
+  });
+
+  // 手順 29：消費の帰属（クォータ日）が出ること
+  test("消費の帰属が出ます", async ({ page }) => {
+    await exhaust(page);
+
+    await expect(page.getByText("消費の帰属")).toBeVisible();
   });
 });
 

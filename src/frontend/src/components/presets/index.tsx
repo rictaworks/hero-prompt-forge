@@ -44,14 +44,17 @@ export function Presets() {
         {text("presets.body")}
       </SectionHeading>
 
-      <section className={styles.panel} aria-label={text("presets.labels.title")}>
+      <section className={styles.panel}>
         {loading ? <p className={styles.loading}>{text("presets.loading")}</p> : null}
         {!loading && presets.length === 0 ? (
           <p className={styles.empty}>{text("presets.empty")}</p>
         ) : null}
-        {presets.map((preset) => (
-          <PresetRow key={preset.id} preset={preset} />
-        ))}
+        {/* **一覧として組みます。** 読み上げの順序と、件ごとの区切りが伝わります。 */}
+        <ul className={styles.list}>
+          {presets.map((preset) => (
+            <PresetRow key={preset.id} preset={preset} />
+          ))}
+        </ul>
       </section>
     </div>
   );
@@ -59,7 +62,7 @@ export function Presets() {
 
 function PresetRow({ preset }: { preset: Preset }) {
   return (
-    <div className={styles.row}>
+    <li className={styles.row}>
       <div className={styles.rowMain}>
         <span className={styles.rowTitle}>{preset.name}</span>
         <span className={styles.rowMeta}>{spelledConditions(preset)}</span>
@@ -73,7 +76,7 @@ function PresetRow({ preset }: { preset: Preset }) {
           {text("presets.labels.use")}
         </Button>
       </div>
-    </div>
+    </li>
   );
 }
 

@@ -19,6 +19,13 @@ export const strings = {
     description:
       "ヒーローイメージのプロンプトを、アートディレクターの指示水準で生成します。",
   },
+  // 画面をまたいで使う、短い区切りと呼び名です。
+  common: {
+    labels: {
+      // 値と値の区切りです。**画面へ直書きしません。**
+      separator: " / ",
+    },
+  },
   nav: {
     projects: { en: "Projects", ja: "プロジェクト" },
     presets: { en: "Presets", ja: "プリセット" },
@@ -105,7 +112,6 @@ export const strings = {
     loading: "読み込んでいます。",
     emptyProjects: "プロジェクトがまだありません。新規生成から作れます。",
     emptyRequests: "生成履歴がまだありません。新規生成からお試しください。",
-    degradedNote: "縮退の印が付いた案は、規則辞書だけで組み立てたものです。表現の磨き込みは行われていません。",
   },
   // 入力フォーム（03）です（issue #71、#152）。
   newRequest: {
@@ -133,7 +139,6 @@ export const strings = {
       submit: "3 案を生成",
       submitting: "生成の受け付け中",
       namingHeading: "名前を確実に反映させる書き方",
-      namingExamples: "書き方の例",
       requiredMark: "必須",
       counterUnit: "文字",
     },
@@ -156,7 +161,6 @@ export const strings = {
         "この形で書かない名前は、名前として拾いません。読みが決まらなかった名前は、アートディレクションノートに出ます。",
     },
     errors: {
-      summaryTitle: "入力の内容をご確認ください。",
       industryMissing: "業種を選んでください。",
       styleFamilyMissing: "スタイル系統を選んでください。",
       targetModelMissing: "生成モデルを選んでください。",
@@ -169,6 +173,16 @@ export const strings = {
     labels: {
       eyebrow: "IN PROGRESS",
       title: "Generating",
+      // 状態ごとの見出しです（PR #174 のレビュー・要修正 13）。
+      // **終わった状態でも「Generating」のままにしません。**
+      titleDelivered: "Package Ready",
+      titleFailed: "Limits & Fallbacks",
+      eyebrowDelivered: "PACKAGE",
+      eyebrowFailed: "EXCEPTIONS",
+      requestNumber: "REQUEST",
+      variationNumber: "VARIATION",
+      degradedQuote: "DEGRADED PROMPT",
+      openResultPlain: "このまま 3 案を見る",
       stateHeading: "STATE",
       modelHeading: "MODEL",
       dictionaryHeading: "DICTIONARY",
@@ -188,7 +202,8 @@ export const strings = {
     degraded: "LLM への呼び出しが上限に達したため、規則辞書のみによる合成へ縮退しました。規則の適用とコピースペースの規定は通常どおり行われていますが、表現の磨き込みは行われていません。成果物を提供していますので、本日の生成枠は確定します。",
     degradedNote: "縮退で生成された案には、履歴の一覧にも印が残ります。",
     archived: "この生成リクエストは整理済みです。",
-    notFound: "この生成リクエストは見つかりませんでした。",
+    // 状態ごとの添え書きです（`app-ui/degraded.html` の節の添え書きに当たります）。
+    exceptionsBody: "上限到達・縮退モードでの完了・禁止入力の差し戻しは、いずれも曖昧なエラーを返さず、次の操作と時刻を明示します。",
   },
   // 結果 3 案（05）です（issue #73）。
   result: {
@@ -206,6 +221,14 @@ export const strings = {
       openNotes: "評価メモを書く",
     },
     body: "構図の異なる 3 案です。使う案の本文をコピーして、お使いの画像生成サービスへ貼り付けてください。",
+    // 推奨パラメータの鍵の呼び名です。**機械の鍵をそのまま出しません。**
+    parameters: {
+      labels: {
+        aspect_ratio: "画角",
+        size: "画像の大きさ",
+        api_version: "呼び出しの版",
+      },
+    },
     negativeAbsent: "このモデルは打ち消しの欄を持ちません。",
     copyFailed: "コピーできませんでした。本文を選んで、手元の操作でコピーしてください。",
     empty: "この生成リクエストには、まだ案がありません。",
@@ -234,7 +257,6 @@ export const strings = {
       eyebrow: "PRESETS",
       title: "Saved Conditions",
       nameHeading: "プリセット名",
-      conditionsHeading: "保存されている条件",
       use: "この条件で作る",
       save: "いまの条件を保存",
       saving: "保存中",
@@ -256,15 +278,23 @@ export const strings = {
     labels: {
       quotaEyebrow: "DAILY QUOTA",
       quotaResetHeading: "NEXT RESET",
+      quotaZone: "JST",
+      quotaDayHeading: "消費の帰属",
+      quotaRefundHeading: "返還される場合",
+      quotaRefundValue: "縮退も失敗したとき",
+      resultLink: "本日の結果を見る",
       rejectedEyebrow: "REJECTED",
       rejectedDetectedHeading: "DETECTED IN — サービス概要",
       rejectedReasonHeading: "REASON",
       rejectedSuggestionHeading: "SUGGESTION",
-      rejectedFix: "入力の修正へ戻る",
+      rejectedFix: "入力を修正する",
       historyLink: "履歴を見る",
     },
     quotaNote:
       "生成済みの 3 案の閲覧・コピー・評価メモの記録は、上限に関係なく行えます。",
+    // 取り出しの経路では、見つかった語も入力の写しも返りません。
+    rejectedInputAbsent:
+      "差し戻した記録には、書いていただいた文章を残していません。権利に触れると判定した文章ですので、実在の方のお名前や商標を含みます。",
     // 差し戻しの種別です（`config/forbidden_inputs.yml` の `kind`）。
     reasons: {
       real_person: "実在人物名の指定です。肖像・パブリシティ権の観点から生成の対象外です。",
@@ -385,6 +415,9 @@ export const strings = {
     },
   },
   errors: {
+    labels: {
+      retry: "もう一度読み込む",
+    },
     common: {
       nextActionUnknown: "解決しない場合は info@rictaworks.jp までご連絡ください。",
     },

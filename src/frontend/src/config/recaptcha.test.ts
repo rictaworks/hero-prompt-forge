@@ -68,4 +68,52 @@ describe("Bot 対策の設定", () => {
 
     expect(recaptchaSiteKey()).toBe("site-key-for-spec");
   });
+
+  // **この分かれ方は環境だけで決まります**（PR #174 のレビュー・要修正 9）。
+  //
+  // **要求側の値・別の環境変数では切り替わりません。** 抜け道を足すと、
+  // 本番で Bot 対策が黙って無効になります。
+  describe("分かれ方が環境だけで決まること", () => {
+    const SWITCHES = [
+      "NEXT_PUBLIC_RECAPTCHA_DISABLED",
+      "NEXT_PUBLIC_RECAPTCHA_SKIP",
+      "RECAPTCHA_DISABLED",
+      "NEXT_PUBLIC_DEBUG",
+    ];
+
+    for (const name of SWITCHES) {
+      it(`本番では、${name} を立てても失敗させます`, () => {
+        process.env = {
+          ...original,
+          NEXT_PUBLIC_APP_ENV: "production",
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "",
+          [name]: "1",
+        };
+
+        expect(() => recaptchaSiteKey()).toThrow(MissingRecaptchaSiteKeyError);
+      });
+
+      it(`本番では、${name} を立てても鍵をそのまま返します`, () => {
+        process.env = {
+          ...original,
+          NEXT_PUBLIC_APP_ENV: "production",
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "site-key-for-spec",
+          [name]: "1",
+        };
+
+        expect(recaptchaSiteKey()).toBe("site-key-for-spec");
+      });
+    }
+
+    // **未知の環境は、その場で失敗させます。**
+    it("環境が不正なら、その場で失敗させます", () => {
+      process.env = {
+        ...original,
+        NEXT_PUBLIC_APP_ENV: "staging",
+        NEXT_PUBLIC_RECAPTCHA_SITE_KEY: "",
+      };
+
+      expect(() => recaptchaSiteKey()).toThrow();
+    });
+  });
 });

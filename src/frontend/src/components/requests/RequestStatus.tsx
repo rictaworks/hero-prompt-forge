@@ -39,15 +39,38 @@ export function RequestStatus({ id }: { id: string }) {
   return (
     <div className={styles.section}>
       <SectionHeading
-        eyebrow={text("requestStatus.labels.eyebrow")}
-        title={text("requestStatus.labels.title")}
-      />
+        eyebrow={text(`requestStatus.labels.${headingOf(request).eyebrow}`)}
+        title={text(`requestStatus.labels.${headingOf(request).title}`)}
+      >
+        {request.status === "rejected" || request.status === "failed"
+          ? text("requestStatus.exceptionsBody")
+          : undefined}
+      </SectionHeading>
 
       <StateBanner request={request} />
       <Facts request={request} />
       <Actions request={request} />
     </div>
   );
+}
+
+/**
+ * 状態ごとの見出しです（PR #174 のレビュー・要修正 13）。
+ *
+ * **終わった状態でも「Generating」のままにしません。** 帯と表は状態を
+ * 伝えているのに、いちばん大きな文字だけが違うことを言う形になります。
+ */
+export function headingOf(request: PromptRequestDetail): {
+  eyebrow: string;
+  title: string;
+} {
+  if (request.status === "completed" || request.status === "degraded_completed") {
+    return { eyebrow: "eyebrowDelivered", title: "titleDelivered" };
+  }
+  if (request.status === "rejected" || request.status === "failed") {
+    return { eyebrow: "eyebrowFailed", title: "titleFailed" };
+  }
+  return { eyebrow: "eyebrow", title: "title" };
 }
 
 /** 状態ごとの伝え方です。**どの状態でも、必ず何かをお伝えします。** */
@@ -76,7 +99,7 @@ function StateBanner({ request }: { request: PromptRequestDetail }) {
         </Banner>
       );
     case "degraded_completed":
-      return <DegradedPanel />;
+      return <DegradedPanel request={request} />;
     case "rejected":
       return <RejectionBanner request={request} />;
     case "failed":
@@ -97,18 +120,45 @@ function StateBanner({ request }: { request: PromptRequestDetail }) {
  *
  * 体裁は `app-ui/degraded.html` の「縮退モード」に合わせます。
  */
-function DegradedPanel() {
+function DegradedPanel({ request }: { request: PromptRequestDetail }) {
+  const first = (request.outputs ?? [])[0];
+
   return (
     <div>
       <Banner kind="degraded" title={text("requestStatus.labels.degradedEyebrow")}>
         {text("requestStatus.degraded")}
       </Banner>
       <div className={styles.panel}>
-        <div className={styles.chips}>
-          <span className={`${styles.chip} ${styles.chipWarn}`}>
-            {text("requestStatus.labels.degradedChip")}
-          </span>
+        <div className={styles.variationHead}>
+          <div>
+            <span className={styles.variationEyebrow}>
+              {`${text("requestStatus.labels.requestNumber")} #${request.id}`}
+              {first
+                ? `${text("common.labels.separator")}${text("requestStatus.labels.variationNumber")} ${String(first.variation_no).padStart(2, "0")}`
+                : ""}
+            </span>
+            {first ? (
+              <h3 className={styles.variationTitle}>
+                {spellChoice("compositionType", first.composition_type)}
+              </h3>
+            ) : null}
+            <span className={styles.variationMeta}>
+              {spellChoice("targetModel", request.target_model)}
+            </span>
+          </div>
+          <div className={styles.chips}>
+            {request.dictionary_version ? (
+              <span className={styles.chip}>{request.dictionary_version}</span>
+            ) : null}
+            <span className={`${styles.chip} ${styles.chipWarn}`}>
+              {text("requestStatus.labels.degradedChip")}
+            </span>
+          </div>
         </div>
+
+        {/* **縮退で組み立てた本文を、そのまま見ていただきます。** */}
+        {first ? <p className={styles.quote}>{first.main_prompt}</p> : null}
+
         <p className={styles.note}>{text("requestStatus.degradedNote")}</p>
       </div>
     </div>
@@ -213,7 +263,7 @@ function Actions({ request }: { request: PromptRequestDetail }) {
           variant="outline"
           icon="rotate-right"
           iconPosition="start"
-          href={`/requests/new?project_id=${request.project_id}`}
+          href={`/requests/new?project_id=${request.project_id}&request_id=${request.id}`}
         >
           {text("requestStatus.labels.retry")}
         </Button>

@@ -50,11 +50,56 @@
   color: var(--text);
 }
 
+/* 案の見出しです（`app-ui/styles/degraded.css` の `.dg-variation__head`）。 */
+.variationHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.variationEyebrow {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+
+.variationTitle {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+}
+
+.variationMeta {
+  font-size: 11.5px;
+  color: var(--grey-666);
+}
+
+/* 縮退で組み立てた本文です（`.dg-quote--prompt`）。 */
+.quote {
+  background: var(--dark3);
+  border: 1px solid var(--border);
+  padding: 16px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 0 0 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .chips {
   display: flex;
   gap: 2px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
 .chip {

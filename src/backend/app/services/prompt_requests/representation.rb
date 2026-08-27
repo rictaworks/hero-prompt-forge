@@ -37,6 +37,19 @@ module PromptRequests
       id project_id status degraded target_model dictionary_version
     ].freeze
 
+    # 取り出しで返す入力条件です（PR #174 のレビュー・重大 3）。
+    #
+    # **「同じ条件で作り直す」ために要ります。** 業種とスタイル系統だけでは、
+    # 生成モデル・トーン・サービス概要・ブランドカラー・余白の位置・画角が
+    # 失われます。requirements.md 4.3 は「過去案の再表示・複製」を求めています。
+    #
+    # **返す範囲は広がりません。** 要求した本人が送った入力の写しです。
+    #
+    # **一覧には載せません。** 件数が増えるほど応答が重くなります。
+    #
+    # **差し戻した記録には、自由に書いていただいた欄が残っていません**
+    # （`PromptRequests::Acceptance` が落とします）。そのまま返します。
+
     def initialize(prompt_request)
       @prompt_request = prompt_request
     end
@@ -54,7 +67,7 @@ module PromptRequests
 
     # @return [Hash]
     def to_h
-      body = base
+      body = base.merge(inputs: prompt_request.inputs)
       body[:outputs] = outputs if DELIVERED.include?(prompt_request.status)
       body[:failure] = failure if EXPLAINED.include?(prompt_request.status)
       body

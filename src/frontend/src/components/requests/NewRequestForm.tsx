@@ -29,10 +29,12 @@ import {
   STYLE_FAMILIES,
   TARGET_MODELS,
   MAX_PRESET_NAME_LENGTH,
+  MAX_PROJECT_NAME_LENGTH,
   type Preset,
   type Project,
   type ProjectList,
   type PromptInputs,
+  type PromptRequestDetail,
   type PromptRequestSummary,
 } from "@/types/resources";
 import styles from "./new-request.module.css";
@@ -104,10 +106,12 @@ export function NewRequestForm() {
   // 組み立てて求めます。効き目のあとで状態を書き戻すと、描き直しが重なります。
   const requested = params.get("project_id");
   const presetId = params.get("preset_id");
+  const requestId = params.get("request_id");
   const { preset, presetError } = usePreset(presetId);
+  const { source, sourceError } = useSourceRequest(requestId);
   const initial = useMemo(
-    () => initialForm(projects, requested, preset),
-    [projects, requested, preset],
+    () => initialForm(projects, requested, preset, source),
+    [projects, requested, preset, source],
   );
   const form = edited ?? initial;
 
@@ -135,7 +139,7 @@ export function NewRequestForm() {
     }
   };
 
-  const failure = loadError ?? presetError;
+  const failure = loadError ?? presetError ?? sourceError;
   if (failure) {
     return failure instanceof ApiError ? (
       <ErrorNotice error={failure} />
@@ -153,7 +157,11 @@ export function NewRequestForm() {
         {text("newRequest.body")}
       </SectionHeading>
 
-      <SubmitFeedback error={submitError} />
+      <SubmitFeedback
+        error={submitError}
+        submitted={form.serviceSummary}
+        onFix={() => setSubmitError(null)}
+      />
 
       <form className={styles.form} onSubmit={submit} noValidate>
         <fieldset className={styles.group}>
@@ -185,7 +193,7 @@ export function NewRequestForm() {
                 id="project-name"
                 type="text"
                 className={styles.control}
-                maxLength={100}
+                maxLength={MAX_PROJECT_NAME_LENGTH}
                 value={form.projectName}
                 onChange={(event) => update("projectName", event.target.value)}
               />
@@ -329,8 +337,22 @@ export function NewRequestForm() {
   );
 }
 
-/** 送ったあとの伝え方です。**種類ごとに見せ方を変えます。** */
-function SubmitFeedback({ error }: { error: unknown }) {
+/**
+ * 送ったあとの伝え方です。**種類ごとに見せ方を変えます。**
+ *
+ * **差し戻しでは、送っていただいた文章をそのまま出します。** 見つかった語に
+ * 印を付けますので、どこを直せばよいかが一目で分かります。**文章は画面が
+ * 持っています。** API は、差し戻した記録へ残していません。
+ */
+function SubmitFeedback({
+  error,
+  submitted,
+  onFix,
+}: {
+  error: unknown;
+  submitted: string;
+  onFix: () => void;
+}) {
   if (error === null) {
     return null;
   }
@@ -352,6 +374,8 @@ function SubmitFeedback({ error }: { error: unknown }) {
         message={error.message}
         nextAction={error.nextAction}
         reasons={reasonsOf(error)}
+        submitted={submitted}
+        onFix={onFix}
       />
     );
   }
@@ -475,17 +499,24 @@ export function initialForm(
   projects: Project[],
   requested: string | null,
   preset: Preset | null,
+  source: PromptRequestDetail | null = null,
 ): FormState {
-  const withPreset = preset === null ? EMPTY_FORM : appliedPreset(preset);
+  const base =
+    source !== null
+      ? appliedConditions(source.inputs)
+      : preset === null
+        ? EMPTY_FORM
+        : appliedConditions(preset.input_conditions);
+
   if (requested === null) {
-    return withPreset;
+    return base;
   }
   const found = projects.find((project) => String(project.id) === requested);
   if (!found) {
-    return withPreset;
+    return base;
   }
   return {
-    ...withPreset,
+    ...base,
     projectId: requested,
     industry: found.industry,
     styleFamily: found.style_family,
@@ -493,14 +524,15 @@ export function initialForm(
 }
 
 /**
- * プリセットの条件を、入力の形へ写します。
+ * 保存された条件を、入力の形へ写します。
  *
- * **契約に無い項目は取り込みません。** 保存できる項目は
- * `Preset::ALLOWED_CONDITION_KEYS` に閉じています（`SPEC/api/README.md`）。
- * **文字列でない値も取り込みません。** 推し量って直しません。
+ * **プリセットにも、過去の生成リクエストにも、同じ形を使います。**
+ * どちらも入力条件の集まりです（`SPEC/api/README.md`）。
+ *
+ * **契約に無い項目は取り込みません。** **文字列でない値も取り込みません。**
+ * 推し量って直しません。
  */
-export function appliedPreset(preset: Preset): FormState {
-  const conditions = preset.input_conditions;
+export function appliedConditions(conditions: Record<string, unknown>): FormState {
   const colors = conditions.brand_colors;
   const listed = Array.isArray(colors) ? colors.filter((color) => typeof color === "string") : [];
 
@@ -564,11 +596,7 @@ function SavePreset({ form }: { form: FormState }) {
       {error instanceof ApiError ? <ErrorNotice error={error} /> : null}
       {error !== null && !(error instanceof ApiError) ? <UnexpectedErrorNotice /> : null}
 
-      <Field
-        id="preset-name"
-        label={text("presets.labels.nameHeading")}
-        error={name === "" ? undefined : undefined}
-      >
+      <Field id="preset-name" label={text("presets.labels.nameHeading")}>
         <input
           id="preset-name"
           type="text"
@@ -602,6 +630,43 @@ function SavePreset({ form }: { form: FormState }) {
       </div>
     </fieldset>
   );
+}
+
+/**
+ * 作り直しのもとになる生成リクエストを引きます（PR #174 のレビュー・重大 3）。
+ *
+ * **同じ条件で作り直すために、入力条件をそのまま引き継ぎます。**
+ * 業種とスタイル系統だけでは、生成モデル・トーン・サービス概要・
+ * ブランドカラー・余白の位置・画角が失われます。
+ *
+ * **指定が無ければ、何も引きません。**
+ */
+function useSourceRequest(id: string | null): {
+  source: PromptRequestDetail | null;
+  sourceError: unknown;
+} {
+  const [source, setSource] = useState<PromptRequestDetail | null>(null);
+  const [sourceError, setSourceError] = useState<unknown>(null);
+
+  useEffect(() => {
+    if (id === null) {
+      return;
+    }
+    const controller = new AbortController();
+
+    apiGet<PromptRequestDetail>(`/prompt_requests/${id}`, { signal: controller.signal })
+      .then(setSource)
+      .catch((cause) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setSourceError(cause);
+      });
+
+    return () => controller.abort();
+  }, [id]);
+
+  return { source, sourceError };
 }
 
 /**

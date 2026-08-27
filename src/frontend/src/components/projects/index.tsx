@@ -98,7 +98,9 @@ function ProjectPanel({
   loading: boolean;
 }) {
   return (
-    <section className={styles.panel} aria-label={text("projects.labels.projectsHeading")}>
+    <section className={styles.panel}>
+      {/* **目で見る方にも、何の一覧かが分かるようにします。** */}
+      <h3 className={styles.panelHeading}>{text("projects.labels.projectsHeading")}</h3>
       {loading ? <p className={styles.loading}>{text("projects.loading")}</p> : null}
       {!loading && projects.length === 0 ? (
         <p className={styles.empty}>{text("projects.emptyProjects")}</p>
@@ -109,7 +111,7 @@ function ProjectPanel({
             <span className={styles.rowTitle}>{nameOf(project)}</span>
             <span className={styles.rowMeta}>
               {spellChoice("industry", project.industry)}
-              {" / "}
+              {text("common.labels.separator")}
               {spellChoice("styleFamily", project.style_family)}
             </span>
           </div>
@@ -127,7 +129,8 @@ function RequestPanel({
   loading: boolean;
 }) {
   return (
-    <section className={styles.panel} aria-label={text("projects.labels.requestsHeading")}>
+    <section className={styles.panel}>
+      <h3 className={styles.panelHeading}>{text("projects.labels.requestsHeading")}</h3>
       {loading ? <p className={styles.loading}>{text("projects.loading")}</p> : null}
       {!loading && requests.length === 0 ? (
         <p className={styles.empty}>{text("projects.emptyRequests")}</p>
@@ -150,9 +153,9 @@ function RequestRow({ request }: { request: PromptRequestSummary }) {
         </span>
         <span className={styles.rowMeta}>
           {spellDateTime(request.created_at)}
-          {" / "}
+          {text("common.labels.separator")}
           {spellChoice("targetModel", request.target_model)}
-          {" / "}
+          {text("common.labels.separator")}
           {request.outputs_count}
           {text("projects.labels.outputsUnit")}
         </span>
@@ -174,9 +177,11 @@ function RequestRow({ request }: { request: PromptRequestSummary }) {
 
       <div className={styles.actions}>
         <Link href={`/requests/${request.id}`}>{text("projects.labels.open")}</Link>
+        {/* **同じ条件で作り直します。** 入力条件は、もとの生成リクエストから
+            そのまま引き継ぎます（PR #174 のレビュー・重大 3）。 */}
         <Button
           variant="outline"
-          href={`/requests/new?project_id=${request.project_id}`}
+          href={`/requests/new?project_id=${request.project_id}&request_id=${request.id}`}
           icon="rotate-right"
           iconPosition="start"
         >
