@@ -51,6 +51,15 @@ RSpec.describe '管理画面 : 利用状況' do # rubocop:disable RSpec/Describe
       expect(response).to have_http_status(:ok)
     end
 
+    # **記録していない軸があることを、画面で断ります**（issue #177 の M11）。
+    # 断り書きが消えると、出ている数字が測定の軸を覆い尽くしているように
+    # 見えます。**記録していないものを、記録した 0 件と読み違えます。**
+    it '記録していない軸があることを断ります' do
+      get '/admin/metrics', headers: headers
+
+      expect(response.body).to include(I18n.t('admin.metrics.unrecorded'))
+    end
+
     it '業種別の内訳を出します' do
       user_with_requests(x_user_id: '1111111111', display_name: 'あか', count: 2)
 

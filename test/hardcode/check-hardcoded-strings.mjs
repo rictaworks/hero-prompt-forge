@@ -69,15 +69,37 @@ function stripComments(line, language) {
 }
 
 /**
+ * 雛形のタグの中から、属性の値を取り出します。
+ *
+ * **属性の中の文言も、利用者の目に触れます**（`alt` ・ `title` ・ `placeholder`）。
+ * 地の文だけを見ると、`<img alt="直書き">` が素通りします（issue #177 の提案 12）。
+ */
+function findErbAttributes(part) {
+  const found = [];
+  for (const tag of part.match(/<[^>]*>/g) ?? []) {
+    for (const match of tag.matchAll(/=\s*'([^']*)'|=\s*"([^"]*)"/g)) {
+      const value = match[1] ?? match[2] ?? "";
+      if (value.length > 0) {
+        found.push(value);
+      }
+    }
+  }
+  return found;
+}
+
+/**
  * 雛形の中で、日本語が現れうる場所を取り出します。
  *
  * **`<% %>` の外に置かれた地の文と、`<% %>` の中の文字列リテラルの
  * どちらも見ます。** 地の文へ直に書いた日本語も、直書きです。
+ *
+ * **地の文に加えて、タグの属性の値も見ます。** 属性へ書いた日本語も直書きです。
  */
 function findErbLiterals(line) {
   const found = [];
   const outside = line.replace(/<%[\s\S]*?%>/g, "\u0000");
   for (const part of outside.split("\u0000")) {
+    found.push(...findErbAttributes(part));
     const text = part.replace(/<[^>]*>/g, "").trim();
     if (text.length > 0) {
       found.push(text);

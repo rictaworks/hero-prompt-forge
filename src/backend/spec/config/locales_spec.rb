@@ -20,6 +20,20 @@ RSpec.describe '文言の定義' do
       .to raise_error(I18n::MissingTranslationData)
   end
 
+  # **監査の記録の日時には、年を入れます**（issue #177 の提案 13）。
+  # 年が落ちると、去年の操作と今年の操作が同じ見た目になります。
+  describe '管理の操作の記録の日時' do
+    let(:at) { Time.zone.local(2026, 8, 27, 10, 30) }
+
+    it '年月日と時刻で書きます' do
+      expect(I18n.l(at, format: :audit_at)).to eq('2026年8月27日 10:30')
+    end
+
+    it '年を含みます' do
+      expect(I18n.l(at, format: :audit_at)).to include('2026年')
+    end
+  end
+
   # **見出しと呼び名は、文ではありません。**
   # `headings`（見出し）と `labels`（呼び名・区切り）の下だけを、
   # 句点で終わらない文言の置き場とします。
