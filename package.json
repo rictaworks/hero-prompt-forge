@@ -8,8 +8,9 @@
     "test:hardcode": "node --test test/hardcode/*.test.mjs",
     "test:hooks": "node --test test/hooks/*.test.mjs",
     "test:harness": "node --test test/harness/*.test.mjs",
-    "test:all": "npm run test:hooks && npm run test:hardcode && npm run test:harness && npm run check:hardcode",
-    "check:hardcode": "node test/hardcode/check-hardcoded-strings.mjs ."
+    "test:all": "npm run test:hooks && npm run test:hardcode && npm run test:harness && npm run test:docs && npm run check:hardcode",
+    "check:hardcode": "node test/hardcode/check-hardcoded-strings.mjs .",
+    "test:docs": "node --test test/docs/*.test.mjs"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.16.0",
