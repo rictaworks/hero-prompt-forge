@@ -48,6 +48,19 @@
   font-size: 13px;
 }
 
+/**
+ * 外への出口です。
+ *
+ * **押せると分かる見た目にします。** 地の文と同じ色のままでは、
+ * 当ててみるまで押せると分かりません（PR #180 のレビュー・条件 2）。
+ * reCAPTCHA の代わりの表示としても、辿れることが要件です。
+ */
+.links a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .facts {
   display: flex;
   flex-direction: column;
