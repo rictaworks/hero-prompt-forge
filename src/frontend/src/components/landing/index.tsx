@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Button, FaqItem, Logo, ProcessStep, SectionHeading, StrengthCard } from "@/components/ui";
 import { LOGIN_PATH } from "@/config/backend";
 import { text } from "@/strings";
@@ -57,6 +58,7 @@ export function Landing() {
       <ProcessSection />
       <FaqSection />
       <ContactSection />
+      <FooterSection />
     </div>
   );
 }
@@ -173,6 +175,32 @@ function FaqSection() {
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * 画面の下の帯です（issue #172）。
+ *
+ * **モックには無い要素です**（`app-ui/index.html`）。**モックは書き換えません。**
+ * 実装側で足します。
+ *
+ * **ログインの時点で Cookie を置きます。** 置く以上、利用者へ伝える必要が
+ * あります。**規約とポリシーへ、ログインの前に辿れるようにします。**
+ */
+function FooterSection() {
+  const pages = ["terms", "privacy", "commerce"] as const;
+
+  return (
+    <footer className={styles.footer}>
+      <nav className={styles.footerLinks}>
+        {pages.map((page) => (
+          <Link key={page} className={styles.footerLink} href={`/${page}`}>
+            {text(`landing.footer.labels.${page}`)}
+          </Link>
+        ))}
+      </nav>
+      <p className={styles.footerNote}>{text("landing.footer.note")}</p>
+    </footer>
   );
 }
 
