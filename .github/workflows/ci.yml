@@ -248,6 +248,13 @@ jobs:
             puts "自動ログインの利用者を用意しました: #{user.x_user_id}"
           '
 
+      # **確かめる相手を用意します。** 画面の確認は、すでに出来上がった生成の
+      # 記録を開きます。**自動検査のデータベースは空ですので、ここで作ります**
+      # （PR #179 のレビュー・条件 1）。
+      - name: 確認用の記録を用意する
+        working-directory: src/backend
+        run: bin/rails runner ../../scripts/ci/prepare_e2e_data.rb
+
       - name: 依存の導入（画面）
         working-directory: src/frontend
         run: npm ci
