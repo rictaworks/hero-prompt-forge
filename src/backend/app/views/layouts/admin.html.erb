@@ -6,12 +6,33 @@
     <meta name="robots" content="noindex, nofollow">
     <title><%= t('admin.headings.title') %></title>
     <%= csrf_meta_tags %>
+    <%# 開発者だけが使う画面です。見た目は最小限にとどめます。 %>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; color: #222; }
+      .bar { display: flex; align-items: baseline; gap: 24px; padding: 12px 24px; border-bottom: 1px solid #ddd; }
+      .bar h1 { font-size: 16px; margin: 0; }
+      .bar nav { display: flex; gap: 16px; font-size: 14px; }
+      main { padding: 24px; max-width: 1080px; }
+      table { border-collapse: collapse; margin-bottom: 24px; }
+      th, td { border: 1px solid #ddd; padding: 6px 12px; text-align: left; font-size: 14px; }
+      pre { background: #f6f6f6; padding: 12px; overflow-x: auto; font-size: 13px; }
+      textarea { font-family: ui-monospace, monospace; font-size: 13px; }
+      .notice { background: #eef7ee; border: 1px solid #bcd; padding: 8px 12px; }
+      .alert { background: #fdeeee; border: 1px solid #dbb; padding: 8px 12px; }
+    </style>
   </head>
   <body>
-    <header>
-      <h1><%= t('admin.headings.title') %></h1>
+    <header class="bar">
+      <h1><%= link_to t('admin.headings.title'), admin_root_path %></h1>
+      <nav>
+        <%= link_to t('admin.headings.rule_dictionaries'), admin_rule_dictionaries_path %>
+        <%= link_to t('admin.headings.users'), admin_users_path %>
+        <%= link_to t('admin.headings.metrics'), admin_metrics_path %>
+      </nav>
     </header>
     <main>
+      <% if flash[:notice] %><p class="notice"><%= flash[:notice] %></p><% end %>
+      <% if flash[:alert] %><p class="alert"><%= flash[:alert] %></p><% end %>
       <%= yield %>
     </main>
   </body>

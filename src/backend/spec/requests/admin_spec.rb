@@ -146,6 +146,20 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
     end
   end
 
+  # **お知らせ（flash）の仕組みが組み込まれていることを確かめます。**
+  #
+  # API モードでは既定で外れています。**組み込まないまま `flash` を書くと、
+  # 画面を組み立てる段で必ず落ちます。** リクエストテストでは表に出ません
+  # （テストの側が `flash` を参照して読み込むためです）。
+  # **仕組みそのものを見ます**（PR #175 の整備で実測されました）。
+  describe 'お知らせの仕組み' do
+    it '組み込まれています' do
+      names = Rails.application.config.middleware.map { |item| item.name.to_s }
+
+      expect(names).to include('ActionDispatch::Flash')
+    end
+  end
+
   # **利用者の X ログインでは、管理画面へ届きません。**
   describe '利用者の認証との切り分け' do
     it '利用者のセッションでは通しません' do

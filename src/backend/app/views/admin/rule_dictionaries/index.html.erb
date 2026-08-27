@@ -1,0 +1,36 @@
+<h2><%= t('admin.headings.rule_dictionaries') %></h2>
+<p><%= t('admin.rule_dictionaries.description') %></p>
+
+<p><%= link_to t('admin.headings.rule_dictionary_new'), new_admin_rule_dictionary_path %></p>
+
+<% if @dictionaries.empty? %>
+  <p><%= t('admin.rule_dictionaries.empty') %></p>
+<% else %>
+  <table>
+    <thead>
+      <tr>
+        <th><%= t('admin.headings.version') %></th>
+        <th><%= t('admin.headings.state') %></th>
+        <th><%= t('admin.headings.published_at') %></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @dictionaries.each do |dictionary| %>
+        <tr>
+          <td><%= dictionary.version %></td>
+          <td>
+            <%= dictionary.published? ? t('admin.labels.published') : t('admin.labels.draft') %>
+            <% if @current && dictionary.id == @current.id %>
+              （<%= t('admin.labels.current') %>）
+            <% end %>
+          </td>
+          <td>
+            <%= dictionary.published? ? l(dictionary.published_at, format: :reset_at) : t('admin.labels.none') %>
+          </td>
+          <td><%= link_to t('admin.labels.show'), admin_rule_dictionary_path(dictionary) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

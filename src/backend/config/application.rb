@@ -55,6 +55,17 @@ module Backend
     config.middleware.use ActionDispatch::Session::CookieStore,
                           key: ADMIN_SESSION_KEY, same_site: :lax, httponly: true
 
+    # **管理画面のお知らせ（flash）にも、専用の仕組みが要ります**（issue #66、#67）。
+    #
+    # API モードでは、この仕組みも既定で外れています。**組み込まないまま
+    # `flash` を書くと、画面を組み立てる段で必ず落ちます**（`undefined method
+    # 'flash'`）。**リクエストテストでは表に出ません。** テストの側が `flash` を
+    # 参照して読み込むため、テストの中でだけ動きます
+    # （PR #175 の整備で実測されました）。
+    #
+    # **利用者向けの API は使いません。** 管理画面のためだけに組み込みます。
+    config.middleware.use ActionDispatch::Flash
+
     # 時刻は JST です。
     config.time_zone = 'Asia/Tokyo'
     config.active_record.default_timezone = :utc

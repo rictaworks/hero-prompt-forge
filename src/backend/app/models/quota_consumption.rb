@@ -59,6 +59,20 @@ class QuotaConsumption < ApplicationRecord
     update!(attributes.merge(status: next_status.to_s))
   end
 
+  # **管理者による手動リセットです**（requirements.md 4.4、issue #67）。
+  #
+  # **状態の遷移の定めを通しません。** 確定済みからは、どの状態へも進めない
+  # 定めです（`TRANSITIONS`）。手動リセットは、その定めの外にある**運用の
+  # 操作**です。定めに穴を開ける代わりに、専用の入口を 1 つだけ設けます。
+  #
+  # **リセットしたことを記録へ残します**（`reset_by_admin`）。
+  # **誰がいつ行ったのかは `AdminAction` が持ちます。**
+  #
+  # **返還した扱いにします。** 当日中の生成をもう一度できるようにするためです。
+  def reset_by_admin!
+    update!(status: 'refunded', reset_by_admin: true)
+  end
+
   # そのクォータ日の消費を返します。無ければ nil です。
   def self.find_for(user, quota_day)
     find_by(user_id: user.id, quota_day: quota_day)
