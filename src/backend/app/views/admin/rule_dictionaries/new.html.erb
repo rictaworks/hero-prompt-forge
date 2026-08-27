@@ -13,18 +13,15 @@
 
   <p>
     <%= form.label :anti_ai_rules, t('admin.headings.anti_ai_rules') %><br>
-    <%= form.text_area :anti_ai_rules, rows: 12, cols: 100,
-                       value: JSON.pretty_generate(@dictionary.anti_ai_rules) %>
+    <%= form.text_area :anti_ai_rules, rows: 12, cols: 100, value: @submitted[:anti_ai_rules] %>
   </p>
   <p>
     <%= form.label :style_spec_rules, t('admin.headings.style_spec_rules') %><br>
-    <%= form.text_area :style_spec_rules, rows: 20, cols: 100,
-                       value: JSON.pretty_generate(@dictionary.style_spec_rules) %>
+    <%= form.text_area :style_spec_rules, rows: 20, cols: 100, value: @submitted[:style_spec_rules] %>
   </p>
   <p>
     <%= form.label :industry_defaults, t('admin.headings.industry_defaults') %><br>
-    <%= form.text_area :industry_defaults, rows: 20, cols: 100,
-                       value: JSON.pretty_generate(@dictionary.industry_defaults) %>
+    <%= form.text_area :industry_defaults, rows: 20, cols: 100, value: @submitted[:industry_defaults] %>
   </p>
 
   <p><%= form.submit t('admin.labels.create') %></p>

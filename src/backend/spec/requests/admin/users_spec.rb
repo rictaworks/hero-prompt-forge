@@ -14,6 +14,15 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
   end
 
   # 判定サービスへ実際に問い合わせません。**外へ通信しません。**
+  #
+  # **組み立ての時点で環境変数を読みます。** 応答だけを差し替えても、
+  # 差し替える相手を組み立てる段で落ちます。手元は `.env` に値があるため
+  # 通り、値の無い自動検査では通りません（PR #175 の整備で実測されました）。
+  # **判定サービスの設定も、ここで差し替えます。**
+  def gate_keys
+    %w[FOLLOWER_GATE_BASE_URL FOLLOWER_GATE_CLIENT_ID FOLLOWER_GATE_CREDENTIAL]
+  end
+
   def stub_decision(plan)
     decision = instance_double(FollowerGateClient::Decision, confirmed: true, plan: plan)
     allow_any_instance_of(FollowerGateClient).to receive(:decide).and_return(decision) # rubocop:disable RSpec/AnyInstance
@@ -23,6 +32,9 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
     allow(ENV).to receive(:fetch).and_call_original
     allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return(name)
     allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::PASSWORD_KEY, nil).and_return(password)
+    gate_keys.each do |key|
+      allow(ENV).to receive(:fetch).with(key).and_return("#{key.downcase}-for-spec")
+    end
   end
 
   describe '認証' do
@@ -183,6 +195,27 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
       post "/admin/users/#{active.id}/reset-quota", headers: headers
 
       expect(flash[:alert]).to eq(I18n.t('admin.users.no_quota'))
+    end
+
+    # **お知らせが、実際の画面に出ることを確かめます。**
+    # 移った先を描くところまで通します（PR #175 の整備で実測された症状です）。
+    it 'お知らせが移った先の画面に出ます' do
+      consume!
+      post "/admin/users/#{active.id}/reset-quota", headers: headers
+
+      # **移った先でも資格情報が要ります。**
+      get response.location, headers: headers
+
+      expect(response.body).to include(I18n.t('admin.users.quota_reset'))
+    end
+
+    it '移った先の画面が開けます' do
+      consume!
+      post "/admin/users/#{active.id}/reset-quota", headers: headers
+
+      get response.location, headers: headers
+
+      expect(response).to have_http_status(:ok)
     end
   end
 

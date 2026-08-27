@@ -122,6 +122,30 @@ RSpec.describe '管理画面 : 規則辞書' do # rubocop:disable RSpec/Describe
 
       expect(response).to have_http_status(:unprocessable_content)
     end
+
+    # **書きかけの内容を残します**（PR #175 の整備より）。
+    # 空へ戻すと、長い JSON を書き直すことになります。
+    it '失敗しても、書きかけの内容を残します' do
+      post '/admin/rule-dictionaries',
+           params: content_params(anti_ai_rules: '{ こわれた'), headers: headers
+
+      expect(response.body).to include('{ こわれた')
+    end
+
+    it '失敗しても、他の欄の内容を残します' do
+      post '/admin/rule-dictionaries',
+           params: content_params(anti_ai_rules: '{ こわれた'), headers: headers
+
+      expect(response.body).to include('lens_mm')
+    end
+
+    it '失敗しても、版の名前を残します' do
+      post '/admin/rule-dictionaries',
+           params: content_params(version: 'vspec.kept', anti_ai_rules: '{ こわれた'),
+           headers: headers
+
+      expect(response.body).to include('vspec.kept')
+    end
   end
 
   describe '公開' do

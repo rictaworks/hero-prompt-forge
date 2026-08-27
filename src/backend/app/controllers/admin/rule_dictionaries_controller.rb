@@ -40,6 +40,7 @@ module Admin
     def new
       @source = RuleDictionary.current
       @dictionary = RuleDictionary.new(attributes_of(@source))
+      @submitted = CONTENT_FIELDS.index_with { |field| JSON.pretty_generate(@dictionary.public_send(field)) }
       @version = suggested_version
     end
 
@@ -93,18 +94,23 @@ module Admin
     end
 
     def render_invalid_json(error)
-      @source = RuleDictionary.current
-      @dictionary = RuleDictionary.new
-      @version = params[:version]
-      @error = t('admin.rule_dictionaries.invalid_json', field: error.message)
-      render :new, status: :unprocessable_content
+      render_again(t('admin.rule_dictionaries.invalid_json', field: error.message))
     end
 
     def render_invalid_record(error)
+      render_again(error.record.errors.full_messages.join(t('admin.labels.separator')))
+    end
+
+    # **書きかけの内容を残します**（PR #175 の整備より）。
+    #
+    # 空へ戻すと、長い JSON を書き直すことになります。**読めない内容も
+    # そのまま残します。** どこが違うのかを、その場で直していただけます。
+    def render_again(message)
       @source = RuleDictionary.current
-      @dictionary = error.record
+      @dictionary = RuleDictionary.new
+      @submitted = CONTENT_FIELDS.index_with { |field| params[field].to_s }
       @version = params[:version]
-      @error = error.record.errors.full_messages.join(t('admin.labels.separator'))
+      @error = message
       render :new, status: :unprocessable_content
     end
 
