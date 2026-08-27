@@ -17,7 +17,7 @@ classDiagram
         +replace(main_terms, negative_terms, notes, dictionary_version) Draft
     }
     class LlmRefiner {
-        +call(draft) Draft
+        +refine(draft) Draft
     }
     class DegradedComposer {
         +degraded?(draft) bool
@@ -78,7 +78,7 @@ classDiagram
 ```mermaid
 classDiagram
     class LlmRefiner {
-        +refine(素材)
+        +refine(draft) Draft
     }
     class GeminiClient {
         +refine(instruction, lines) String[]
