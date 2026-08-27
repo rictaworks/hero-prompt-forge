@@ -182,3 +182,126 @@ jobs:
 
       - name: 直書きの文言が無いことの確認
         run: npm run check:hardcode
+
+  e2e:
+    name: ブラウザ操作の確認（Playwright）
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hero
+          POSTGRES_PASSWORD: hero_ci_only
+          POSTGRES_DB: hero_prompt_forge_development
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hero"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # **開発サーバーを立てて確かめます。** 本番を指した場合は、設定の
+      # 読み込みの時点で失敗します（`playwright.config.ts`）。
+      APP_ENV: development
+      RAILS_ENV: development
+      DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_development
+      TEST_DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_development
+      # 開発環境でだけ効く自動ログインです。**本番では効きません**（`AppEnvironment`）。
+      # 画面の確認はログイン後の画面を含みますので、ここで有効にします。
+      DEVELOPMENT_AUTO_LOGIN_X_USER_ID: "1000000000000000001"
+      NEXT_PUBLIC_APP_ENV: development
+      NEXT_PUBLIC_BASE_URL: http://localhost:3000
+      # **ブラウザへ配りません。** 画面の中継先です。組み立て時に焼き込まれます。
+      BACKEND_INTERNAL_URL: http://localhost:3001
+      E2E_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/backend
+          bundler-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/frontend/package-lock.json
+
+      - name: データベースの準備
+        working-directory: src/backend
+        run: bin/rails db:prepare
+
+      # **ログイン後の画面を確かめます。** 自動ログインは、この識別子の利用者が
+      # 居る場合にだけ効きます（`AuthenticatesUser#development_user`）。
+      - name: 自動ログインの利用者を作る
+        working-directory: src/backend
+        run: |
+          bin/rails runner '
+            user = User.find_or_initialize_by(x_user_id: ENV.fetch("DEVELOPMENT_AUTO_LOGIN_X_USER_ID"))
+            user.display_name = "CI" if user.display_name.blank?
+            user.plan = "active"
+            user.save!
+            puts "自動ログインの利用者を用意しました: #{user.x_user_id}"
+          '
+
+      - name: 依存の導入（画面）
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: 画面の組み立て
+        working-directory: src/frontend
+        run: npm run build
+
+      - name: 依存の導入（確認の道具）
+        run: npm ci
+
+      - name: ブラウザの導入
+        run: npx playwright install --with-deps chromium
+
+      # **起動を待ってから次へ進みます。** 待たずに確認へ進むと、
+      # 立ち上がりの遅さが「画面が出ない」として現れます。
+      - name: バックエンドを起動
+        working-directory: src/backend
+        run: |
+          bin/rails server -p 3001 -b 127.0.0.1 > "$RUNNER_TEMP/rails.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3001/health > /dev/null; then
+              echo "バックエンドが起動しました。"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "バックエンドが起動しませんでした。" >&2
+          cat "$RUNNER_TEMP/rails.log" >&2
+          exit 1
+
+      - name: 画面を起動
+        working-directory: src/frontend
+        run: |
+          npm run start -- -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3000/ > /dev/null; then
+              echo "画面が起動しました。"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "画面が起動しませんでした。" >&2
+          cat "$RUNNER_TEMP/next.log" >&2
+          exit 1
+
+      - name: ブラウザ操作の確認
+        run: npx playwright test
+
+      # 落ちたときに、何が起きていたかを追えるようにします。
+      - name: 起動の記録
+        if: failure()
+        run: |
+          echo "===== バックエンド ====="
+          cat "$RUNNER_TEMP/rails.log" || true
+          echo "===== 画面 ====="
+          cat "$RUNNER_TEMP/next.log" || true

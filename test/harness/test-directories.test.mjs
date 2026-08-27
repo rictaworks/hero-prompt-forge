@@ -66,3 +66,49 @@ test("束ねる実行が、Playwright 以外のすべてを呼びます", () => 
 test("束ねる実行は、開発サーバーを要する Playwright を呼びません", () => {
   assert.equal(scripts()["test:all"].includes("test:e2e"), false);
 });
+
+// **ブラウザ操作の確認が、自動検査から呼ばれることを確かめます**（issue #173）。
+//
+// 束ねる実行（`test:all`）から外す判断は正しいのですが、**自動検査にも
+// ジョブが無いと、一度も走らないまま取り込まれます。** 実際に PR #170 では、
+// 「バックエンドのドメインを隠蔽する」という約束を守る唯一のテストが
+// Playwright だけにあり、自動では動いていませんでした。
+function workflow() {
+  return readFileSync(join(ROOT, ".github", "workflows", "ci.yml"), "utf8");
+}
+
+test("自動検査が、ブラウザ操作の確認を走らせます", () => {
+  assert.ok(
+    workflow().includes("npx playwright test"),
+    ".github/workflows/ci.yml に、Playwright を走らせる手順がありません。",
+  );
+});
+
+test("ブラウザ操作の確認の接続先は、開発サーバーです", () => {
+  const line = workflow()
+    .split("\n")
+    .find((text) => text.includes("E2E_BASE_URL:"));
+
+  assert.ok(line, ".github/workflows/ci.yml が E2E_BASE_URL を与えていません。");
+  assert.match(
+    line,
+    /https?:\/\/(localhost|127\.0\.0\.1)/,
+    "接続先が開発サーバーではありません。本番へ向けて確認を流しません。",
+  );
+});
+
+// **立ち上げてから確かめます。** 待たずに確認へ進むと、立ち上がりの遅さが
+// 「画面が出ない」として現れます。
+test("画面とバックエンドを起動してから、ブラウザ操作の確認を走らせます", () => {
+  const text = workflow();
+  const backend = text.indexOf("bin/rails server");
+  const frontend = text.indexOf("npm run start");
+  const check = text.indexOf("npx playwright test");
+
+  assert.ok(backend > -1, "バックエンドを起動する手順がありません。");
+  assert.ok(frontend > -1, "画面を起動する手順がありません。");
+  assert.ok(
+    backend < check && frontend < check,
+    "起動より先にブラウザ操作の確認を走らせています。",
+  );
+});
