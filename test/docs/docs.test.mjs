@@ -83,20 +83,134 @@ test("実装した画面は、すべて README に書かれています", () => 
   );
 });
 
-test("README に書いた経路は、すべて実装されています", () => {
+/**
+ * 実装している経路を数え上げます。
+ *
+ * **経路の定義（`routes.rb`）から組み立てます。** 末尾の語だけを見ると、
+ * **定義していない動詞や、利用者向けには無い経路が素通りします**
+ * （PR #185 のレビュー・提案 1）。
+ */
+function implementedEndpoints() {
   const routes = read("src", "backend", "config", "routes.rb");
-  const controllers = join(ROOT, "src", "backend", "app", "controllers");
+  const found = [];
 
-  // 経路の定義そのものを読み解かず、**要となる語が定義に現れること**を見ます。
-  const missing = documentedEndpoints().filter(({ path }) => {
-    const name = path.split("/").filter((part) => part && !part.startsWith(":")).at(-1);
-    return !routes.includes(name) && !existsSync(join(controllers, `${name}_controller.rb`));
-  });
+  // 直に書いた経路です（`get 'auth/start', to: ...`）。
+  for (const match of routes.matchAll(/^\s*(get|post|patch|put|delete)\s+'([^']+)'/gm)) {
+    const path = match[2].split(" =>")[0];
+    found.push({ verb: match[1].toUpperCase(), path: `/${path.replace(/^\//, "")}` });
+  }
+
+  // 資源としてまとめた経路です。**`only:` に挙げた操作だけを数えます。**
+  const ACTIONS = {
+    index: { verb: "GET", suffix: "" },
+    create: { verb: "POST", suffix: "" },
+    show: { verb: "GET", suffix: "/:id" },
+    update: { verb: "PATCH", suffix: "/:id" },
+    destroy: { verb: "DELETE", suffix: "/:id" },
+  };
+
+  for (const match of routes.matchAll(/resources? :(\w+), only: %i\[([^\]]*)\]/g)) {
+    const name = match[1];
+    const singular = !match[0].startsWith("resources ");
+    for (const action of match[2].trim().split(/\s+/).filter(Boolean)) {
+      const shape = ACTIONS[action];
+      if (!shape) {
+        continue;
+      }
+      // 単数の資源（`resource :session`）は、識別子を取りません。
+      found.push({ verb: shape.verb, path: `/${name}${singular ? "" : shape.suffix}` });
+    }
+  }
+
+  return found;
+}
+
+test("README に書いた経路は、すべて実装されています", () => {
+  const implemented = implementedEndpoints();
+  const missing = documentedEndpoints().filter(
+    ({ verb, path }) =>
+      !implemented.some(
+        (entry) => entry.verb === verb && path.endsWith(entry.path.replace(/^\//, "/")),
+      ),
+  );
 
   assert.deepEqual(
     missing.map((entry) => `${entry.verb} ${entry.path}`),
     [],
     "README に、経路の定義に無いエンドポイントが書かれています。",
+  );
+});
+
+/**
+ * 状態遷移図が、実装の定めと一致することを確かめます。
+ *
+ * **図は、実装が変わっても黙って残ります**（PR #185 のレビュー・提案 2）。
+ * 遷移の定めは機械が読めますので、ここで突き合わせます。
+ */
+function implementedTransitions(file, constant) {
+  const source = read("src", "backend", "app", "models", file);
+  const block = source.slice(source.indexOf(`${constant} = {`));
+  const found = [];
+
+  for (const match of block.matchAll(/'(\w+)' => %w\[([^\]]*)\]/g)) {
+    for (const to of match[2].trim().split(/\s+/).filter(Boolean)) {
+      found.push(`${match[1]} --> ${to}`);
+    }
+  }
+  for (const match of block.matchAll(/(\w+) => \[(\w+(?:, \w+)*)\]/g)) {
+    for (const to of match[2].split(", ")) {
+      found.push(`${match[1]} --> ${to}`);
+    }
+  }
+  return found;
+}
+
+/** 状態遷移図に描かれた遷移です。 */
+function documentedTransitions(names) {
+  const text = read("SPEC", "state.md");
+  const found = [];
+
+  for (const match of text.matchAll(/^\s{4}(\w+) --> (\w+)/gm)) {
+    if (names.includes(match[1]) && names.includes(match[2])) {
+      found.push(`${match[1]} --> ${match[2]}`);
+    }
+  }
+  return found;
+}
+
+test("生成リクエストの状態遷移図が、実装の定めと一致します", () => {
+  const implemented = implementedTransitions("prompt_request.rb", "TRANSITIONS").map((line) =>
+    line.replace(/\b(DRAFT|QUEUED|GENERATING|COMPLETED|DEGRADED_COMPLETED|FAILED|REJECTED|ARCHIVED)\b/g, (word) =>
+      word.toLowerCase(),
+    ),
+  );
+  const documented = documentedTransitions([
+    "draft",
+    "queued",
+    "generating",
+    "completed",
+    "degraded_completed",
+    "failed",
+    "rejected",
+    "archived",
+  ]);
+
+  assert.deepEqual(
+    [...new Set(implemented)].sort(),
+    [...new Set(documented)].sort(),
+    "SPEC/state.md の生成リクエストの図が、実装の定めと食い違っています。",
+  );
+});
+
+test("クォータの状態遷移図が、実装の定めを漏らしません", () => {
+  const implemented = implementedTransitions("quota_consumption.rb", "TRANSITIONS");
+  const documented = documentedTransitions(["reserved", "confirmed", "refunded"]);
+  const missing = implemented.filter((line) => !documented.includes(line));
+
+  assert.deepEqual(
+    missing,
+    [],
+    `SPEC/state.md のクォータの図に、実装済みの遷移がありません: ${missing.join(", ")}。`,
   );
 });
 

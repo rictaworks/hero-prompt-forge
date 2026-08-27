@@ -34,7 +34,10 @@ Playwright で自動化できる手順がありません。**
 test/hooks/*.test.mjs        マージ前フックの検査
 test/hardcode/*.test.mjs     ハードコード検出の検査
 test/harness/*.test.mjs      テストの置き場が実行から漏れていないかの検査
+test/docs/*.test.mjs         README と SPEC が実装と合っているかの検査
 ```
+
+**これらは `test/pr<番号>/` に置きません。** PR ごとの確認ではなく、**道具そのものが正しく働くかを見る検査**だからです。持ち場ごとに 1 つの置き場を持ちます。
 
 いずれも `node --test` で動かします。**一時ディレクトリへ作った最小の
 リポジトリを対象にします。** このリポジトリの `review-records/` を対象にすると、

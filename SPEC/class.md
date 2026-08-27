@@ -7,40 +7,48 @@
 ```mermaid
 classDiagram
     class PromptGenerationService {
-        +call(prompt_request) PromptPackage[]
+        +call() PromptPackage[]
     }
     class StyleSpec {
-        +decide(inputs, dictionary) 仕様
+        +apply(draft) Draft
     }
     class Draft {
-        +build(仕様) 素材
+        +add(main_terms, negative_terms, notes, dictionary_version) Draft
+        +replace(main_terms, negative_terms, notes, dictionary_version) Draft
     }
     class LlmRefiner {
-        +refine(素材) 素材
+        +call(draft) Draft
     }
     class DegradedComposer {
-        +compose(仕様) 素材
+        +degraded?(draft) bool
     }
     class ModelAdapter {
         <<abstract>>
-        +format(素材) PromptPackage
+        +format(draft) Formatted
     }
     class MidjourneyAdapter
-    class DalleAdapter
     class StableDiffusionAdapter
-    class NanoBananaAdapter
     class NarrativeAdapter {
-        <<mixin>>
         +自然文へ組み立てます
     }
+    class DalleAdapter
+    class NanoBananaAdapter
     class TermRoles {
         +役割ごとの述語を決めます
     }
-    class PromptPackage {
+    class Formatted {
         +main_prompt
         +negative_prompt
         +parameters
-        +art_direction_note
+        +prompt
+        +notes
+    }
+    class PromptPackage {
+        +variation
+        +formatted
+        +note
+        +draft
+        +degraded?() bool
     }
 
     PromptGenerationService --> StyleSpec
@@ -48,17 +56,20 @@ classDiagram
     PromptGenerationService --> LlmRefiner
     PromptGenerationService --> DegradedComposer
     PromptGenerationService --> ModelAdapter
+    PromptGenerationService --> PromptPackage
     ModelAdapter <|-- MidjourneyAdapter
-    ModelAdapter <|-- DalleAdapter
     ModelAdapter <|-- StableDiffusionAdapter
-    ModelAdapter <|-- NanoBananaAdapter
-    DalleAdapter ..> NarrativeAdapter
-    NanoBananaAdapter ..> NarrativeAdapter
+    ModelAdapter <|-- NarrativeAdapter
+    NarrativeAdapter <|-- DalleAdapter
+    NarrativeAdapter <|-- NanoBananaAdapter
     NarrativeAdapter --> TermRoles
-    ModelAdapter --> PromptPackage
+    ModelAdapter --> Formatted
+    PromptPackage --> Formatted
 ```
 
-**生成モデルごとの違いは、整形の持ち場に閉じます。** 語を並べるモデル（Midjourney ・ Stable Diffusion）と、自然文で述べるモデル（DALL·E ・ nano banana）で、整形だけが変わります。
+**整えるのと、包むのは別の持ち場です。** 生成モデルごとの整形は `Formatted` を返します。**それを案の情報（何案目か・ノート・下書き）と一緒に包んだものが `PromptPackage` です。** 包むのは `PromptGenerationService` です。
+
+**生成モデルごとの違いは、整形の持ち場に閉じます。** 語を並べるモデル（Midjourney ・ Stable Diffusion）は `ModelAdapter` を直に継ぎます。**自然文で述べるモデル（DALL·E ・ nano banana）は、`NarrativeAdapter` を間に挟みます。** 自然文の組み立て方を 2 つのモデルで分け持つためです。
 
 **素材の役割は控えから受け取ります**（`TermRoles`）。素材の文字列を照合して見分けません。言い回しが変わったときに黙って外れるためです。
 
@@ -146,9 +157,11 @@ classDiagram
 ```mermaid
 classDiagram
     class Reservation {
-        +reserve!(user, prompt_request)
-        +settle!(prompt_request)
-        +refund!(prompt_request)
+        +reserve!(user, prompt_request, now)
+        +settle!(prompt_request, now)
+    }
+    class Settlement {
+        +next_status_for(prompt_request) String
     }
     class QuotaDay {
         +of(time) Date
@@ -161,6 +174,7 @@ classDiagram
     }
 
     Reservation --> QuotaDay
+    Reservation --> Settlement
     Reservation --> QuotaConsumption
 ```
 
@@ -179,7 +193,7 @@ classDiagram
         -unsettled_ids()
     }
     class Delivery {
-        +store(request, packages)
+        +call(packages)
     }
 
     ReclaimPromptRequestsJob ..> GeneratePromptJob : 投入し直します

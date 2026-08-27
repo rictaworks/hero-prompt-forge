@@ -121,6 +121,6 @@ erDiagram
 
 **`quota_consumptions` は、利用者とクォータ日の組で一意です。** 同じ日に 2 件作れません。**予約中（`reserved`）の行は、1 つのお申し込みにつき 1 件だけ**という部分一意の索引も持ちます。
 
-**`prompt_requests` と `quota_consumptions` の結び付きは、後から付きます。** 枠の予約は、お申し込みの行を作る前に行うためです（`prompt_request_id` は空を許します）。
+**`quota_consumptions.prompt_request_id` は空を許します。** 枠の予約は、**お申し込みに結び付けずに行うこともできる**ためです（`Quota::Reservation.reserve!` は `prompt_request:` を省いて呼べます）。**受付の経路では、行を作ってから予約しますので、結び付きます。**
 
 **利用者を消す経路はありません。** 生成履歴が結び付いているためです。

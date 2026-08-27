@@ -33,6 +33,8 @@ stateDiagram-v2
 | `failed` | 上限まで試しても通りませんでした | **返します**（`refunded`） |
 | `archived` | 記録として畳みました | 変わりません |
 
+**`archived` へ進める操作は、まだありません。** 遷移の定めは置いてありますが、**呼び出す場所を実装していません。** 画面には、この状態を受け取ったときの表示だけを用意してあります。
+
 **`rejected` は枠を使いません。** 禁止入力の判定を、枠の予約より先に置いています。
 
 **`generating` から `failed` を経て `queued` へ戻れます。** 同じお申し込みを、もう一度組み立て直せます。
@@ -44,13 +46,19 @@ stateDiagram-v2
     [*] --> reserved : 投入の直前に予約します
     reserved --> confirmed : 成果物を提供しました
     reserved --> refunded : 失敗として記録しました
+    refunded --> reserved : 当日中に、もう一度作ります
+    confirmed --> refunded : 管理者が手動でリセットします
     confirmed --> [*]
     refunded --> [*]
 ```
 
+**`refunded` は終わりではありません。** 返還した枠は、**その日のうちにもう一度使えます**（`Quota::Reservation#reclaim!`）。失敗した生成を作り直せるようにするためです。
+
+**`confirmed` から `refunded` へは、管理者の手動リセットだけが進めます**（`QuotaConsumption#reset_by_admin!`）。**この 1 本だけは、定めた遷移の表を通りません。** 専用の入口を 1 つだけ設け、**リセットしたことを記録へ残します**（`reset_by_admin`）。`transition_to!` で同じことはできません。
+
 **クォータ日は JST 3:00 を境界とします**（`Quota::QuotaDay`）。午前 0 時ではありません。
 
-**予約したまま置き去りになる行があります。** 働き手が異常終了した場合です。**定時の拾い直し（`ReclaimPromptRequestsJob`、5 分ごと）が、決着だけが残った行を拾い直します。** 拾い直さないと、翌日以降の予約そのものが止まります（`DanglingReservationError`）。
+**予約したまま置き去りになる行があります。** 働き手が異常終了した場合です。**定時の拾い直し（`ReclaimPromptRequestsJob`、5 分ごと）が、2 種類の行を拾い直します。** 動きが無いまま置き去りになった行と、**決着したのに枠が予約のまま残る行**です。 拾い直さないと、翌日以降の予約そのものが止まります（`DanglingReservationError`）。
 
 **管理者は手動でリセットできます**（`reset_by_admin`）。記録は `admin_actions` に残ります。
 
