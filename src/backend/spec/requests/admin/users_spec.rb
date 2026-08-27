@@ -320,5 +320,24 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
 
       expect(response.body).to include(name).and include(AdminAction::RESET_QUOTA)
     end
+
+    # **年を含む日時で出します**（issue #177 の提案 13）。
+    # 監査の記録ですので、年が無いと後から追えません。
+    it '記録の日時に年を出します' do
+      AdminAction.record!(actor: name, action: AdminAction::RESET_QUOTA, user: user)
+
+      get "/admin/users/#{user.id}", headers: headers
+
+      expect(response.body).to include("#{AdminAction.last.created_at.year}年")
+    end
+
+    it '記録の日時を、監査の書式で出します' do
+      AdminAction.record!(actor: name, action: AdminAction::RESET_QUOTA, user: user)
+
+      get "/admin/users/#{user.id}", headers: headers
+
+      expect(response.body)
+        .to include(I18n.l(AdminAction.last.created_at, format: :audit_at))
+    end
   end
 end
