@@ -183,6 +183,11 @@ jobs:
       - name: 直書きの文言が無いことの確認
         run: npm run check:hardcode
 
+      # **文書が黙って嘘になることを防ぎます**（issue #78 ・ #79）。
+      # 画面や経路が消えても、文書はそのまま残ります。
+      - name: 文書の検査
+        run: npm run test:docs
+
   e2e:
     name: ブラウザ操作の確認（Playwright）
     runs-on: ubuntu-latest

@@ -8,19 +8,60 @@
 
 ## 現在の状態
 
-アプリケーションの実装は未着手です。現在このリポジトリにあるのは、画面モックとその静的実装（`app-ui/`）、および開発規約です。
+**利用者の画面と、開発者用の管理画面が動きます。** X でログインし、条件を入れて生成をお申し込みし、3 案を受け取り、評価メモを残すところまで通ります。
+
+**実装から起こした図は [SPEC/](SPEC/) にあります**（ER 図・クラス図・状態遷移図・シーケンス図・DFD・ユースケース図）。
 
 ## 自動ログイン
 
-現時点で提供している自動ログインはありません。実装した時点でこの節に手順を書きます。
+**開発と検査でだけ効く自動ログインがあります。** 本番では効きません。
+
+| 環境変数 | 中身 |
+|---|---|
+| `DEVELOPMENT_AUTO_LOGIN_X_USER_ID` | 自動でログインさせる X の数値のユーザー ID です |
+
+**次の 2 つが揃ったときだけ有効です。**
+
+1. `APP_ENV` が `development` または `test` であること
+2. その X のユーザー ID を持つ利用者が、データベースに居ること
+
+**本番（`APP_ENV=production`）では、値が設定されていても無視します。** 自動検査の「本番と同じ設定での読み込み確認」が、毎回そのことを確かめています。
+
+**この近道を、本番の画面に出しません。** 一般の方は X ログインだけで入ります。
 
 ## ページ一覧
 
-公開しているページはまだありません。実装した時点で、ページ名と URL をこの表に追記します。
+**すべて Next.js の画面です。** 下の URL は、手元の開発環境（`http://localhost:3300`）での住所です。
 
-| ページ名 | URL |
+| ページ名 | URL | ログイン |
+|---|---|---|
+| 01 ランディング | [/](http://localhost:3300/) | 要りません |
+| 02 履歴・一覧 | [/projects](http://localhost:3300/projects) | 要ります |
+| 03 入力フォーム | [/requests/new](http://localhost:3300/requests/new) | 要ります |
+| 04 生成中 | [/requests/:id](http://localhost:3300/requests/1) | 要ります |
+| 05 結果 3 案 | [/requests/:id/result](http://localhost:3300/requests/1/result) | 要ります |
+| 06 評価メモ | [/requests/:id/notes](http://localhost:3300/requests/1/notes) | 要ります |
+| 07 プリセット | [/presets](http://localhost:3300/presets) | 要ります |
+| 利用規約 | [/terms](http://localhost:3300/terms) | 要りません |
+| プライバシーポリシー | [/privacy](http://localhost:3300/privacy) | 要りません |
+| 特定商取引法に基づく表示 | [/commerce](http://localhost:3300/commerce) | 要りません |
+
+**08 縮退・エラーは、独立したページではありません。** 04 ・ 05 の画面の中で、縮退・上限到達・差し戻しとして出ます。
+
+**09 管理は、利用者の画面から辿れません**（`requirements.md` 5.2）。開発者用の管理画面は入口を分けています。
+
+### 開発者用の管理画面
+
+**BASIC 認証が掛かります。** 一般の方は使いません。**本番の住所は公開しません。**
+
+**下は主なページです。** このほかに、版の作成と公開・利用者の詳細・判定の取り直し・枠のリセットの経路があります（[SPEC/usecase.md](SPEC/usecase.md)）。
+
+| ページ名 | パス |
 |---|---|
-| （なし） | — |
+| ダッシュボード | `/admin` |
+| 規則辞書 | `/admin/rule-dictionaries` |
+| 利用者とプラン値 | `/admin/users` |
+| 利用状況 | `/admin/metrics` |
 
 ### 画面モック
 
@@ -35,11 +76,41 @@
 
 ## API 一覧
 
-公開しているエンドポイントはまだありません。実装した時点で、タイトルとエンドポイント URL をこの表に追記し、仕様を [SPEC/api](SPEC/api) へ追加します。
+**基底パスは `/api/v1` です。** 契約は [SPEC/api/README.md](SPEC/api/README.md) にあります。
 
-| タイトル | エンドポイント URL | 仕様 |
+**バックエンドの住所を公開しません。** 画面からの呼び出しは、画面の中の中継を通ります。
+
+| タイトル | エンドポイント | 仕様 |
 |---|---|---|
-| （なし） | — | — |
+| ログイン中の利用者 | `GET /api/v1/session` | [SPEC/api](SPEC/api/README.md) |
+| プロジェクトの一覧 | `GET /api/v1/projects` | [SPEC/api](SPEC/api/README.md) |
+| プロジェクトを作ります | `POST /api/v1/projects` | [SPEC/api](SPEC/api/README.md) |
+| プロジェクトを更新します | `PATCH /api/v1/projects/:id` | [SPEC/api](SPEC/api/README.md) |
+| プリセットの一覧 | `GET /api/v1/presets` | [SPEC/api](SPEC/api/README.md) |
+| プリセットを呼び出します | `GET /api/v1/presets/:id` | [SPEC/api](SPEC/api/README.md) |
+| プリセットを保存します | `POST /api/v1/presets` | [SPEC/api](SPEC/api/README.md) |
+| プリセットを更新します | `PATCH /api/v1/presets/:id` | [SPEC/api](SPEC/api/README.md) |
+| 生成履歴の一覧 | `GET /api/v1/prompt_requests` | [SPEC/api](SPEC/api/README.md) |
+| 生成をお申し込みします | `POST /api/v1/prompt_requests` | [SPEC/api](SPEC/api/README.md) |
+| 状態と 3 案を取り出します | `GET /api/v1/prompt_requests/:id` | [SPEC/api](SPEC/api/README.md) |
+| 評価メモを取り出します | `GET /api/v1/prompt_outputs/:id/evaluation_note` | [SPEC/api](SPEC/api/README.md) |
+| 評価メモを記録します | `POST /api/v1/prompt_outputs/:id/evaluation_note` | [SPEC/api](SPEC/api/README.md) |
+| 評価メモを更新します | `PATCH /api/v1/prompt_outputs/:id/evaluation_note` | [SPEC/api](SPEC/api/README.md) |
+
+### ログインと死活監視
+
+| タイトル | エンドポイント | 認証 |
+|---|---|---|
+| ログインを始めます | `GET /auth/start` | 要りません |
+| 認可から戻ります | `GET /auth/callback` | 要りません |
+| ログアウトします | `DELETE /auth/session` | 要ります |
+| 死活監視 | `GET /health` | 要りません |
+| 起動の確認（Rails の既定） | `GET /up` | 要りません |
+
+**`/health` は、データベースへ到達できることまで含めて答えます。** 外形監視サービスが呼びます。
+
+**`/up` は、アプリが起動しているかどうかだけを見ます。** Rails の既定の経路です。
+
 
 ## ディレクトリ構成
 
