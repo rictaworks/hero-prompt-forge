@@ -16,6 +16,10 @@ const JAPANESE = /[぀-ゟ゠-ヿ一-鿿]/;
 const TARGETS = [
   { dir: "src/backend/app", extensions: [".rb"], language: "ruby" },
   { dir: "src/backend/lib", extensions: [".rb"], language: "ruby" },
+  // **画面の雛形も対象です**（PR #175 のレビュー・要修正 3）。
+  // 管理画面は `.erb` で書きます。対象から外れていると、日本語を直書きしても
+  // 気づけません。**`<%= t(...) %>` を通す決まりを、ここで守ります。**
+  { dir: "src/backend/app/views", extensions: [".erb"], language: "erb" },
   { dir: "src/frontend/src", extensions: [".ts", ".tsx"], language: "typescript" },
 ];
 
@@ -57,10 +61,43 @@ function stripComments(line, language) {
   if (language === "ruby") {
     return line.replace(/#.*$/, "");
   }
+  if (language === "erb") {
+    // **雛形の注記（`<%# ... %>`）は対象外です。**
+    return line.replace(/<%#[\s\S]*?%>/g, "");
+  }
   return line.replace(/\/\/.*$/, "").replace(/\/\*.*?\*\//g, "");
 }
 
+/**
+ * 雛形の中で、日本語が現れうる場所を取り出します。
+ *
+ * **`<% %>` の外に置かれた地の文と、`<% %>` の中の文字列リテラルの
+ * どちらも見ます。** 地の文へ直に書いた日本語も、直書きです。
+ */
+function findErbLiterals(line) {
+  const found = [];
+  const outside = line.replace(/<%[\s\S]*?%>/g, "\u0000");
+  for (const part of outside.split("\u0000")) {
+    const text = part.replace(/<[^>]*>/g, "").trim();
+    if (text.length > 0) {
+      found.push(text);
+    }
+  }
+  for (const block of line.match(/<%[\s\S]*?%>/g) ?? []) {
+    for (const match of block.matchAll(/'([^']*)'|"([^"]*)"/g)) {
+      const value = match[1] ?? match[2] ?? "";
+      if (value.length > 0) {
+        found.push(value);
+      }
+    }
+  }
+  return found;
+}
+
 function findLiterals(line, language) {
+  if (language === "erb") {
+    return findErbLiterals(line);
+  }
   const pattern =
     language === "ruby"
       ? /'([^']*)'|"([^"]*)"/g

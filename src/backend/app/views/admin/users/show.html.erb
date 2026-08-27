@@ -49,7 +49,7 @@
     <tbody>
       <% @actions.each do |action| %>
         <tr>
-          <td><%= l(action.created_at, format: :reset_at) %></td>
+          <td><%= l(action.created_at, format: :audit_at) %></td>
           <td><%= action.actor %></td>
           <td><%= action.action %></td>
         </tr>

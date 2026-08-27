@@ -19,6 +19,26 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
   # 差し替える相手を組み立てる段で落ちます。手元は `.env` に値があるため
   # 通り、値の無い自動検査では通りません（PR #175 の整備で実測されました）。
   # **判定サービスの設定も、ここで差し替えます。**
+  # 管理画面が持つ経路の一覧です。**ここに無い経路は作りません。**
+  def expected_admin_routes
+    ['GET /admin',
+     'GET /admin/rule-dictionaries', 'POST /admin/rule-dictionaries',
+     'GET /admin/rule-dictionaries/new', 'GET /admin/rule-dictionaries/:id',
+     'POST /admin/rule-dictionaries/:id/publish',
+     'GET /admin/users', 'GET /admin/users/:id',
+     'POST /admin/users/:id/recheck', 'POST /admin/users/:id/reset-quota',
+     'GET /admin/metrics']
+  end
+
+  # 管理画面が持つ経路です。**すべて数え上げます。**
+  def admin_routes
+    lines = Rails.application.routes.routes.map do |route|
+      "#{route.verb} #{route.path.spec.to_s.sub('(.:format)', '')}"
+    end
+
+    lines.select { |line| line.include?('/admin') }
+  end
+
   def gate_keys
     %w[FOLLOWER_GATE_BASE_URL FOLLOWER_GATE_CLIENT_ID FOLLOWER_GATE_CREDENTIAL]
   end
@@ -117,6 +137,42 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
       expect { Rails.application.routes.recognize_path('/admin/users/1', method: :patch) }
         .to raise_error(ActionController::RoutingError)
     end
+
+    # **経路の一覧そのものを固定します**（PR #175 のレビュー・要修正 5 / M8）。
+    #
+    # 「その 1 本が無い」だけでは、別の書き方の経路（`.../set-plan` など）を
+    # 足しても素通りします。**管理画面が持つ経路を、すべて数え上げます。**
+    it '管理画面の経路は、決めたものだけです' do
+      expect(admin_routes).to match_array(expected_admin_routes)
+    end
+
+    # **書き込みの経路が、印の無い要求を通しません**（要修正 5 / M7）。
+    #
+    # API モードでは `protect_from_forgery` を書いても働かないことがあります。
+    # **この PR が足した経路そのもので確かめます。**
+    describe '書き込みの守り' do
+      before { ActionController::Base.allow_forgery_protection = true }
+
+      after { ActionController::Base.allow_forgery_protection = false }
+
+      it '再判定は、印の無い書き込みを通しません' do
+        post "/admin/users/#{user.id}/recheck", headers: headers
+
+        expect(response).not_to have_http_status(:found)
+      end
+
+      it 'リセットは、印の無い書き込みを通しません' do
+        post "/admin/users/#{user.id}/reset-quota", headers: headers
+
+        expect(response).not_to have_http_status(:found)
+      end
+
+      it '印が無いことを理由に止めます' do
+        post "/admin/users/#{user.id}/recheck", headers: headers
+
+        expect(response.body).to include('InvalidAuthenticityToken')
+      end
+    end
   end
 
   describe 'クォータの手動リセット' do
@@ -189,6 +245,43 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
     it '本日の消費が無ければ、何も変えません' do
       expect { post "/admin/users/#{active.id}/reset-quota", headers: headers }
         .not_to change(AdminAction, :count)
+    end
+
+    # **生成中の枠には当てません**（PR #175 のレビュー・要修正 1）。
+    #
+    # 先に返してしまうと、動いているジョブが決着できず、**成果物は届いて
+    # いるのにジョブが失敗のまま残ります。**
+    describe '生成が動いている最中' do
+      def reserve!
+        request = PromptRequest.create!(project: project, target_model: 'midjourney',
+                                        inputs: {}, status: 'draft')
+        Quota::Reservation.reserve!(user: active, prompt_request: request)
+        request.transition_to!('queued')
+        request
+      end
+
+      it 'リセットを断ります' do
+        reserve!
+
+        post "/admin/users/#{active.id}/reset-quota", headers: headers
+
+        expect(QuotaConsumption.find_for(active, Quota::QuotaDay.of).status).to eq('reserved')
+      end
+
+      it '理由を伝えます' do
+        reserve!
+
+        post "/admin/users/#{active.id}/reset-quota", headers: headers
+
+        expect(flash[:alert]).to eq(I18n.t('admin.users.in_progress'))
+      end
+
+      it '記録を増やしません' do
+        reserve!
+
+        expect { post "/admin/users/#{active.id}/reset-quota", headers: headers }
+          .not_to change(AdminAction, :count)
+      end
     end
 
     it '本日の消費が無ければ、その旨を伝えます' do

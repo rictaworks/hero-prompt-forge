@@ -49,11 +49,21 @@ module Admin
       consumption = QuotaConsumption.find_for(user, quota_day)
 
       return redirect_to(admin_user_path(user), alert: t('admin.users.no_quota')) if consumption.nil?
+      return redirect_to(admin_user_path(user), alert: t('admin.users.in_progress')) if running?(consumption)
 
       reset!(user, consumption, quota_day)
     end
 
     private
+
+    # **生成中の枠には当てません**（PR #175 のレビュー・要修正 1）。
+    #
+    # 動いているジョブは、終わったときに枠を決着させます。先に返してしまうと、
+    # **決着する相手が見つからず、成果物は届いているのにジョブが失敗のまま
+    # 残ります。** 終わるのを待ってからリセットしてください。
+    def running?(consumption)
+      consumption.status == 'reserved'
+    end
 
     def reset!(user, consumption, quota_day)
       consumption.reset_by_admin!

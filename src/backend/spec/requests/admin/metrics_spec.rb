@@ -75,6 +75,33 @@ RSpec.describe '管理画面 : 利用状況' do # rubocop:disable RSpec/Describe
 
       expect(response.body).not_to include('1234509876')
     end
+
+    # **内部の識別子も出しません**（PR #175 のレビュー・要修正 5 / M9）。
+    #
+    # 「表示名と X のユーザーIDが出ない」だけでは、`users.id` の軸を足しても
+    # 素通りします。**誰が何回使ったかを、この画面から読み取れないようにします。**
+    it '利用者の内部の識別子を出しません' do
+      user = user_with_requests(x_user_id: '1111111111', display_name: 'あか', count: 7)
+
+      get '/admin/metrics', headers: headers
+
+      expect(labelled_numbers(response.body)).not_to include(user.id.to_s)
+    end
+
+    it 'プロジェクトの内部の識別子を出しません' do
+      user_with_requests(x_user_id: '1111111111', display_name: 'あか', count: 1)
+      project = Project.last
+
+      get '/admin/metrics', headers: headers
+
+      expect(labelled_numbers(response.body)).not_to include(project.id.to_s)
+    end
+
+    # 表の見出し（`<th>`）に出る値だけを取り出します。
+    # **数そのもの（`<td>`）は集計の結果ですので、対象にしません。**
+    def labelled_numbers(body)
+      body.scan(%r{<th>([^<]*)</th>}).flatten.map(&:strip)
+    end
   end
 
   describe '集計の中身' do
