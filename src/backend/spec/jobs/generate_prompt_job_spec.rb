@@ -428,6 +428,67 @@ RSpec.describe GeneratePromptJob do
     end
   end
 
+  # **定時の拾い直しと、投入し直しが重なった場合です**（issue #181）。
+  #
+  # `perform_now` は待ち行列を経由しないため、`with_lock` の錠だけを
+  # 確かめます（上の「働き手が落ちた場合」）。**ここでは実際の Solid Queue
+  # を通し、待ち行列の同時実行の制限そのものを確かめます。** PR #176 の
+  # レビューで実際に再現した経路です：定時の拾い直しが新しい投入をした
+  # 最中に、もとの回が待ち行列から戻ってくると、`resumable?` は投入し直し
+  # （`executions` が 2 以上）を行の持ち時間を見ずに再開させるため、
+  # 2 つの投入が同時に組み立てへ進みます。
+  describe '定時の拾い直しと投入し直しが重なった場合' do
+    include ActiveJob::TestHelper
+
+    # **本物の Solid Queue を使います。** `:test` アダプタは同時実行の
+    # 制限を再現しません（待ち行列を経由せず、配列に積むだけのため）。
+    around do |example|
+      original_adapter = ActiveJob::Base.queue_adapter
+      ActiveJob::Base.queue_adapter = :solid_queue
+      example.run
+    ensure
+      ActiveJob::Base.queue_adapter = original_adapter
+    end
+
+    def abandoned(elapsed)
+      target = queued
+      target.transition_to!('generating')
+      target.update_column(:updated_at, elapsed.ago) # rubocop:disable Rails/SkipsModelValidations
+      target
+    end
+
+    # **投入するだけで確かめます。** 実際に組み立てさせると Solid Queue の
+    # 働き手プロセスが要りますので、ここでは「同時に実行可能な状態には
+    # ならない」ことを、待ち行列自身の記録（`SolidQueue::Job`）で確かめます。
+    it '同じ生成リクエストは、実行可能な状態に同時になりません' do
+      target = abandoned(described_class::STALE_AFTER + 1.minute)
+
+      # **もとの回が待ち行列から戻ってきた投入し直しです。**
+      first = described_class.perform_later(target.id)
+      # **その最中に、定時の拾い直しが行う新しい投入です。**
+      second = described_class.perform_later(target.id)
+
+      job_ids = [first.provider_job_id, second.provider_job_id]
+      ready = SolidQueue::ReadyExecution.where(job_id: job_ids)
+      blocked = SolidQueue::BlockedExecution.where(job_id: job_ids)
+
+      expect(ready.count).to eq(1)
+      expect(blocked.count).to eq(1)
+    end
+
+    # **後から来た投入は待ち行列に残ります。** 破棄されるわけではありません。
+    # 先の投入が確定・失敗のどちらで終わっても、行の状態は変わっているため、
+    # あとから解放されたときは `resumable?` が見送ります（無害な素通りです）。
+    it '後から来た投入は、破棄されず待ち行列に残ります' do
+      target = abandoned(described_class::STALE_AFTER + 1.minute)
+
+      described_class.perform_later(target.id)
+      second = described_class.perform_later(target.id)
+
+      expect(SolidQueue::Job.where(id: second.provider_job_id)).to exist
+    end
+  end
+
   # **確定だけが残った場合も、投入し直しで拾い直します。**
   describe 'クォータの確定が外れた場合' do
     def deliver_without_settlement
