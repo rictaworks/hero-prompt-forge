@@ -4,6 +4,7 @@ import {
   validate,
   type FormState,
 } from "@/components/requests/NewRequestForm";
+import { text } from "@/strings";
 
 /** 必須の 3 項目だけを埋めた入力です。 */
 function filled(overrides: Partial<FormState> = {}): FormState {
@@ -65,6 +66,57 @@ describe("入力フォームの検査", () => {
     );
 
     expect(found.brandColorSecond).toBeDefined();
+  });
+
+  // **イラスト・抽象にブランドカラーを添えると、生成が必ず失敗します**
+  // （`MissingSpecificationsError`、issue #184）。画面で選べなくします。
+  it.each(["illustration", "abstract"] as const)(
+    "スタイル系統が %s なら、ブランドカラーの指定を止めます",
+    (styleFamily) => {
+      const found = validate(
+        filled({ styleFamily, brandColorFirst: "#123456" }),
+      );
+
+      expect(found.brandColorFirst).toBeDefined();
+    },
+  );
+
+  it.each(["illustration", "abstract"] as const)(
+    "スタイル系統が %s でも、2 色目だけの指定を止めます",
+    (styleFamily) => {
+      const found = validate(
+        filled({ styleFamily, brandColorSecond: "#123456" }),
+      );
+
+      expect(found.brandColorFirst).toBeDefined();
+    },
+  );
+
+  it.each(["photoreal", "three_d"] as const)(
+    "スタイル系統が %s なら、ブランドカラーを指定できます",
+    (styleFamily) => {
+      const found = validate(
+        filled({ styleFamily, brandColorFirst: "#123456" }),
+      );
+
+      expect(found.brandColorFirst).toBeUndefined();
+    },
+  );
+
+  it("イラストでも、ブランドカラーを指定しなければ止めません", () => {
+    const found = validate(filled({ styleFamily: "illustration" }));
+
+    expect(found.brandColorFirst).toBeUndefined();
+  });
+
+  it("書き方の誤りがあれば、組み合わせの指摘より書き方の指摘を優先します", () => {
+    const found = validate(
+      filled({ styleFamily: "illustration", brandColorFirst: "青" }),
+    );
+
+    expect(found.brandColorFirst).toBe(
+      text("newRequest.errors.brandColorFormat"),
+    );
   });
 });
 

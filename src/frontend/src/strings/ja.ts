@@ -168,6 +168,8 @@ export const strings = {
       targetModelMissing: "生成モデルを選んでください。",
       serviceSummaryTooLong: "サービス概要は 1000 文字までです。",
       brandColorFormat: "ブランドカラーは #RRGGBB の形で入力してください。",
+      brandColorStyleConflict:
+        "イラスト・抽象のスタイル系統では、ブランドカラーを指定すると生成が必ず失敗します。ブランドカラーを空にするか、スタイル系統を変更してください。",
     },
   },
   // 生成中（04）です（issue #72）。

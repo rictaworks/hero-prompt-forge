@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Button, SectionHeading } from "@/components/ui";
 import { ErrorNotice, UnexpectedErrorNotice } from "@/components/feedback";
@@ -47,6 +47,17 @@ const NEW_PROJECT = "";
 /** 名前の書き方の例です（issue #152）。**3 つ以上示します。** */
 const NAMING_EXAMPLES = ["quoted", "reading", "company"] as const;
 
+/**
+ * ブランドカラーを添えると、生成が必ず失敗するスタイル系統です（issue #184）。
+ *
+ * **どちらも、スタイル仕様化規則の必須項目に配色（`palette`）を持ちます。**
+ * ブランドカラーを指定すると、その配色指定がアクセントへ弱められ、
+ * 撮影の指示を欠いた案として出力の直前で落ちます
+ * （`Generation::PromptGenerationService::MissingSpecificationsError`）。
+ * バックエンドの規則そのものは直さず、**画面でこの組み合わせを選べなくします。**
+ */
+const BRAND_COLOR_CONFLICTING_STYLE_FAMILIES = ["illustration", "abstract"] as const;
+
 export interface FormState {
   projectId: string;
   projectName: string;
@@ -79,6 +90,23 @@ export const EMPTY_FORM: FormState = {
 export type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 /**
+ * 画面が組み上がった（クライアントでマウントされた）かどうかです（issue #184）。
+ *
+ * **`useEffect` の中で `setState` を呼びません。** カスケードする再描画を
+ * 招くため、リンター（`react-hooks/set-state-in-effect`）が止めます。
+ * `useSyncExternalStore` は、サーバーでの初期値とクライアントでの値を
+ * 分けて返せる、この用途のために用意された仕組みです。**購読先を持ちません。**
+ * マウント後に値が変わることはありませんので、通知は行いません。
+ */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+}
+
+/**
  * 入力フォーム（03）です（issue #71、#152）。
  *
  * **必須の 3 項目を、画面で止めます。** 送ってから断られるのではなく、
@@ -101,6 +129,13 @@ export function NewRequestForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
+  // **画面が組み上がったかどうかです**（issue #184）。
+  //
+  // **サーバーが描いた HTML には、まだ送信処理（`onSubmit`）が付いていません。**
+  // 組み上がる前に送信ボタンが押されると、ブラウザの既定の動き（素の GET 送信）が
+  // 起き、`/requests/new?...` へ遷移して入力していただいた内容が消えます
+  // （実測で確認されました）。**マウントが完了するまで `disabled` を持たせます。**
+  const ready = useHydrated();
 
   // 履歴の「同じ条件で作る」から来た場合に、そのプロジェクトを選んでおきます。
   //
@@ -328,7 +363,7 @@ export function NewRequestForm() {
         <SavePreset form={form} />
 
         <div className={styles.submit}>
-          <Button variant="submit" disabled={submitting} fullWidth>
+          <Button variant="submit" disabled={submitting || !ready} fullWidth>
             {submitting
               ? text("newRequest.labels.submitting")
               : text("newRequest.labels.submit")}
@@ -730,8 +765,29 @@ export function validate(form: FormState): FieldErrors {
   if (form.brandColorSecond !== "" && !BRAND_COLOR_FORMAT.test(form.brandColorSecond)) {
     found.brandColorSecond = text("newRequest.errors.brandColorFormat");
   }
+  if (
+    found.brandColorFirst === undefined &&
+    found.brandColorSecond === undefined &&
+    hasBrandColorStyleConflict(form)
+  ) {
+    found.brandColorFirst = text("newRequest.errors.brandColorStyleConflict");
+  }
 
   return found;
+}
+
+/**
+ * ブランドカラーと、スタイル系統の配色指定が衝突する組み合わせです（issue #184）。
+ *
+ * **書き方の誤り（`brandColorFormat`）とは別に見ます。** 書き方が正しくても、
+ * この組み合わせでは生成が必ず失敗します。
+ */
+function hasBrandColorStyleConflict(form: FormState): boolean {
+  const family = form.styleFamily as (typeof BRAND_COLOR_CONFLICTING_STYLE_FAMILIES)[number];
+  const conflictingFamily = BRAND_COLOR_CONFLICTING_STYLE_FAMILIES.includes(family);
+  const hasBrandColor = form.brandColorFirst !== "" || form.brandColorSecond !== "";
+
+  return conflictingFamily && hasBrandColor;
 }
 
 /** 送る形へ直します。**空の項目は送りません。** */

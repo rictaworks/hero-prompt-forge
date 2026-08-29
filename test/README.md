@@ -65,16 +65,29 @@ npm run test:all
 
 ## レビューのための一時的な作業ツリー
 
-reviewer が PR の内容を実際に動かして確かめる場合は、`/.review/` の下に
-`git worktree` を作ります。**dev コンテナから見える位置に作る必要があります。**
+reviewer・pr-checker が PR の内容を実際に動かして確かめる場合は、`DELETE/`
+（ゴミ箱、リポジトリ直下の README.md を参照）の下に `git worktree` を作ります。
+**dev コンテナから見える位置に作る必要があります。**
 
 ```bash
-git worktree add .review/pr<PR番号> origin/<ブランチ名>
-docker compose exec dev bash -c 'cd /workspace/.review/pr<PR番号>/src/backend && bundle exec rspec'
+git worktree add DELETE/review-worktrees/pr<PR番号>-<日付>-<担当> origin/<ブランチ名>
+docker compose exec dev bash -c 'cd /workspace/DELETE/review-worktrees/pr<PR番号>-<日付>-<担当>/src/backend && bundle exec rspec'
 ```
 
-`/.review/` は版管理から外しています。**実装側の作業ツリーでブランチを
-切り替えないでください。** 別の作業と衝突します。
+**置き場は `DELETE/` の下の 1 か所に統一します。** 以前はここに `/.review/`
+という別の置き場も書かれており、`.gitignore` にも専用の除外行がありました。
+**ただし実際の運用では、ほぼすべてのレビュー記録が最初から `DELETE/` の下に
+作業ツリーを作っており、`/.review/` を経由していません。** PR #179 の
+pr-checker が「置き場の指定が 2 通りある」と指摘していました（issue #184）。
+`DELETE/` は「削除の代わりに移動する場所」としてすでにプロジェクト全体で
+使われていますので、レビュー用の作業ツリーもそこへ寄せます。**使われなく
+なった `/.review/` の除外行も `.gitignore` から取り除きました。**
+**別の置き場を新たに増やしません。**
+
+`DELETE/` は `.gitignore` で版管理から外しています（もとから追跡されていた
+ファイルを `git mv` した場合を除きます）。**確認が終わっても `git worktree`
+を削除コマンドで消さず、`DELETE/` の下に残したままにします。** 実装側の
+作業ツリーでブランチを切り替えないでください。別の作業と衝突します。
 
 ## 実行
 
