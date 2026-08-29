@@ -422,6 +422,22 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
       end
     end
 
+    # **「同じ条件で作り直す」ために要ります**（PR #174 のレビュー・重大 3）。
+    # 業種とスタイル系統だけでは、生成モデル・トーン・サービス概要・
+    # ブランドカラー・余白の位置・画角が失われます（issue #70）。
+    #
+    # **取り出しの契約から落としても、この検めが無ければ気づけません**
+    # （PR #182 のレビューより）。
+    describe '入力条件の取り出し' do
+      before { login_as(user) }
+
+      it '受け付けた入力条件をそのまま返します' do
+        get_request
+
+        expect(response.parsed_body['inputs']).to eq(input_fields.stringify_keys)
+      end
+    end
+
     describe '成果物を提供できた場合' do
       before do
         login_as(user)

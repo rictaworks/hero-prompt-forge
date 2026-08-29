@@ -32,8 +32,8 @@ RSpec.describe '管理画面 : 利用状況' do # rubocop:disable RSpec/Describe
 
   before do
     allow(ENV).to receive(:fetch).and_call_original
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return(name)
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::PASSWORD_KEY, nil).and_return(password)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::USER_NAME_KEY, nil).and_return(name)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::PASSWORD_KEY, nil).and_return(password)
   end
 
   describe '認証' do

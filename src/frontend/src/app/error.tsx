@@ -1,6 +1,7 @@
 "use client";
 
 import { UnexpectedErrorNotice } from "@/components/feedback";
+import { Button } from "@/components/ui";
 import { traceError } from "@/lib/logger";
 import { text } from "@/strings";
 import styles from "@/components/app/app-shell.module.css";
@@ -28,9 +29,9 @@ export default function Error({
       <main className={styles.main}>
         <UnexpectedErrorNotice traceId={error.digest} />
         <div>
-          <button type="button" onClick={reset}>
+          <Button variant="outline" onClick={reset}>
             {retryLabel()}
-          </button>
+          </Button>
         </div>
       </main>
     </div>

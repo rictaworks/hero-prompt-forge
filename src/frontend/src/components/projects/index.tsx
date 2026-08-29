@@ -142,7 +142,14 @@ function RequestPanel({
   );
 }
 
-function RequestRow({ request }: { request: PromptRequestSummary }) {
+/**
+ * 履歴の一覧の 1 行です。
+ *
+ * **テストから直に描けるよう、公開しています。** `request_id` を
+ * 引き継ぐ移動先（PR #174 のレビュー・重大 3）は、一覧全体を描かなくても
+ * 確かめられます。
+ */
+export function RequestRow({ request }: { request: PromptRequestSummary }) {
   const delivered = DELIVERED_STATUSES.includes(request.status);
 
   return (

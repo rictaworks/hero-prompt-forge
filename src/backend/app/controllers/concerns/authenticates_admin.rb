@@ -14,9 +14,12 @@ module AuthenticatesAdmin
 
   # 資格情報の置き場と、設定されていない場合の失敗は `Admin::Credentials` が持ちます。
   # **ここでは呼び名だけを引き継ぎます。**
+  #
+  # **環境変数の鍵の名前（`USER_NAME_KEY` ・ `PASSWORD_KEY`）はここへ引き継ぎません。**
+  # `Admin::Credentials` と 2 か所に並ぶと、片方だけを直したときに黙って
+  # 食い違います。**参照する側は `Admin::Credentials::USER_NAME_KEY` を
+  # 直接使います**（PR #182 の整備より）。
   MissingCredentialsError = Admin::Credentials::MissingCredentialsError
-  USER_NAME_KEY = Admin::Credentials::USER_NAME_KEY
-  PASSWORD_KEY = Admin::Credentials::PASSWORD_KEY
 
   # ブラウザの認証の窓に出る名前です。**利用者には見えません。**
   # 開発者だけが見るため、画面の文言とは別に持ちます。

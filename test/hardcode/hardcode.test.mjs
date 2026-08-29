@@ -49,14 +49,25 @@ test("雛形の属性の中の文言を検出します", () => {
   assert.ok(literals.includes("直書きの見出しです"));
 });
 
+// **一重引用符の属性も検出します**（PR #182 のレビューより）。
+// 見本が二重引用符しか使わないと、一重引用符の側だけを検査から落としても
+// 気づけません。
+test("一重引用符の属性の中の文言も検出します", () => {
+  const literals = scan(fixtures)
+    .filter((v) => v.file.replaceAll("\\", "/") === "src/backend/app/views/admin/ng.html.erb")
+    .map((v) => v.literal);
+
+  assert.ok(literals.includes("一重引用符の直書きです"));
+});
+
 test("雛形の注記と文言の呼び出しは検出しません", () => {
   const files = scan(fixtures).map((v) => v.file.replaceAll("\\", "/"));
 
   assert.ok(!files.includes("src/backend/app/views/admin/ok.html.erb"));
 });
 
-test("検出した件数は4件です", () => {
-  assert.equal(scan(fixtures).length, 4);
+test("検出した件数は5件です", () => {
+  assert.equal(scan(fixtures).length, 5);
 });
 
 test("開発者向けの印が付いた行は検出しません", () => {
