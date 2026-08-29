@@ -8,32 +8,35 @@ import { expect, test } from "@playwright/test";
  * `onSubmit` がまだ付いていないため、ブラウザの既定の動き（素の GET 送信）が
  * 起き、`/requests/new?...` へ遷移して入力していただいた内容が消えます。
  *
- * **組み上がる前の状態を、意図的に作ります。** `_next` の静的資産（JS・CSS）を
- * 遅らせ、HTML の到着とスクリプトの実行の間に間を空けます。
+ * **ネットワークの遅延で「組み上がる前」を再現しません。** JS の読み込みを
+ * 遅らせて狙う方法は、CI（本番と同じ組み立て）と手元の開発サーバーとで
+ * 読み込みの速さが違い、狙った瞬間を安定して捕まえられませんでした
+ * （実測：手元では捕まえられても、CI では組み上がりが速く、5 秒の間ずっと
+ * 押せる状態のままでした）。**サーバーが描いた HTML そのもの**を確かめれば、
+ * JavaScript がまったく動いていない状態（＝組み上がる前のどの瞬間でも）で
+ * ボタンが押せないことを、タイミングに左右されずに確かめられます。
  */
-async function delayHydration(page: import("@playwright/test").Page, ms: number) {
-  await page.route("**/_next/**", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-    await route.continue();
-  });
-}
-
 test.describe("入力フォーム（03）・組み上がる前の送信保護", () => {
-  // 手順 1：組み上がる前は、送信ボタンが押せないこと
-  test("組み上がる前は、送信ボタンが押せません", async ({ page }) => {
-    await delayHydration(page, 1500);
+  // 手順 1：サーバーが描いた時点の HTML に、送信ボタンの disabled が
+  // 含まれていること（＝ JavaScript が 1 行も動く前から押せません）
+  test("サーバーが描いた HTML の時点で、送信ボタンは押せない形になっています", async ({
+    page,
+    baseURL,
+  }) => {
+    const response = await page.request.get(`${baseURL}/requests/new`);
+    const html = await response.text();
 
-    await page.goto("/requests/new", { waitUntil: "domcontentloaded" });
+    // **この画面の `type="submit"` は、送信ボタン 1 つだけです。** 他のボタン
+    // （プリセット保存・入力を修正する 等）は `type="button"` か、初期表示では
+    // 描かれません。
+    const button = html.match(/<button[^>]*type="submit"[^>]*>/);
 
-    await expect(
-      page.getByRole("button", { name: "3 案を生成" }),
-    ).toBeDisabled();
+    expect(button).not.toBeNull();
+    expect(button?.[0]).toMatch(/\bdisabled(="{2}|\s|>)/);
   });
 
   // 手順 2：組み上がれば、送信ボタンが押せるようになること
   test("組み上がれば、送信ボタンが押せるようになります", async ({ page }) => {
-    await delayHydration(page, 1500);
-
     await page.goto("/requests/new", { waitUntil: "domcontentloaded" });
 
     await expect(
