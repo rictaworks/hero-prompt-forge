@@ -86,11 +86,6 @@ class Loader {
 
 const loader = new Loader();
 
-/** テストから読み直せるようにします。**本番の経路では使いません。** */
-export function resetLoader(): void {
-  Object.assign(loader, new Loader());
-}
-
 /**
  * 合図を返します。**鍵が無い環境では `null` です。**
  *

@@ -67,7 +67,11 @@ module Generation
     SPECIFICATIONS_NOTE_KIND = :style_spec_applied
 
     # 人物の構図の役割です。**整形の段（issue #156）が引きます。**
-    PERSON_SAFETY_ROLE = 'person_safety'
+    #
+    # **バリエーションの展開（issue #50）が持つ名前をそのまま使います。**
+    # 書き写すと、片方だけを直したときに黙って食い違います（PR #182 の
+    # 整備より）。
+    PERSON_SAFETY_ROLE = VariationBuilder::PERSON_SAFETY_ROLE
     PERSON_SAFETY_NOTE_KIND = :person_safety_applied
     # 構図を当てなかったことを残す印です。**理由を添えます。**
     PERSON_SAFETY_SKIPPED_NOTE_KIND = :person_safety_skipped
@@ -212,8 +216,15 @@ module Generation
     end
 
     # **役割の名前も一緒に残します**（issue #156）。
+    #
+    # **`index_with(...).invert` を使いません。** `役割 => 素材` を
+    # `素材 => 役割` へ組んでから逆にする書き方は、素材が 2 件以上になると
+    # 逆変換の時点で片方だけを黙って残します（同じ役割の名前を鍵にした
+    # ハッシュには、値を 1 件しか持てないためです）。**当てる構図は
+    # 1 件だけです**（`safety_decision` の `compositions.first(1)`）ので、
+    # 先頭の 1 件から直接組み立てます（PR #182 の整備より）。
     def applied_note(decision)
-      roles = decision[:compositions].index_with { PERSON_SAFETY_ROLE }.invert
+      roles = { PERSON_SAFETY_ROLE => decision[:compositions].first }
 
       with_source({ kind: PERSON_SAFETY_NOTE_KIND, compositions: decision[:compositions],
                     roles: roles }, decision)

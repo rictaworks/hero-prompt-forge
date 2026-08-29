@@ -50,8 +50,8 @@ RSpec.describe '管理画面 : 利用者' do # rubocop:disable RSpec/DescribeCla
 
   before do
     allow(ENV).to receive(:fetch).and_call_original
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return(name)
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::PASSWORD_KEY, nil).and_return(password)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::USER_NAME_KEY, nil).and_return(name)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::PASSWORD_KEY, nil).and_return(password)
     gate_keys.each do |key|
       allow(ENV).to receive(:fetch).with(key).and_return("#{key.downcase}-for-spec")
     end

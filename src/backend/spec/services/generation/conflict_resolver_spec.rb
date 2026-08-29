@@ -407,6 +407,16 @@ RSpec.describe Generation::ConflictResolver do
       expect(note[:weakened]).to eq('a restrained palette led by the brand accent')
     end
 
+    # **弱めた配色の役割も残します**（issue #156）。**もとの素材の役割
+    # （`palette`）を引き継ぎます。** 引き継がないと、整形の段が役割を
+    # 見失い、弱めた素材が既定の述語（`The image shows ...`）で述べられます
+    # （PR #182 のレビューより）。
+    it '弱めた配色の役割を残します' do
+      note = palette_notes(resolver.resolve(styled)).first
+
+      expect(note[:roles]).to eq(Generation::StylePalette::ROLE => 'a restrained palette led by the brand accent')
+    end
+
     # **ブランドカラーの指定が無ければ、衝突しません。**
     it 'ブランドカラーの指定が無ければ、そのままにします' do
       bare = draft_for(style_family: 'abstract').add(main_terms: [palette_term])

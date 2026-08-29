@@ -38,6 +38,27 @@ RSpec.describe Admin::Credentials do
     it '値が無い場合でも、実施者を返しません' do
       expect(credentials.actor_for(nil, nil)).to be_nil
     end
+
+    # **`&` を使い、両方の照合を必ず行います**（時間の差で、利用者名と
+    # 合言葉のどちらが違うのかが漏れないようにするためです）。**`&&` に
+    # 変えると、利用者名が違った時点で合言葉の照合を省きます。**
+    # コメントで守っているだけの状態でしたので、直接の検めを足します
+    # （PR #182 のレビューより）。
+    it '利用者名が違っても、合言葉の照合を省きません' do
+      allow(ActiveSupport::SecurityUtils).to receive(:secure_compare).and_call_original
+
+      credentials.actor_for('stranger', password)
+
+      expect(ActiveSupport::SecurityUtils).to have_received(:secure_compare).twice
+    end
+
+    it '合言葉が違っても、両方の照合を行います' do
+      allow(ActiveSupport::SecurityUtils).to receive(:secure_compare).and_call_original
+
+      credentials.actor_for(name, 'wrong')
+
+      expect(ActiveSupport::SecurityUtils).to have_received(:secure_compare).twice
+    end
   end
 
   describe '.from_env' do

@@ -1,19 +1,28 @@
 /**
  * @jest-environment jsdom
  */
-import { RecaptchaLoadError, humanToken, resetLoader } from "@/lib/recaptcha";
+import type * as Recaptcha from "@/lib/recaptcha";
 
 /**
  * 人の操作の合図です（PR #174 のレビュー・要修正 11）。
  *
  * **読み込みが一度失敗しても、次に押したときに取り直せます。**
  * 断られた約束を持ち続けると、画面を開き直すまで必ず失敗します。
+ *
+ * **持ち回しの読み直しに、本番の経路へ出す関数を使いません。**
+ * `jest.resetModules()` でモジュールを丸ごと読み直し、テストごとに
+ * 新しい持ち回しを得ます（PR #182 の整備より・テスト専用の抜け道を
+ * 本番の束に出さないためです）。
  */
 describe("人の操作の合図", () => {
   const original = process.env;
+  let humanToken: typeof Recaptcha.humanToken;
+  let RecaptchaLoadError: typeof Recaptcha.RecaptchaLoadError;
 
   beforeEach(() => {
-    resetLoader();
+    jest.resetModules();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- モジュールを丸ごと読み直すためです。
+    ({ humanToken, RecaptchaLoadError } = require("@/lib/recaptcha") as typeof Recaptcha);
     document.head.innerHTML = "";
     delete window.grecaptcha;
   });

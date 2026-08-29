@@ -73,6 +73,28 @@ RSpec.describe '自然文の述語' do # rubocop:disable RSpec/DescribeClass
         expect(sentence).to include('clear copy space across the left third of the frame')
       end
 
+      # **人物の構図の役割を落とすと、既定の述語（`The image shows ...`）で
+      # 述べられます。issue #156 が直そうとした形そのものです**（PR #182 の
+      # レビューより）。控えの役割から役割を落としても、どのテストにも
+      # 当たらないまま通ります。
+      #
+      # **先頭の案（variation 0）では確かめません。** 先頭の案は、当てた
+      # 構図と選び直した構図がたまたま同じ値になるため、役割を選び直したあとの
+      # 値へそろえ損ねても、たまたま正しい値のままに見えます。**2 番目の案
+      # （variation 1）は選び直した構図が変わりますので、そろえ損ねが見えます。**
+      it '人物の構図を、構図の述語で述べます（選び直した 2 番目の案）' do
+        prompt = packages(target_model: model)[1].formatted.main_prompt
+        sentence = prompt.split('. ').find { |item| item.start_with?('The composition keeps') }
+
+        expect(sentence).to include('hands cropped out of the frame')
+      end
+
+      it '人物の構図を、既定の文では述べません（選び直した 2 番目の案）' do
+        prompt = packages(target_model: model)[1].formatted.main_prompt
+
+        expect(shows_sentence(prompt).to_s).not_to include('hands cropped out of the frame')
+      end
+
       it '配色を、配色の述語で述べます' do
         prompt = main_prompt(target_model: model)
 

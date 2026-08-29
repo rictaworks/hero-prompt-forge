@@ -13,8 +13,8 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
 
   before do
     allow(ENV).to receive(:fetch).and_call_original
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return(name)
-    allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::PASSWORD_KEY, nil).and_return(password)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::USER_NAME_KEY, nil).and_return(name)
+    allow(ENV).to receive(:fetch).with(Admin::Credentials::PASSWORD_KEY, nil).and_return(password)
   end
 
   describe '認証がないとき' do
@@ -50,6 +50,25 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
 
       expect(response).to have_http_status(:unauthorized)
     end
+
+    # **通らなかった名前を「実施者」として控えません**（issue #177 の M12）。
+    #
+    # **いまは、認証そのものが壊れることで間接に守っています。** 通った
+    # 名前だけを実施者にする書き換え（`@admin_actor = name` のように、
+    # 照合結果を見ずに候補の名前をそのまま控える書き換え）が起きても、
+    # 認証は落ちますので気づけます。**しかし「実施者が残らないこと」自体は、
+    # ここまでどのテストも直接検めていません**（PR #182 のレビューより）。
+    it '利用者名が違っても、実施者は残りません' do
+      get '/admin', headers: { 'HTTP_AUTHORIZATION' => with_credentials(user: 'stranger') }
+
+      expect(controller.send(:admin_actor)).to be_nil
+    end
+
+    it '合言葉が違っても、実施者は残りません' do
+      get '/admin', headers: { 'HTTP_AUTHORIZATION' => with_credentials(secret: 'wrong') }
+
+      expect(controller.send(:admin_actor)).to be_nil
+    end
   end
 
   describe '資格情報が正しいとき' do
@@ -77,7 +96,7 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
   # 空文字と照合して通すと、設定し忘れた環境で誰でも開ける状態になります。
   describe '資格情報が設定されていないとき' do
     before do
-      allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with(Admin::Credentials::USER_NAME_KEY, nil).and_return(nil)
     end
 
     it '失敗させます' do
@@ -86,7 +105,7 @@ RSpec.describe '管理画面' do # rubocop:disable RSpec/DescribeClass
     end
 
     it '空文字でも失敗させます' do
-      allow(ENV).to receive(:fetch).with(AuthenticatesAdmin::USER_NAME_KEY, nil).and_return('')
+      allow(ENV).to receive(:fetch).with(Admin::Credentials::USER_NAME_KEY, nil).and_return('')
 
       expect { get '/admin', headers: { 'HTTP_AUTHORIZATION' => with_credentials } }
         .to raise_error(AuthenticatesAdmin::MissingCredentialsError)

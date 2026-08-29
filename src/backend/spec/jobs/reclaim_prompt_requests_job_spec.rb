@@ -250,5 +250,16 @@ RSpec.describe ReclaimPromptRequestsJob do
       expect(schedule.dig('production', 'reclaim_prompt_requests', 'class'))
         .to eq(described_class.name)
     end
+
+    # **間隔は、置き去りと見なすまでの時間と釣り合わせます**（config/recurring.yml のコメントより）。
+    # 短くしすぎると、組み立ての最中の行へ何度も投入を重ねます。長くしすぎると、
+    # 一度見送られた回の再挑戦が遅れます。**値そのものを検めなければ、間隔を
+    # 大きく変えても気づけません**（PR #182 のレビューより）。
+    it '間隔は、置き去りと見なすまでの時間と釣り合っています' do
+      schedule = YAML.safe_load_file(Rails.root.join('config/recurring.yml'), aliases: true)
+
+      expect(schedule.dig('production', 'reclaim_prompt_requests', 'schedule'))
+        .to eq('every 5 minutes')
+    end
   end
 end
