@@ -8,31 +8,35 @@ import { expect, test } from "@playwright/test";
  * `onSubmit` がまだ付いていないため、ブラウザの既定の動き（素の GET 送信）が
  * 起き、`/requests/new?...` へ遷移して入力していただいた内容が消えます。
  *
- * **ネットワークの遅延で「組み上がる前」を再現しません。** JS の読み込みを
- * 遅らせて狙う方法は、CI（本番と同じ組み立て）と手元の開発サーバーとで
- * 読み込みの速さが違い、狙った瞬間を安定して捕まえられませんでした
- * （実測：手元では捕まえられても、CI では組み上がりが速く、5 秒の間ずっと
- * 押せる状態のままでした）。**サーバーが描いた HTML そのもの**を確かめれば、
- * JavaScript がまったく動いていない状態（＝組み上がる前のどの瞬間でも）で
- * ボタンが押せないことを、タイミングに左右されずに確かめられます。
+ * **組み上がりの速さに左右されない形で確かめます。** ネットワークを遅らせて
+ * 「組み上がる前」の一瞬を狙う方法は、開発サーバー（`npm run dev`）と
+ * 本番相当の組み立て（`npm run start`）とで組み上がる速さが大きく違い、
+ * 安定して捕まえられませんでした（実測）。**代わりに、`domcontentloaded`
+ * 直後という最も早いタイミングで、実際にボタンへ素のクリックを送り込み、
+ * その結果として `?` を含む URL へ遷移しないことを確かめます。** ボタンが
+ * まだ描かれていなければクリックは何も起こさず、描かれていれば
+ * `disabled` かどうかに関わらず、この確認がそのまま結果を保証します。
  */
 test.describe("入力フォーム（03）・組み上がる前の送信保護", () => {
-  // 手順 1：サーバーが描いた時点の HTML に、送信ボタンの disabled が
-  // 含まれていること（＝ JavaScript が 1 行も動く前から押せません）
-  test("サーバーが描いた HTML の時点で、送信ボタンは押せない形になっています", async ({
+  // 手順 1：もっとも早いタイミングで送信ボタンへクリックを送っても、
+  // 素の GET 送信（`?` 付きの URL への遷移）が起きないこと
+  test("もっとも早いタイミングで押しても、素の GET 送信は起きません", async ({
     page,
-    baseURL,
   }) => {
-    const response = await page.request.get(`${baseURL}/requests/new`);
-    const html = await response.text();
+    await page.goto("/requests/new", { waitUntil: "domcontentloaded" });
 
-    // **この画面の `type="submit"` は、送信ボタン 1 つだけです。** 他のボタン
-    // （プリセット保存・入力を修正する 等）は `type="button"` か、初期表示では
-    // 描かれません。
-    const button = html.match(/<button[^>]*type="submit"[^>]*>/);
+    // **Playwright の待ち合わせを経由しません。** 通常の `click()` は要素が
+    // 押せる状態になるまで自動で待つため、この確認の意味がなくなります。
+    await page.evaluate(() => {
+      document
+        .querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.click();
+    });
 
-    expect(button).not.toBeNull();
-    expect(button?.[0]).toMatch(/\bdisabled(="{2}|\s|>)/);
+    // 素の GET 送信が起きていれば、この間にページ全体の遷移が終わります。
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+
+    await expect(page).toHaveURL(/\/requests\/new$/);
   });
 
   // 手順 2：組み上がれば、送信ボタンが押せるようになること
