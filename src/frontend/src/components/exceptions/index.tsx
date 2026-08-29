@@ -35,6 +35,23 @@ export interface QuotaPanelProps {
    * 既定へ寄せると、時刻を出さない上限到達の画面が黙って出ます。
    */
   resetAt: string;
+  /**
+   * 使い切った枠の状態です（`details.status`）。**`confirmed` のときだけ、
+   * モックの3行目「状態」を出します**（issue #183、`app-ui/degraded.html`）。
+   *
+   * `reserved`（前の生成がまだ進行中）は、まだ完了していないという意味で
+   * 「confirmed（完了により確定）」と表示すると誤りになるため出しません。
+   * モックはこの区別を持たない（確定した1例だけを示す）ため、無い場合の
+   * 見せ方は実装側で決めています。
+   */
+  status?: string;
+  /**
+   * 本日確定した生成リクエストの識別子です（`details.result_prompt_request_id`）。
+   *
+   * **`status` が `confirmed` のときだけ添えられます。** ある場合だけ、
+   * 「本日の結果を見る」を出し、結果画面（`/requests/:id/result`）へ導きます。
+   */
+  resultRequestId?: number;
 }
 
 /**
@@ -48,7 +65,13 @@ export interface QuotaPanelProps {
  * **午前 0 時ではありません。** どの日ぶんを使ったのかが分からないと、
  * 「昨日使ったのに、まだ使えないのはなぜか」が説明できません。
  */
-export function QuotaPanel({ message, nextAction, resetAt }: QuotaPanelProps) {
+export function QuotaPanel({
+  message,
+  nextAction,
+  resetAt,
+  status,
+  resultRequestId,
+}: QuotaPanelProps) {
   const reset = spellDateTime(resetAt);
   const quotaDay = spellQuotaDay(resetAt);
 
@@ -78,6 +101,16 @@ export function QuotaPanel({ message, nextAction, resetAt }: QuotaPanelProps) {
             </span>
             <span className={styles.factsValue}>{quotaDay}</span>
           </div>
+          {status === "confirmed" ? (
+            <div className={styles.factsRow}>
+              <span className={styles.factsKey}>
+                {text("exceptions.labels.quotaStateHeading")}
+              </span>
+              <span className={styles.factsValue}>
+                {text("exceptions.labels.quotaStateConfirmed")}
+              </span>
+            </div>
+          ) : null}
           <div className={styles.factsRow}>
             <span className={styles.factsKey}>
               {text("exceptions.labels.quotaRefundHeading")}
@@ -88,6 +121,15 @@ export function QuotaPanel({ message, nextAction, resetAt }: QuotaPanelProps) {
           </div>
           <p className={styles.factsNote}>{text("exceptions.quotaNote")}</p>
           <div className={styles.actions}>
+            {resultRequestId !== undefined ? (
+              <Button
+                variant="outline"
+                icon="chevron-right"
+                href={`/requests/${resultRequestId}/result`}
+              >
+                {text("exceptions.labels.resultLink")}
+              </Button>
+            ) : null}
             <Link className={styles.actionLink} href="/projects">
               {text("exceptions.labels.historyLink")}
             </Link>
@@ -282,6 +324,29 @@ export function resetAtOf(error: ApiError): string {
     throw new MissingResetAtError("上限到達に次回のリセット時刻がありません。"); // 開発者向け
   }
   return value;
+}
+
+/**
+ * 使い切った枠の状態を取り出します（`details.status`、issue #183）。
+ *
+ * **形が違えば、何も返しません。** `confirmed` 以外の値のときは、画面側が
+ * 「状態」の行を出しません。
+ */
+export function quotaStatusOf(error: ApiError): string | undefined {
+  const value = error.details.status;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * 本日確定した生成リクエストの識別子を取り出します
+ * （`details.result_prompt_request_id`、issue #183）。
+ *
+ * **確定（`confirmed`）のときだけ添えられます。** 予約中（`reserved`）は、
+ * まだ見せられる結果がありません。**形が違えば、何も返しません。**
+ */
+export function resultRequestIdOf(error: ApiError): number | undefined {
+  const value = error.details.result_prompt_request_id;
+  return typeof value === "number" ? value : undefined;
 }
 
 function isReason(value: unknown): value is ForbiddenReason {

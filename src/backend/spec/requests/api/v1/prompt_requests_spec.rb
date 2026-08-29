@@ -364,6 +364,53 @@ RSpec.describe '生成リクエスト API' do # rubocop:disable RSpec/DescribeCl
       it 'ジョブを投入しません' do
         expect { post_request }.not_to have_enqueued_job(GeneratePromptJob)
       end
+
+      # **画面（issue #183）が、まだ結果の無い状態を「確定」と誤って
+      # 出さないためです。**
+      it '状態は予約中として添えます' do
+        post_request
+
+        expect(error_body.dig('details', 'status')).to eq('reserved')
+      end
+
+      it '本日の結果の識別子は添えません（まだ結果がありません）' do
+        post_request
+
+        expect(error_body['details']).not_to have_key('result_prompt_request_id')
+      end
+    end
+
+    # **本日すでに1件完了しているときです**（issue #183）。
+    # 「本日の結果を見る」導線の行き先を決めるために、識別子を添えます。
+    describe '本日すでに確定している場合' do
+      before { login_as(user) }
+
+      def confirmed_request
+        request = PromptRequest.create!(project: project, target_model: 'midjourney',
+                                        inputs: input_fields.transform_keys(&:to_s))
+        Quota::Reservation.reserve!(user: user, prompt_request: request)
+        request.transition_to!('queued')
+        request.transition_to!('generating')
+        request.transition_to!('completed')
+        Quota::Reservation.settle!(request)
+        request
+      end
+
+      it '状態を確定済みとして添えます' do
+        confirmed_request
+
+        post_request
+
+        expect(error_body.dig('details', 'status')).to eq('confirmed')
+      end
+
+      it '本日確定した生成リクエストの識別子を添えます' do
+        request = confirmed_request
+
+        post_request
+
+        expect(error_body.dig('details', 'result_prompt_request_id')).to eq(request.id)
+      end
     end
   end
 

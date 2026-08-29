@@ -41,11 +41,39 @@ RSpec.describe Quota::Reservation do
         }
     end
 
+    # **画面（issue #183）が、予約中と確定済みを取り違えないためです。**
+    # 予約中は、まだ見せられる結果がありません。
+    it '予約中のまま上限に達したときは、状態を予約中として添えます' do
+      described_class.reserve!(user: user, now: now)
+
+      expect { described_class.reserve!(user: user, now: now) }
+        .to raise_error(described_class::ExhaustedError) { |error|
+          expect(error.status).to eq('reserved')
+          expect(error.prompt_request_id).to be_nil
+        }
+    end
+
     it '確定済みでも二度目は予約できません' do
       described_class.reserve!(user: user, now: now).transition_to!('confirmed')
 
       expect { described_class.reserve!(user: user, now: now) }
         .to raise_error(described_class::ExhaustedError)
+    end
+
+    # **確定済みの生成リクエストの識別子を添えます。** 画面の「本日の結果を
+    # 見る」導線（issue #183）が、この識別子で結果画面へ飛びます。
+    it '確定済みのときは、状態と本日確定した生成リクエストの識別子を添えます' do
+      described_class.reserve!(user: user, prompt_request: prompt_request, now: now)
+      prompt_request.transition_to!('queued')
+      prompt_request.transition_to!('generating')
+      prompt_request.transition_to!('completed')
+      described_class.settle!(prompt_request)
+
+      expect { described_class.reserve!(user: user, now: now) }
+        .to raise_error(described_class::ExhaustedError) { |error|
+          expect(error.status).to eq('confirmed')
+          expect(error.prompt_request_id).to eq(prompt_request.id)
+        }
     end
 
     it '日が変われば予約できます' do

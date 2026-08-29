@@ -121,8 +121,18 @@ module Api
       def render_quota_exhausted(error)
         render_error(code: 'quota_exhausted', scope: 'quota_exhausted',
                      status: :too_many_requests,
-                     details: { reset_at: error.reset_at.iso8601 },
+                     details: quota_exhausted_details(error),
                      reset_at: spelled(error.reset_at))
+      end
+
+      # **`result_prompt_request_id` は、確定済み（`confirmed`）のときだけ
+      # 添えます**（issue #183）。予約中（`reserved`）は、まだ見せられる
+      # 結果がありません。
+      def quota_exhausted_details(error)
+        base = { reset_at: error.reset_at.iso8601, status: error.status }
+        return base if error.prompt_request_id.nil?
+
+        base.merge(result_prompt_request_id: error.prompt_request_id)
       end
     end
   end

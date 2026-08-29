@@ -93,7 +93,8 @@ module Quota
       # もとの例外をそのまま投げ直させます。
       def translation_for(user, quota_day, prompt_request)
         # その日の記録がすでにあるなら、並列に投入されて先を越されています。
-        return exhausted(quota_day) if QuotaConsumption.find_for(user, quota_day)
+        existing = QuotaConsumption.find_for(user, quota_day)
+        return exhausted(quota_day, existing) if existing
 
         dangling_reservation(prompt_request)
       end
@@ -125,7 +126,7 @@ module Quota
           elsif consumption.status == 'refunded'
             reclaim!(consumption, prompt_request)
           else
-            raise exhausted(quota_day)
+            raise exhausted(quota_day, consumption)
           end
         end
       end
@@ -190,8 +191,19 @@ module Quota
         Metrics::SideChannel.record(MetricEvent::QUOTA_RECLAIMED, now: now)
       end
 
-      def exhausted(quota_day)
-        ExhaustedError.new(quota_day: quota_day, reset_at: QuotaDay.reset_at(quota_day))
+      # **`prompt_request_id` は確定済み（`confirmed`）のときだけ添えます。**
+      # 予約中（`reserved`）は、生成がまだ進行中で、見せられる結果がありません
+      # （issue #183）。
+      def exhausted(quota_day, consumption)
+        ExhaustedError.new(quota_day: quota_day, reset_at: QuotaDay.reset_at(quota_day),
+                           status: consumption.status,
+                           prompt_request_id: result_request_id(consumption))
+      end
+
+      def result_request_id(consumption)
+        return nil unless consumption.status == 'confirmed'
+
+        consumption.prompt_request_id
       end
     end
   end
