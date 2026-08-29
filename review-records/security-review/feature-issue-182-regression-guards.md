@@ -32,3 +32,26 @@
   - `authenticates_admin.rb`：未使用だった別名定数（`USER_NAME_KEY` / `PASSWORD_KEY`）を削除（挙動は不変）
   - `recaptcha.ts` / `error.tsx`：テスト専用の抜け道（`resetLoader`）の削除、素の `<button>` を `Button` コンポーネントへ統一（挙動は不変）
 - `resetLoader` の削除は、テスト専用のリセット関数が本番の公開面（named export）から消えるため、攻撃面をわずかに縮小する変更（プラスの効果）
+
+---
+
+## 2回目（記録のみの追加）
+
+- 実施日時（JST）：2026-08-29
+- 差分の指紋：e3b0c44298fc1c14（`review-records/` を除く差分は 0 バイトで、空文字列のハッシュと一致）
+- 対象：reviewer 記録（`review-records/reviewer/pr187.md`）と pr-checker 記録（`review-records/pr-checker/pr187.md`）の追加のみ
+
+### 判定
+
+合格
+
+### 実施した検査
+
+| 検査 | 方法 | 結果 |
+|---|---|---|
+| 資格情報の混入 | gitleaks 8.30.1 `protect --staged` | 検出なし |
+| コードの変更有無 | `git diff --cached -- . ':(exclude)review-records/'` | 0 バイト（記録ファイルの追加のみ） |
+
+### 指摘
+
+指摘はありません。
