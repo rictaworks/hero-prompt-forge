@@ -8,8 +8,10 @@ import { ErrorNotice, UnexpectedErrorNotice } from "@/components/feedback";
 import {
   QuotaPanel,
   RejectionPanel,
+  quotaStatusOf,
   reasonsOf,
   resetAtOf,
+  resultRequestIdOf,
 } from "@/components/exceptions";
 import { RECAPTCHA_TOKEN_HEADER } from "@/config/recaptcha";
 import { apiGet, apiPost } from "@/lib/api";
@@ -365,6 +367,8 @@ function SubmitFeedback({
         message={error.message}
         nextAction={error.nextAction}
         resetAt={resetAtOf(error)}
+        status={quotaStatusOf(error)}
+        resultRequestId={resultRequestIdOf(error)}
       />
     );
   }

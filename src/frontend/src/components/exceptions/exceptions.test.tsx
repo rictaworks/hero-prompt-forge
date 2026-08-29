@@ -5,8 +5,10 @@ import {
   QuotaPanel,
   RejectionPanel,
   marked,
+  quotaStatusOf,
   reasonsOf,
   resetAtOf,
+  resultRequestIdOf,
   spellQuotaDay,
 } from "@/components/exceptions";
 import { ApiError } from "@/types/api";
@@ -103,6 +105,92 @@ describe("上限到達", () => {
 
   it("日時として読めなければ失敗させます", () => {
     expect(() => spellQuotaDay("こわれた値")).toThrow(MissingResetAtError);
+  });
+
+  // **モックは3行目に「状態」を持ちます**（issue #183、`app-ui/degraded.html`）。
+  // **確定（confirmed）のときだけ出します。** 予約中は、まだ完了していません。
+  describe("状態（issue #183）", () => {
+    it("確定済みのときは、状態の行を出します", () => {
+      render(
+        <QuotaPanel
+          message="m"
+          nextAction="n"
+          resetAt="2026-08-28T03:00:00+09:00"
+          status="confirmed"
+        />,
+      );
+
+      expect(screen.getByText("状態")).toBeVisible();
+      expect(screen.getByText("confirmed（完了により確定）")).toBeVisible();
+    });
+
+    it("予約中のときは、状態の行を出しません", () => {
+      render(
+        <QuotaPanel
+          message="m"
+          nextAction="n"
+          resetAt="2026-08-28T03:00:00+09:00"
+          status="reserved"
+        />,
+      );
+
+      expect(screen.queryByText("状態")).toBeNull();
+    });
+
+    it("状態が無ければ、状態の行を出しません", () => {
+      render(
+        <QuotaPanel message="m" nextAction="n" resetAt="2026-08-28T03:00:00+09:00" />,
+      );
+
+      expect(screen.queryByText("状態")).toBeNull();
+    });
+
+    it("形が違えば、状態を取り出しません", () => {
+      expect(quotaStatusOf(quotaError({ status: 12345 }))).toBeUndefined();
+    });
+
+    it("文字列であれば、その値を返します", () => {
+      expect(quotaStatusOf(quotaError({ status: "confirmed" }))).toBe("confirmed");
+    });
+  });
+
+  // **「本日の結果を見る」は、結果があるときだけ出します**（issue #183）。
+  describe("本日の結果を見る導線（issue #183）", () => {
+    it("本日確定した識別子があれば、結果への導線を出します", () => {
+      render(
+        <QuotaPanel
+          message="m"
+          nextAction="n"
+          resetAt="2026-08-28T03:00:00+09:00"
+          status="confirmed"
+          resultRequestId={42}
+        />,
+      );
+
+      const link = screen.getByRole("link", { name: /本日の結果を見る/ });
+      expect(link).toHaveAttribute("href", "/requests/42/result");
+    });
+
+    it("識別子が無ければ、導線を出しません", () => {
+      render(
+        <QuotaPanel
+          message="m"
+          nextAction="n"
+          resetAt="2026-08-28T03:00:00+09:00"
+          status="reserved"
+        />,
+      );
+
+      expect(screen.queryByRole("link", { name: /本日の結果を見る/ })).toBeNull();
+    });
+
+    it("形が違えば、識別子を取り出しません", () => {
+      expect(resultRequestIdOf(quotaError({ result_prompt_request_id: "42" }))).toBeUndefined();
+    });
+
+    it("数値であれば、その値を返します", () => {
+      expect(resultRequestIdOf(quotaError({ result_prompt_request_id: 42 }))).toBe(42);
+    });
   });
 });
 

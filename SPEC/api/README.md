@@ -264,7 +264,7 @@
 | `403` | `human_verification_failed` | 人の操作だと確かめられませんでした。**理由を返しません** |
 | `404` | `not_found` | プロジェクトが無い、または他人のものです |
 | `422` | `forbidden_input` | 禁止入力です。**クォータを消費しません。** `details` の中身は下の表のとおりです |
-| `429` | `quota_exhausted` | 本日の枠を使い切っています。**`details.reset_at` に次回のリセット時刻（JST 03:00）を添えます** |
+| `429` | `quota_exhausted` | 本日の枠を使い切っています。`details` の中身は下の表のとおりです |
 | `503` | `service_unavailable` | 照合そのものができませんでした |
 
 **人の操作の確かめ（reCAPTCHA v3）**
@@ -291,6 +291,14 @@
 | `reasons[].suggestion_key` | 直し方を引くための鍵です |
 
 **差し戻した記録には、自由に書いていただいた `service_summary` を残しません。** 権利に触れると判定した文章ですので、実在の方のお名前や商標を含みます。**業種・スタイル系統といった選択肢の値は、入力し直していただくときの手がかりとして残します。**
+
+**`429`（`quota_exhausted`）の `details`**
+
+| 項目 | 必須 | 内容 |
+|---|---|---|
+| `reset_at` | ○ | 次回のリセット時刻（JST 03:00）です |
+| `status` | ○ | 使い切った枠の状態です。`reserved`（前の生成がまだ進行中で、結果がありません） / `confirmed`（すでに完了しています） |
+| `result_prompt_request_id` | `status` が `confirmed` のときだけ | 本日確定した生成リクエストの識別子です。**結果画面（`GET /requests/:id/result`）への導線に使います** |
 
 ### `GET /api/v1/prompt_requests/:id`
 
