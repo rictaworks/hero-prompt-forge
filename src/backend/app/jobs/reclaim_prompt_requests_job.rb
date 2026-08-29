@@ -28,6 +28,12 @@
 class ReclaimPromptRequestsJob < ApplicationJob
   queue_as :default
 
+  # **同じ場所で毎回落ちる行を、際限なく拾い続けたと見なす理由です**
+  # （issue #181）。`record_failure` の理由（`reason_for`）は種別だけを
+  # 残すため、この名前がそのまま `rejection_reason` に記録されます。
+  # 利用者の入力は含みません。
+  class AbandonedError < StandardError; end
+
   # 1 回で投入する上限です。**次の回で続きを拾います。**
   BATCH_SIZE = 50
 
@@ -35,10 +41,28 @@ class ReclaimPromptRequestsJob < ApplicationJob
   # **書き写しません。** 片方だけを直すと、拾い直しが黙って発火しなくなります。
   STALE_AFTER = GeneratePromptJob::STALE_AFTER
 
+  # **拾い直しに上限を設けます**（issue #181・PR #176 のレビューより）。
+  #
+  # 働き手が同じ理由で毎回落ちる行（例：メモリ不足）は、`generating` の
+  # まま残り続けます。上限が無いと、5 分ごとに際限なく投入され続け、
+  # 1 回ごとに有償の呼び出しがかかります。
+  #
+  # **回数を数える列は増やしません。** 掴み手の印と同じく移行が要りますし、
+  # このリポジトリには既にクォータの日境界（`Quota::QuotaDay`、
+  # requirements.md 4.4）があります。**生成リクエストを作った時点の
+  # クォータ日と、いまのクォータ日がずれていれば、日をまたいでも組み立てに
+  # 一度も進めていない行**と見なし、打ち切ります（失敗として記録し、
+  # 枠を返します）。対象は `generating` のまま動きが無い行だけです。
+  # 決着だけが残っている行（`awaiting_settlement?` 側）は、組み立てを
+  # 終えていますので対象外です。
   def perform
-    ids = (stale_ids + unsettled_ids).uniq.first(BATCH_SIZE)
+    stale = stale_ids
+    abandoned = abandoned_ids(stale)
+    cut_off!(abandoned) if abandoned.any?
 
-    Trace.step('jobs.reclaim_prompt_requests', candidates: ids.size) do
+    ids = ((stale - abandoned) + unsettled_ids).uniq.first(BATCH_SIZE)
+
+    Trace.step('jobs.reclaim_prompt_requests', candidates: ids.size, abandoned: abandoned.size) do
       ids.each { |id| GeneratePromptJob.perform_later(id) }
       ids.size
     end
@@ -53,6 +77,24 @@ class ReclaimPromptRequestsJob < ApplicationJob
                  .order(:updated_at)
                  .limit(BATCH_SIZE)
                  .ids
+  end
+
+  # **日をまたいでも組み立てに進めていない行です。** 生成リクエストを
+  # 作った時点のクォータ日と、いまのクォータ日を比べます。
+  def abandoned_ids(ids)
+    return [] if ids.empty?
+
+    today = Quota::QuotaDay.of(Time.current)
+    PromptRequest.where(id: ids)
+                 .reject { |request| Quota::QuotaDay.of(request.created_at) == today }
+                 .map(&:id)
+  end
+
+  # **失敗として打ち切ります。** `GeneratePromptJob` の失敗記録
+  # （`record_failure`）をそのまま通します。行の遷移・理由の記録・
+  # クォータの返還を、この持ち場で書き写しません。
+  def cut_off!(ids)
+    ids.each { |id| GeneratePromptJob.new(id).record_failure(AbandonedError.new) }
   end
 
   # 決着だけが残っている行です。**枠が予約のまま残っています。**
