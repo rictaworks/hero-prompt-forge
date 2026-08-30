@@ -29,7 +29,7 @@ RSpec.describe 'database.yml' do
     ENV.replace(original)
   end
 
-  context 'TEST_DATABASE_URL を設定していないとき（本番の起動条件）' do
+  describe 'TEST_DATABASE_URL を設定していないとき（本番の起動条件）' do
     it 'ファイル全体の読み込みで例外になりません' do
       with_env('TEST_DATABASE_URL' => nil, 'DATABASE_URL' => 'postgres://example/production_only') do
         expect { ActiveSupport::ConfigurationFile.parse(database_yaml_path) }.not_to raise_error
@@ -53,7 +53,7 @@ RSpec.describe 'database.yml' do
     end
   end
 
-  context 'DATABASE_URL を設定していないとき' do
+  describe 'DATABASE_URL を設定していないとき' do
     # **本番の接続先には既定値を持たせません。** 気づかず既定値へつながると、
     # 本番のつもりで別のデータベースを操作してしまう恐れがあるためです。
     # 落ちる先は変えず、これまでどおり例外にします。
@@ -64,10 +64,10 @@ RSpec.describe 'database.yml' do
     end
   end
 
-  context 'TEST_DATABASE_URL を設定しているとき（従来どおりの動作）' do
+  describe 'TEST_DATABASE_URL を設定しているとき（従来どおりの動作）' do
     it '設定した接続先をそのまま使います' do
       with_env('TEST_DATABASE_URL' => 'postgres://example/explicit_test',
-                'DATABASE_URL' => 'postgres://example/production_only') do
+               'DATABASE_URL' => 'postgres://example/production_only') do
         config = ActiveSupport::ConfigurationFile.parse(database_yaml_path)
 
         expect(config.dig('test', 'url')).to eq('postgres://example/explicit_test')
