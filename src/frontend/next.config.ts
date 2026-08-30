@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { backendRewrites } from "./src/config/backend";
+import { SECURITY_HEADERS } from "./src/config/security-headers";
 
 /**
  * **バックエンドのドメインを隠蔽します**（CLAUDE.md）。
@@ -10,6 +11,14 @@ import { backendRewrites } from "./src/config/backend";
 const nextConfig: NextConfig = {
   async rewrites() {
     return backendRewrites();
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [...SECURITY_HEADERS],
+      },
+    ];
   },
 };
 
