@@ -20,7 +20,11 @@ development:
 
 test:
   <<: *default
-  url: <%= ENV.fetch("TEST_DATABASE_URL") %>
+  # Rails は有効な RAILS_ENV だけでなく、このファイル全体の ERB を評価してから
+  # 設定を組み立てます（`load_database_yaml`）。そのため、本番で TEST_DATABASE_URL を
+  # 渡していなくても、この節の ERB は必ず評価されます。既定値が無いと
+  # `bin/rails db:prepare` が本番コンテナの起動のたびに落ちます（issue #190）。
+  url: <%= ENV.fetch("TEST_DATABASE_URL", "postgresql://localhost/hero_prompt_forge_test") %>
 
 production:
   <<: *default

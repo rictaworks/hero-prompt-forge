@@ -116,11 +116,13 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+    # TEST_DATABASE_URL をここへ設定しません。本番は DATABASE_URL しか持ちません。
+    # 一緒に設定すると、本番で実際に起きる「TEST_DATABASE_URL が無い」状態を
+    # このジョブが一度も再現できなくなります（issue #190）。
     env:
       APP_ENV: production
       RAILS_ENV: production
       DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_production
-      TEST_DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_production
       SECRET_KEY_BASE: ci_boot_check_only_not_a_real_secret
     steps:
       - uses: actions/checkout@v4
