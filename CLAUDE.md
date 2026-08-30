@@ -226,6 +226,39 @@ issue → setting & coding → security review → add, commit, push
 - **GitHub Releases をトリガーとしてデプロイします。** Releases をトリガーに、audit & security gate をデスクトップで実施します。
 - **Railway・Vercel いずれのサービスも、GitHub の push を検知した自動デプロイ（サービス側の Source 連携）を設定しません。** デプロイは `.github/workflows/release-deploy.yml`（Release 発行がトリガー）の `railway up` / `vercel deploy --prod`、またはデスクトップからの手動実行のみで行います。**サービス側の「Connect Repo」でブランチを連携すると、CI・security-gate・タグ付けを経ないコードが push のたびに無審査で本番へ到達します**（2026-08-31、`backend` サービスの `main` 連携が実際にこの状態になっていたため切断した実績あり）。新規サービスを作る際・既存サービスの Source 設定を確認する際は、必ず GitHub 連携が外れていることを確かめます。
 
+## 監視
+
+**`requirements.md` 7.3 が要求する外形監視・通知は、2026-08-31 時点で未設置です。** 設置する際は questboard（`SPEC/ops-maintenance.md` が最も詳細）・living-site-evolver・x-follower-gate で確立済みの、次のパターンに揃えます。**監視スタックを自前で構築しません**（3リポジトリとも共通の方針）。
+
+### ヘルスチェック（実装済み）
+
+- `GET /health`（`app/controllers/health_controller.rb`）：DB到達性込みで `{"status":"ok"}` / 503 `{"status":"unavailable"}` を返す。認証なし、内部構造（テーブル名・接続先・版）を含めない
+- Railway の `backend` サービスの healthcheck パスへこの `/health` を設定する（デプロイ時にヘルスチェックが通らなければ切り替えを中止させる）
+
+### 外形監視（未設置・設置時の方針）
+
+- **UptimeRobot 無料枠を使う。作成は API ではなくダッシュボードから行う**（無料プランでは `api.uptimerobot.com/v2/newMonitor` が Cloudflare 側で 4xx を返す。読み取り系の `getMonitors` は使える）
+- **型は Keyword 監視にする**（`"status":"ok"` の有無を見る）。200 だけを見る HTTP 監視は、中身が変わっても気づけない
+- **バックエンドは隠しドメイン（`*.up.railway.app`）のまま監視サービスへ直接渡してよい。** ドメイン隠蔽は公開面（ブラウザ・利用側アプリの環境変数）の方針であり、監視サービスは対象外
+- **フロントエンド（Vercel）経由の中継だけでなく、バックエンドへ直接も監視する。** 中継だけを見ていると、中継が壊れても前段が200を返す限り緑のままになり、後段の死を検知できない（living-site-evolver の実例）
+- 5分間隔を目安にする（questboard の実例）
+
+### デプロイ失敗通知（設置時の方針）
+
+- Railway の Webhook（Slack アプリ「Railway Alerts」、権限は `incoming-webhook` のみ）で `Deployment Failed` / `Deployment Crashed` を通知する
+- Webhook URL は Railway 側にのみ保持し、リポジトリへ置かない
+
+### 7.3 が要求するその他のアラート（未実装）
+
+- LLM ジョブ（`GeneratePromptJob`）の失敗率・縮退モード発生
+- X API のエラー率・フォロワーキャッシュの差分取得失敗
+
+いずれも questboard の日次 CI（`workflow_dispatch` の `alert_drill` で手動発火できる Slack 通知）と同型で実装できる。**設定しただけでは動いている保証にならないため、実装時は発火試験の手段も必ず用意する。**
+
+### 通知先
+
+`ENV/PRODUCTION.md`（未作成。追跡対象外のため新規作成が必要）に、通知先・受け取った側の一次対応手順を明記する。questboard の例（`SPEC/ops-maintenance.md`）にならい、「障害の種別 → 通知先」の対応表を書く。
+
 ## リリース・バージョン
 
 - バージョン番号は **メジャー2桁.マイナー2桁.デバッグ2桁**、初期値は **`01.01.00`** です。
