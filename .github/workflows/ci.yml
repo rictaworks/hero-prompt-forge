@@ -36,9 +36,9 @@ jobs:
       DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_test
       TEST_DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 branch, 2026-08-31時点
         with:
           working-directory: src/backend
           bundler-cache: true
@@ -69,9 +69,9 @@ jobs:
       BACKEND_INTERNAL_URL: http://backend.invalid
       NEXT_PUBLIC_BASE_URL: http://frontend.invalid
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -125,9 +125,9 @@ jobs:
       DATABASE_URL: postgres://hero:hero_ci_only@localhost:5432/hero_prompt_forge_production
       SECRET_KEY_BASE: ci_boot_check_only_not_a_real_secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 branch, 2026-08-31時点
         with:
           working-directory: src/backend
           bundler-cache: true
@@ -154,9 +154,9 @@ jobs:
     name: 開発フックの検査
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -173,9 +173,9 @@ jobs:
     name: ハードコードの検査
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -223,14 +223,14 @@ jobs:
       BACKEND_INTERNAL_URL: http://localhost:3001
       E2E_BASE_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1 branch, 2026-08-31時点
         with:
           working-directory: src/backend
           bundler-cache: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
