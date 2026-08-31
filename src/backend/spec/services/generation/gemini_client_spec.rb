@@ -275,8 +275,9 @@ RSpec.describe Generation::GeminiClient do
       expect(sent.last.uri.host).to eq('example.invalid')
     end
 
-    # **追跡（LangSmith）を有効にしません。** 磨く対象の英文が第三者の保管先へ渡ります。
-    it '追跡の設定を持ちません' do
+    # **langchainrb 組み込みの追跡は使いません。** 独自の LangsmithLogger を
+    # 経由します（issue #200）。
+    it 'LangChain 組み込みの追跡設定を持ちません' do
       expect(ENV.fetch('LANGCHAIN_TRACING_V2', nil)).to be_blank
     end
 
@@ -294,6 +295,56 @@ RSpec.describe Generation::GeminiClient do
       expect { refine }.to raise_error(described_class::RequestFailedError) { |error|
         expect(error.message).not_to include('ひみつ')
       }
+    end
+  end
+
+  # **LangSmith への記録**（issue #200）。この持ち場は本業を止めません。
+  describe 'LangSmith への記録' do
+    def with_langsmith_key(value)
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with(Generation::LangsmithLogger::API_KEY_VARIABLE).and_return(value)
+    end
+
+    it '成功したら記録します' do
+      with_langsmith_key('langsmith-key')
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      stub_request(:post, Generation::LangsmithLogger::ENDPOINT).to_return(status: 200, body: '{}')
+      allow(Generation::LangsmithLogger).to receive(:log_success).and_call_original
+
+      refine
+
+      expect(Generation::LangsmithLogger).to have_received(:log_success)
+        .with(hash_including(lines: lines, refined: %w[first]))
+    end
+
+    it '失敗したら記録します' do
+      with_langsmith_key('langsmith-key')
+      stub_request(:post, endpoint).to_return(status: 503, body: '')
+      stub_request(:post, Generation::LangsmithLogger::ENDPOINT).to_return(status: 200, body: '{}')
+      allow(Generation::LangsmithLogger).to receive(:log_failure).and_call_original
+
+      expect { refine }.to raise_error(described_class::RequestFailedError)
+      expect(Generation::LangsmithLogger).to have_received(:log_failure)
+        .with(hash_including(lines: lines))
+    end
+
+    # **LangSmith への送信が落ちても、生成そのものは失敗しません。**
+    it 'LangSmithへの送信が失敗しても、結果を返します' do
+      with_langsmith_key('langsmith-key')
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      stub_request(:post, Generation::LangsmithLogger::ENDPOINT).to_raise(SocketError)
+
+      expect(refine).to eq(%w[first])
+    end
+
+    it '鍵が無ければ記録しません' do
+      with_langsmith_key(nil)
+      stub_request(:post, endpoint).to_return(status: 200, body: answer('first'))
+      langsmith_stub = stub_request(:post, Generation::LangsmithLogger::ENDPOINT)
+
+      refine
+
+      expect(langsmith_stub).not_to have_been_requested
     end
   end
 end
