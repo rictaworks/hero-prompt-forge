@@ -21,10 +21,11 @@ module Generation
   #
   # **待ち続けません。** 越えたら失敗させ、縮退（issue #53）へ回します。
   #
-  # **追跡（LangSmith）を有効にしません。** 有効にすると、磨く対象の英文が
-  # 第三者の保管先へ渡ります。**送る内容と保管期間を決めるまで、使いません**
-  # （issue #160 の受け入れ条件）。判断は `SPEC/api/README.md` ではなく、
-  # プライバシーポリシー（issue #171）の側で扱います。
+  # **追跡（LangSmith）を行います**（issue #200）。 送るのは、Gemini へ
+  # 実際に送るのと同じ内容（指示文・磨く対象の英文・返ってきた英文）だけです。
+  # 利用者を識別できる情報は送りません。プライバシーポリシー・利用規約に
+  # 開示済みです。`LANGSMITH_API_KEY` が無ければ送信しません
+  # （`Generation::LangsmithLogger`）。
   class GeminiClient
     # API キーが環境変数にない場合に投げます。
     class MissingApiKeyError < StandardError; end
@@ -65,12 +66,30 @@ module Generation
     # @param lines [Array<String>] 磨く対象の英文です
     # @return [Array<String>]
     def refine(instruction:, lines:)
-      traced(lines) { parse(completion(instruction, lines)) }
+      started_at = Time.current
+      refined = traced(lines) { parse(completion(instruction, lines)) }
+      log_success(instruction, lines, refined, started_at)
+      refined
+    rescue RequestFailedError => e
+      log_failure(instruction, lines, started_at, e)
+      raise
     end
 
     private
 
     attr_reader :settings
+
+    def log_success(instruction, lines, refined, started_at)
+      LangsmithLogger.log_success(instruction: instruction, lines: lines, refined: refined,
+                                  model: settings.fetch('model'), started_at: started_at,
+                                  finished_at: Time.current)
+    end
+
+    def log_failure(instruction, lines, started_at, error)
+      LangsmithLogger.log_failure(instruction: instruction, lines: lines,
+                                  model: settings.fetch('model'), started_at: started_at,
+                                  finished_at: Time.current, error: error)
+    end
 
     def traced(lines, &)
       Trace.step('generation.llm_requested',
